@@ -191,6 +191,34 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .stat-card.highlight .delta.up   { color: #6ee7b7; }
 .stat-card.highlight .delta.down { color: #fca5a5; }
 
+/* ── Monthly goal card ───────────────────── */
+.goal-card { background: linear-gradient(135deg, #5b6af0 0%, #7c5cf0 100%); color: #fff; border: none; }
+.goal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.goal-card h2 { color: #fff; }
+.goal-month { font-size: 12px; color: rgba(255,255,255,0.8); }
+.goal-edit { display: flex; align-items: center; gap: 6px; }
+.goal-prefix { color: rgba(255,255,255,0.8); font-weight: 600; }
+.goal-input {
+  width: 110px; padding: 7px 10px; border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.15);
+  color: #fff; font-size: 14px; font-weight: 600;
+}
+.goal-input::placeholder { color: rgba(255,255,255,0.6); }
+.btn-primary.sm { padding: 7px 14px; font-size: 13px; }
+.goal-card .btn-primary.sm { background: #fff; color: var(--accent); }
+.goal-figures { display: flex; align-items: baseline; gap: 8px; margin: 18px 0 12px; flex-wrap: wrap; }
+.goal-current { font-size: 34px; font-weight: 700; line-height: 1; }
+.goal-of { font-size: 14px; color: rgba(255,255,255,0.7); }
+.goal-target { font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.9); }
+.goal-pct { margin-left: auto; font-size: 22px; font-weight: 700; }
+.goal-pct.done { color: #6ee7b7; }
+.goal-bar-wrap { height: 12px; border-radius: 6px; background: rgba(255,255,255,0.2); overflow: hidden; }
+.goal-bar { height: 100%; border-radius: 6px; background: #fff; transition: width 0.6s ease; }
+.goal-bar.done { background: #6ee7b7; }
+.goal-meta { margin-top: 12px; font-size: 13px; color: rgba(255,255,255,0.92); }
+.goal-meta strong { color: #fff; }
+.goal-card .delta.up { color: #6ee7b7; }
+
 /* Section divider heading inside a tab */
 .section-divider {
   font-size: 14px; font-weight: 600; color: var(--sub);

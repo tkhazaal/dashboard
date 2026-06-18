@@ -50,6 +50,7 @@ const state = {
   pathSearch:  '',
   pathRole:    'any',
   pathMin:     0,
+  monthlyGoal: 0,
 
   // Cached raw SamCart data (for client-side filtering)
   scData:      null,
@@ -193,6 +194,7 @@ function buildRevenueChart(monthly) {
 
 function renderSalesAnalytics(d) {
   if (!d) return;
+  renderGoal();
   $('sa-revenue').textContent   = fmtMoney(d.totalRevenue);
   $('sa-orders').textContent    = fmtNum(d.totalOrders);
   $('sa-aov').textContent       = fmtMoneyFull(d.avgOrderValue);
@@ -480,9 +482,66 @@ async function loadSettings() {
   const form = $('settingsForm');
   if (s.site_name)   form.site_name.value   = s.site_name;
   if (s.tracker_url) form.tracker_url.value = s.tracker_url;
+  if (s.monthly_goal) { form.monthly_goal.value = s.monthly_goal; $('goal-input').value = s.monthly_goal; }
   if (s.samcart_api_key_masked) $('apiKeyMasked').textContent = 'Current key: ' + s.samcart_api_key_masked;
+  state.monthlyGoal = parseFloat(s.monthly_goal) || 0;
   updateTrackingCode(s.tracker_url || 'http://localhost:3000');
+  renderGoal();
 }
+
+// ── Monthly goal progress ─────────────────────────────────────────
+function renderGoal() {
+  const goal = state.monthlyGoal || 0;
+  const mtd  = state.scData?.monthToDate;
+  const current = mtd?.revenue || 0;
+
+  // Current month label
+  const now = new Date();
+  $('goal-month').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  $('goal-current').textContent = fmtMoney(current);
+  $('goal-target').textContent  = goal ? fmtMoney(goal) : 'no goal set';
+
+  if (!goal) {
+    $('goal-pct').textContent = '';
+    $('goal-bar').style.width = '0%';
+    $('goal-meta').textContent = 'Set a monthly goal to track progress.';
+    return;
+  }
+
+  const pctVal = Math.min(100, Math.round((current / goal) * 1000) / 10);
+  const reached = current >= goal;
+  $('goal-pct').textContent = pctVal + '%';
+  $('goal-pct').className = 'goal-pct ' + (reached ? 'done' : '');
+  $('goal-bar').style.width = pctVal + '%';
+  $('goal-bar').className = 'goal-bar' + (reached ? ' done' : '');
+
+  // Days left in month + pace needed
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const daysLeft = Math.max(0, daysInMonth - now.getDate());
+  const remaining = Math.max(0, goal - current);
+
+  if (reached) {
+    $('goal-meta').innerHTML = `<span class="delta up">🎉 Goal reached!</span> ${fmtMoney(current - goal)} over target with ${daysLeft} days to spare.`;
+  } else {
+    const perDay = daysLeft > 0 ? remaining / daysLeft : remaining;
+    $('goal-meta').innerHTML = `<strong>${fmtMoney(remaining)}</strong> to go · ${daysLeft} day${daysLeft!==1?'s':''} left · need <strong>${fmtMoney(Math.round(perDay))}/day</strong> to hit target`;
+  }
+}
+
+async function saveGoal(value) {
+  const goal = parseFloat(value) || 0;
+  state.monthlyGoal = goal;
+  $('settingsForm').monthly_goal.value = goal || '';
+  renderGoal();
+  await fetch('/api/settings', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ monthly_goal: String(goal) })
+  });
+}
+
+$('goal-save').addEventListener('click', () => saveGoal($('goal-input').value));
+$('goal-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveGoal($('goal-input').value); });
 
 function updateTrackingCode(baseUrl) {
   $('trackingCode').textContent = `<!-- Metric Tracking Dashboard -->\n<script async src="${baseUrl}/t.js"><\/script>`;
@@ -496,6 +555,11 @@ $('settingsForm').addEventListener('submit', async e => {
     $('settingsSaved').textContent = '✓ Settings saved.';
     setTimeout(() => { $('settingsSaved').textContent = ''; }, 3000);
     updateTrackingCode(body.tracker_url || 'http://localhost:3000');
+    if (body.monthly_goal !== undefined) {
+      state.monthlyGoal = parseFloat(body.monthly_goal) || 0;
+      $('goal-input').value = state.monthlyGoal || '';
+      renderGoal();
+    }
     if (body.samcart_api_key) loadSamCart(true);
   }
 });

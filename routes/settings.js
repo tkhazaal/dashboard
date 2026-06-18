@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const allowed = ['site_name', 'tracker_url', 'samcart_api_key'];
+    const allowed = ['site_name', 'tracker_url', 'samcart_api_key', 'monthly_goal'];
     const updates = [];
 
     for (const key of allowed) {

@@ -37,8 +37,9 @@ CREATE TABLE IF NOT EXISTS settings (
 
 INSERT INTO settings (key, value)
 VALUES
-  ('site_name',   'My Dashboard'),
-  ('tracker_url', 'http://localhost:3000')
+  ('site_name',    'My Dashboard'),
+  ('tracker_url',  'http://localhost:3000'),
+  ('monthly_goal', '80000')
 ON CONFLICT (key) DO NOTHING;
 
 
