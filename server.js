@@ -13,9 +13,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Serve the embeddable tracking script
-app.get('/t.js', (req, res) => {
-  const row = db.prepare(`SELECT value FROM settings WHERE key = 'tracker_url'`).get();
-  const baseUrl = row?.value || `http://localhost:${PORT}`;
+app.get('/t.js', async (req, res) => {
+  let baseUrl = `http://localhost:${PORT}`;
+  try {
+    const { data } = await db.from('settings').select('value').eq('key', 'tracker_url').single();
+    if (data?.value) baseUrl = data.value;
+  } catch (e) { /* fall back to default */ }
+  baseUrl = baseUrl.replace(/\/+$/, ''); // strip trailing slashes
 
   res.setHeader('Content-Type', 'application/javascript');
   res.setHeader('Cache-Control', 'public, max-age=3600');
