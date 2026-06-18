@@ -100,6 +100,28 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .sync-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
 .sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.refresh-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 14px;
+  margin-bottom: 8px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.refresh-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.refresh-btn:hover { filter: brightness(1.1); }
+.refresh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.refresh-btn.spinning svg { animation: spin 0.8s linear infinite; }
+
 .sync-status { font-size: 11px; color: var(--sidebar-text); text-align: center; margin-top: 8px; min-height: 14px; }
 
 /* ── Main ───────────────────────────────── */
@@ -522,7 +544,7 @@ tbody tr:hover { background: #fafbff; }
   .sidebar { width: 60px; min-width: 60px; }
   .sidebar-logo span, .nav-item span, .sync-btn span { display: none; }
   .nav-item { justify-content: center; }
-  .sync-btn { padding: 9px; }
+  .sync-btn, .refresh-btn { padding: 9px; }
   .tab { padding: 20px 16px 40px; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
 }

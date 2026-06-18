@@ -515,18 +515,34 @@ $('path-clear').addEventListener('click', () => {
 });
 
 // ── Boot ──────────────────────────────────────────────────────────
-async function init() {
+async function refreshAll(force = false) {
   await Promise.allSettled([
     loadOverviewStats(state.ovDays),
     loadTrend(state.trendDays),
     loadPagesTable(),
-    loadLiveFeed(),
-    loadSamCart(),
+    loadLiveFeed($('feedSearch').value.trim()),
+    loadSamCart(force),
     loadSettings(),
   ]);
 }
 
-init();
+$('refreshBtn').addEventListener('click', async () => {
+  const btn = $('refreshBtn');
+  btn.disabled = true;
+  btn.classList.add('spinning');
+  $('syncStatus').textContent = 'Refreshing…';
+  try {
+    await refreshAll(true);
+    $('syncStatus').textContent = 'Refreshed ' + new Date().toLocaleTimeString();
+  } catch (err) {
+    $('syncStatus').textContent = 'Error: ' + err.message.slice(0, 60);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('spinning');
+  }
+});
+
+refreshAll();
 
 // Auto-refresh live feed every 30s
 setInterval(() => loadLiveFeed($('feedSearch').value.trim()), 30000);
