@@ -1,5 +1,10 @@
+// Polyfill WebSocket for Node < 22 (supabase-js v2 requires it at createClient time).
+// Must run BEFORE @supabase/supabase-js is loaded.
+if (typeof globalThis.WebSocket === 'undefined') {
+  globalThis.WebSocket = require('ws');
+}
+
 const { createClient } = require('@supabase/supabase-js');
-const ws = require('ws');
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_KEY;
@@ -11,7 +16,6 @@ if (!url || !key) {
 
 const supabase = createClient(url, key, {
   auth: { persistSession: false },
-  realtime: { transport: ws },
 });
 
 // Test connection on startup
