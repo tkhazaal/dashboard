@@ -25,59 +25,67 @@ async function setCache(key, payload) {
   );
 }
 
-async function fetchAllPages(path, apiKey) {
+const SC_HEADERS = apiKey => ({ 'sc-api': apiKey, 'Accept': 'application/json' });
+
+// Cursor-paginated fetch — follows pagination.next until exhausted.
+async function fetchAllOrders(apiKey, { maxPages = 300, onProgress } = {}) {
   const all = [];
-  let page = 1;
+  let url   = `${BASE_URL}/orders?per_page=100`;
+  let pages = 0;
 
-  while (true) {
-    const url  = `${BASE_URL}${path}?per_page=100&page=${page}`;
-    const resp = await fetch(url, {
-      headers: { 'Authorization': apiKey, 'Accept': 'application/json' },
-      timeout: 30000,
-    });
-
+  while (url && pages < maxPages) {
+    const resp = await fetch(url, { headers: SC_HEADERS(apiKey), timeout: 30000 });
     if (!resp.ok) {
       const txt = await resp.text();
       throw new Error(`SamCart API ${resp.status}: ${txt.slice(0, 200)}`);
     }
-
     const json = await resp.json();
-
-    if (Array.isArray(json)) { all.push(...json); break; }
-    if (json.data) {
-      all.push(...json.data);
-      const meta = json.meta || {};
-      if ((meta.current_page || page) >= (meta.last_page || 1)) break;
-      page++;
-    } else {
-      all.push(...(Object.values(json).find(v => Array.isArray(v)) || []));
-      break;
-    }
-    if (page > 200) break;
+    const data = Array.isArray(json) ? json : (json.data || []);
+    all.push(...data);
+    pages++;
+    if (onProgress) onProgress(all.length);
+    url = json.pagination && json.pagination.next ? json.pagination.next : null;
   }
   return all;
 }
 
-function computeMetrics(orders) {
+// Fetch a single customer's name/email by id (for top-customer enrichment).
+async function fetchCustomer(id, apiKey) {
+  try {
+    const resp = await fetch(`${BASE_URL}/customers/${id}`, { headers: SC_HEADERS(apiKey), timeout: 15000 });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch { return null; }
+}
+
+// Primary product of an order = first non-upsell cart item (fallback: first item).
+function orderProduct(o) {
+  const items = o.cart_items || [];
+  const main  = items.find(it => !it.upsell_id) || items[0];
+  return (main && main.product_name) || 'Unknown Product';
+}
+
+async function computeMetrics(orders, apiKey) {
   const custMap = new Map();
 
   for (const o of orders) {
-    const email   = (o.customer_email || o.email || '').toLowerCase().trim();
-    const name    = o.customer_name || o.full_name || `${o.first_name||''} ${o.last_name||''}`.trim() || 'Unknown';
-    const amount  = parseFloat(o.total_price || o.total || o.amount || 0);
-    const product = o.product_name || o.product?.name || o.item_name || 'Unknown Product';
-    const date    = o.created_at || o.order_date || o.date || null;
+    if (o.test_mode) continue;                         // exclude sandbox/test orders
+    const cid = o.customer_id;
+    if (cid == null) continue;
 
-    if (!email) continue;
-    if (!custMap.has(email)) custMap.set(email, { email, name, orders: [], products: new Set(), ltv: 0 });
-    const c = custMap.get(email);
+    const amount  = (parseFloat(o.total) || 0) / 100;  // SamCart amounts are in cents
+    const date    = o.order_date || null;
+    const product = orderProduct(o);
+
+    if (!custMap.has(cid)) custMap.set(cid, { cid, orders: [], products: new Set(), ltv: 0 });
+    const c = custMap.get(cid);
     c.orders.push({ amount, product, date });
-    c.products.add(product);
+    (o.cart_items || []).forEach(it => { if (it.product_name) c.products.add(it.product_name); });
     c.ltv += amount;
   }
 
   const customers = [...custMap.values()].map(c => ({
-    email: c.email, name: c.name,
+    cid: c.cid,
     orders: c.orders.length, products: c.products.size,
     ltv: Math.round(c.ltv * 100) / 100,
     orderList: c.orders,
@@ -126,22 +134,75 @@ function computeMetrics(orders) {
 
   const productPaths = [...pathMap.entries()]
     .map(([k, count]) => { const [first, second] = k.split('|||'); return { first, second, count }; })
+    .filter(p => p.first !== p.second)
     .sort((a, b) => b.count - a.count).slice(0, 10);
 
-  const topCustomers = [...customers]
-    .sort((a, b) => b.ltv - a.ltv).slice(0, 20)
-    .map(({ orderList, ...rest }) => rest);
+  // Top customers — enrich the top 20 with real names/emails from /customers/{id}
+  const topRaw = [...customers].sort((a, b) => b.ltv - a.ltv).slice(0, 20);
+  const topCustomers = await Promise.all(topRaw.map(async c => {
+    const info = await fetchCustomer(c.cid, apiKey);
+    const name = info ? `${info.first_name||''} ${info.last_name||''}`.trim() : '';
+    return {
+      name:  name || `Customer #${c.cid}`,
+      email: info?.email || '',
+      orders: c.orders, products: c.products, ltv: c.ltv,
+    };
+  }));
+
+  // ── Monthly revenue trend (last 12 months) ──────────────────────
+  const monthMap = new Map();
+  for (const c of customers) {
+    for (const o of c.orderList) {
+      if (!o.date) continue;
+      const m = String(o.date).slice(0, 7); // YYYY-MM
+      if (!monthMap.has(m)) monthMap.set(m, { revenue: 0, orders: 0 });
+      const e = monthMap.get(m);
+      e.revenue += o.amount; e.orders++;
+    }
+  }
+  const monthly = [...monthMap.entries()]
+    .sort((a, b) => a[0] < b[0] ? -1 : 1)
+    .slice(-12)
+    .map(([month, v]) => ({ month, revenue: Math.round(v.revenue * 100) / 100, orders: v.orders }));
+
+  // Month-over-month comparison (last full month vs prior)
+  let momRevenue = null, momOrders = null;
+  if (monthly.length >= 2) {
+    const cur = monthly[monthly.length - 1], prev = monthly[monthly.length - 2];
+    momRevenue = prev.revenue ? Math.round(((cur.revenue - prev.revenue) / prev.revenue) * 1000) / 10 : null;
+    momOrders  = prev.orders  ? Math.round(((cur.orders  - prev.orders ) / prev.orders ) * 1000) / 10 : null;
+  }
+
+  // ── Top products by revenue ─────────────────────────────────────
+  const prodMap = new Map();
+  for (const c of customers) {
+    for (const o of c.orderList) {
+      if (!prodMap.has(o.product)) prodMap.set(o.product, { revenue: 0, units: 0 });
+      const e = prodMap.get(o.product);
+      e.revenue += o.amount; e.units++;
+    }
+  }
+  const topProducts = [...prodMap.entries()]
+    .map(([name, v]) => ({ name, revenue: Math.round(v.revenue * 100) / 100, units: v.units }))
+    .sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+
+  const totalOrders = customers.reduce((s, c) => s + c.orders, 0);
 
   return {
     totalCustomers: total,
     totalRevenue:   Math.round(revenue * 100) / 100,
+    totalOrders,
+    avgOrderValue:  totalOrders ? Math.round((revenue / totalOrders) * 100) / 100 : 0,
     avgLtv:         Math.round(avgLtv * 100) / 100,
     medianLtv:      Math.round(medianLtv * 100) / 100,
     repeatBuyers:   repeats.length,
     singleBuyers:   total - repeats.length,
+    repeatRate:     total ? Math.round((repeats.length / total) * 1000) / 10 : 0,
+    avgOrdersPerCustomer: total ? Math.round((totalOrders / total) * 100) / 100 : 0,
     funnelBuyers:   funnelCount,
     ecosystemBuyers: ecosystemCount,
-    tiers: TIERS, topCustomers, productPaths,
+    momRevenue, momOrders,
+    tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
   };
 }
 
@@ -190,30 +251,33 @@ router.get('/data', async (req, res) => {
   const KEY   = 'samcart_metrics';
 
   try {
+    // Serve cache if present (unless forced)
     if (!force) {
       const cached = await getCached(KEY);
       if (cached) return res.json({ ...cached, fromCache: true });
     }
 
     const apiKey = await getApiKey();
-    if (!apiKey) return res.status(400).json({ error: 'No SamCart API key configured. Go to Settings.' });
+    if (!apiKey) return res.json({ ...DEMO_DATA, syncedAt: new Date().toISOString(), note: 'No API key configured' });
+
+    // A full crawl is slow (~130 pages); only do it when forced (Sync button).
+    // Otherwise serve stale cache or demo so the dashboard stays responsive.
+    if (!force) {
+      const { data: stale } = await supabase.from('samcart_cache').select('data').eq('cache_key', KEY).single();
+      if (stale) { try { return res.json({ ...JSON.parse(stale.data), fromCache: true }); } catch {} }
+      return res.json({ ...DEMO_DATA, syncedAt: new Date().toISOString(), note: 'Click “Sync SamCart” to pull live data' });
+    }
 
     try {
-      const orders  = await fetchAllPages('/orders', apiKey);
-      const metrics = computeMetrics(orders);
+      const orders  = await fetchAllOrders(apiKey);
+      const metrics = await computeMetrics(orders, apiKey);
       const payload = { ...metrics, syncedAt: new Date().toISOString(), orderCount: orders.length };
       await setCache(KEY, payload);
       return res.json({ ...payload, fromCache: false });
     } catch (apiErr) {
       console.error('SamCart API error:', apiErr.message);
-
-      // Try stale cache first
       const { data: stale } = await supabase.from('samcart_cache').select('data').eq('cache_key', KEY).single();
-      if (stale) {
-        try { return res.json({ ...JSON.parse(stale.data), fromCache: true, stale: true }); } catch {}
-      }
-
-      // Fall back to demo data
+      if (stale) { try { return res.json({ ...JSON.parse(stale.data), fromCache: true, stale: true }); } catch {} }
       return res.json({ ...DEMO_DATA, syncedAt: new Date().toISOString(), apiError: apiErr.message });
     }
   } catch (err) {
@@ -221,17 +285,33 @@ router.get('/data', async (req, res) => {
   }
 });
 
-router.post('/sync', async (req, res) => {
+// Background sync — a full crawl takes minutes, so run it detached and let
+// the dashboard poll /sync/status. Avoids reverse-proxy request timeouts.
+let syncState = { running: false, startedAt: null, finishedAt: null, orderCount: 0, error: null };
+
+async function runSync(apiKey) {
+  syncState = { running: true, startedAt: new Date().toISOString(), finishedAt: null, orderCount: 0, error: null };
   try {
-    const apiKey = await getApiKey();
-    if (!apiKey) return res.status(400).json({ error: 'No SamCart API key configured.' });
-    const orders  = await fetchAllPages('/orders', apiKey);
-    const metrics = computeMetrics(orders);
+    const orders  = await fetchAllOrders(apiKey, { onProgress: n => { syncState.orderCount = n; } });
+    const metrics = await computeMetrics(orders, apiKey);
     await setCache('samcart_metrics', { ...metrics, syncedAt: new Date().toISOString(), orderCount: orders.length });
-    res.json({ success: true, orderCount: orders.length, syncedAt: new Date().toISOString() });
+    syncState.finishedAt = new Date().toISOString();
   } catch (err) {
-    res.status(502).json({ error: err.message });
+    syncState.error = err.message;
+    console.error('SamCart sync failed:', err.message);
+  } finally {
+    syncState.running = false;
   }
+}
+
+router.post('/sync', async (req, res) => {
+  const apiKey = await getApiKey();
+  if (!apiKey) return res.status(400).json({ error: 'No SamCart API key configured.' });
+  if (syncState.running) return res.json({ started: false, running: true, orderCount: syncState.orderCount });
+  runSync(apiKey); // fire-and-forget
+  res.json({ started: true, running: true });
 });
+
+router.get('/sync/status', (req, res) => res.json(syncState));
 
 module.exports = router;
