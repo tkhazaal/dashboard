@@ -36,6 +36,26 @@ async function api(path) {
   return r.json();
 }
 
+// ── Theme (light / dark) ──────────────────────────────────────────
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const label = $('themeLabel');
+  if (label) label.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+  try { localStorage.setItem('_mtd_theme', theme); } catch {}
+}
+function initTheme() {
+  let saved;
+  try { saved = localStorage.getItem('_mtd_theme'); } catch {}
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+  const btn = $('themeBtn');
+  if (btn) btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+  });
+}
+initTheme();
+
 // ── State ─────────────────────────────────────────────────────────
 const state = {
   ovDays:      30,
@@ -122,7 +142,7 @@ function buildTrendChart(rows) {
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9ca3af', maxTicksLimit: 12 } },
-        y: { grid: { color: '#f0f0f5' }, ticks: { font: { size: 11 }, color: '#9ca3af' }, beginAtZero: true }
+        y: { grid: { color: 'rgba(148,163,184,0.18)' }, ticks: { font: { size: 11 }, color: '#9ca3af' }, beginAtZero: true }
       }
     }
   });
@@ -185,7 +205,7 @@ function buildRevenueChart(monthly) {
       },
       scales: {
         x:  { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9ca3af' } },
-        y:  { position: 'left',  grid: { color: '#f0f0f5' }, ticks: { font: { size: 11 }, color: '#9ca3af', callback: v => '$' + (v >= 1000 ? (v/1000)+'k' : v) }, beginAtZero: true },
+        y:  { position: 'left',  grid: { color: 'rgba(148,163,184,0.18)' }, ticks: { font: { size: 11 }, color: '#9ca3af', callback: v => '$' + (v >= 1000 ? (v/1000)+'k' : v) }, beginAtZero: true },
         y1: { position: 'right', grid: { display: false },   ticks: { font: { size: 11 }, color: '#10b981' }, beginAtZero: true }
       }
     }
