@@ -82,7 +82,19 @@ function initDateBtns(groupId, onSelect) {
 }
 
 // ── Charts ────────────────────────────────────────────────────────
-let trendChart, buyerSplitChart;
+let trendChart, buyerSplitChart, revenueChart;
+
+// Month-over-month delta badge (green up / red down)
+function monthName(key) {
+  if (!key) return '';
+  const [y, m] = key.split('-');
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' });
+}
+function momHtml(val, suffix) {
+  if (val == null || isNaN(val)) return '';
+  const up = val >= 0;
+  return `<span class="delta ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${Math.abs(val)}%</span> ${suffix || 'vs prior month'}`;
+}
 
 function buildTrendChart(rows) {
   const ctx = $('trendChart');
@@ -142,6 +154,69 @@ function buildBuyerSplitChart(single, repeat) {
       <div class="legend-item"><div class="legend-dot" style="background:#e8eaf0;border:1px solid #d1d5db"></div>Single (${fmtNum(single)})</div>
     `;
   }
+}
+
+function buildRevenueChart(monthly) {
+  const ctx = $('revenueChart');
+  if (!ctx) return;
+  if (revenueChart) revenueChart.destroy();
+  const rows = monthly || [];
+
+  const labels = rows.map(r => {
+    const [y, m] = r.month.split('-');
+    return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  });
+
+  revenueChart = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar',  label: 'Revenue', data: rows.map(r=>r.revenue), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 4, yAxisID: 'y',  order: 2 },
+        { type: 'line', label: 'Orders',  data: rows.map(r=>r.orders),  borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.4, pointRadius: 3, yAxisID: 'y1', order: 1 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'bottom', labels: { font: { size: 11 }, color: '#6b7280', boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Revenue' ? ` Revenue: ${fmtMoney(ctx.raw)}` : ` Orders: ${fmtNum(ctx.raw)}` } }
+      },
+      scales: {
+        x:  { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9ca3af' } },
+        y:  { position: 'left',  grid: { color: '#f0f0f5' }, ticks: { font: { size: 11 }, color: '#9ca3af', callback: v => '$' + (v >= 1000 ? (v/1000)+'k' : v) }, beginAtZero: true },
+        y1: { position: 'right', grid: { display: false },   ticks: { font: { size: 11 }, color: '#10b981' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderSalesAnalytics(d) {
+  if (!d) return;
+  $('sa-revenue').textContent   = fmtMoney(d.totalRevenue);
+  $('sa-orders').textContent    = fmtNum(d.totalOrders);
+  $('sa-aov').textContent       = fmtMoneyFull(d.avgOrderValue);
+  $('sa-repeatRate').textContent= (d.repeatRate != null ? d.repeatRate + '%' : '—');
+  const momSuffix = d.momLabel ? `(${monthName(d.momLabel)} vs prior)` : 'vs prior month';
+  $('sa-revenueMom').innerHTML  = momHtml(d.momRevenue, momSuffix);
+  $('sa-ordersMom').innerHTML   = momHtml(d.momOrders, momSuffix);
+  $('sa-ordersPerCust').textContent = d.avgOrdersPerCustomer ? `${d.avgOrdersPerCustomer} orders / customer` : '';
+
+  const months = d.monthly || [];
+  $('sa-trendRange').textContent = months.length ? `${months.length} months` : '';
+  buildRevenueChart(months);
+
+  const prods = d.topProducts || [];
+  $('topProductsTable').innerHTML = prods.length === 0
+    ? `<tr class="empty-row"><td colspan="4">No product data yet — click Sync SamCart.</td></tr>`
+    : prods.map((p, i) => `
+        <tr>
+          <td class="rank">${i + 1}</td>
+          <td class="name-cell">${escHtml(p.name)}</td>
+          <td>${fmtNum(p.units)}</td>
+          <td class="ltv-cell">${fmtMoney(p.revenue)}</td>
+        </tr>
+      `).join('');
 }
 
 // ── Analytics loaders ─────────────────────────────────────────────
@@ -263,7 +338,9 @@ async function loadSamCart(force = false) {
   // Overview
   $('ov-totalCustomers').textContent = fmtNum(data.totalCustomers);
   $('ov-totalRevenue').textContent   = fmtMoney(data.totalRevenue);
-  $('ov-avgLtv').textContent         = `Avg LTV: ${fmtMoneyFull(data.avgLtv)}`;
+  $('ov-avgLtv').innerHTML           = data.momRevenue != null
+    ? momHtml(data.momRevenue)
+    : `Avg LTV: ${fmtMoneyFull(data.avgLtv)}`;
 
   if (data.syncedAt) {
     const label = data.isDemo ? 'Demo data — update API key in Settings' :
@@ -275,6 +352,7 @@ async function loadSamCart(force = false) {
   }
 
   buildBuyerSplitChart(data.singleBuyers, data.repeatBuyers);
+  renderSalesAnalytics(data);
   renderCustomers();
   renderTiers(data.tiers);
   renderBehaviour(data);
@@ -432,13 +510,29 @@ $('copyCodeBtn').addEventListener('click', () => {
 // ── Sync button ───────────────────────────────────────────────────
 $('syncBtn').addEventListener('click', async () => {
   $('syncBtn').disabled = true;
-  $('syncStatus').textContent = 'Syncing…';
+  $('syncStatus').textContent = 'Starting sync…';
   try {
     const r = await fetch('/api/samcart/sync', { method: 'POST' });
     const j = await r.json();
     if (j.error) throw new Error(j.error);
-    $('syncStatus').textContent = `Synced ${fmtNum(j.orderCount)} orders`;
-    await loadSamCart();
+
+    // Background sync — poll status until it finishes (full crawl takes minutes)
+    await new Promise((resolve) => {
+      const poll = setInterval(async () => {
+        try {
+          const s = await api('/api/samcart/sync/status');
+          if (s.running) {
+            $('syncStatus').textContent = `Syncing… ${fmtNum(s.orderCount)} orders`;
+          } else {
+            clearInterval(poll);
+            if (s.error) $('syncStatus').textContent = 'Error: ' + s.error.slice(0, 50);
+            else         $('syncStatus').textContent = `Synced ${fmtNum(s.orderCount)} orders ✓`;
+            await loadSamCart(true);
+            resolve();
+          }
+        } catch { /* keep polling */ }
+      }, 3000);
+    });
   } catch (err) {
     $('syncStatus').textContent = 'Error: ' + err.message.slice(0, 60);
   } finally {

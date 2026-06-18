@@ -165,12 +165,17 @@ async function computeMetrics(orders, apiKey) {
     .slice(-12)
     .map(([month, v]) => ({ month, revenue: Math.round(v.revenue * 100) / 100, orders: v.orders }));
 
-  // Month-over-month comparison (last full month vs prior)
-  let momRevenue = null, momOrders = null;
-  if (monthly.length >= 2) {
-    const cur = monthly[monthly.length - 1], prev = monthly[monthly.length - 2];
+  // Month-over-month — compare the two most-recent COMPLETED months.
+  // The current calendar month is partial, so including it understates growth.
+  const curMonthKey = new Date().toISOString().slice(0, 7);
+  const completedMonths = monthly.filter(m => m.month !== curMonthKey);
+  const monthToDate = monthly.find(m => m.month === curMonthKey) || null;
+  let momRevenue = null, momOrders = null, momLabel = null;
+  if (completedMonths.length >= 2) {
+    const cur = completedMonths[completedMonths.length - 1], prev = completedMonths[completedMonths.length - 2];
     momRevenue = prev.revenue ? Math.round(((cur.revenue - prev.revenue) / prev.revenue) * 1000) / 10 : null;
     momOrders  = prev.orders  ? Math.round(((cur.orders  - prev.orders ) / prev.orders ) * 1000) / 10 : null;
+    momLabel   = cur.month; // the completed month the comparison reflects
   }
 
   // ── Top products by revenue ─────────────────────────────────────
@@ -201,7 +206,7 @@ async function computeMetrics(orders, apiKey) {
     avgOrdersPerCustomer: total ? Math.round((totalOrders / total) * 100) / 100 : 0,
     funnelBuyers:   funnelCount,
     ecosystemBuyers: ecosystemCount,
-    momRevenue, momOrders,
+    momRevenue, momOrders, momLabel, monthToDate,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
   };
 }

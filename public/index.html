@@ -292,13 +292,56 @@
     <!-- ── PURCHASE BEHAVIOUR ──────────────── -->
     <section class="tab" id="tab-behaviour">
       <div class="page-header">
-        <div><h1>Purchase Behaviour</h1><p class="subtitle">How customers come back and repeat patterns</p></div>
+        <div><h1>Sales Analytics</h1><p class="subtitle">Revenue performance, retention &amp; repeat-purchase behaviour</p></div>
       </div>
+
+      <!-- Headline sales KPIs -->
+      <div class="stat-grid">
+        <div class="stat-card highlight">
+          <div class="stat-label">Total Revenue</div>
+          <div class="stat-value" id="sa-revenue">—</div>
+          <div class="stat-sub" id="sa-revenueMom"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Orders</div>
+          <div class="stat-value" id="sa-orders">—</div>
+          <div class="stat-sub" id="sa-ordersMom"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Order Value</div>
+          <div class="stat-value" id="sa-aov">—</div>
+          <div class="stat-sub">Per transaction</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Repeat Purchase Rate</div>
+          <div class="stat-value" id="sa-repeatRate">—</div>
+          <div class="stat-sub" id="sa-ordersPerCust"></div>
+        </div>
+      </div>
+
+      <!-- Revenue trend + top products -->
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><h2>Monthly Revenue Trend</h2><span class="badge blue" id="sa-trendRange"></span></div>
+          <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Top Products by Revenue</h2></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Product</th><th>Units</th><th>Revenue</th></tr></thead>
+              <tbody id="topProductsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="section-divider">Retention &amp; Repeat Behaviour</h3>
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Single Buyers</div><div class="stat-value" id="pb-single">—</div><div class="stat-sub" id="pb-singlePct"></div></div>
         <div class="stat-card"><div class="stat-label">Repeat Buyers</div><div class="stat-value" id="pb-repeat">—</div><div class="stat-sub" id="pb-repeatPct"></div></div>
-        <div class="stat-card"><div class="stat-label">Funnel Revenue</div><div class="stat-value" id="pb-funnel">—</div><div class="stat-sub">Same session upsells</div></div>
+        <div class="stat-card"><div class="stat-label">Funnel Buyers</div><div class="stat-value" id="pb-funnel">—</div><div class="stat-sub">Same session upsells</div></div>
         <div class="stat-card"><div class="stat-label">Ecosystem Return</div><div class="stat-value" id="pb-ecosystem">—</div><div class="stat-sub">Independent returners</div></div>
       </div>
 
