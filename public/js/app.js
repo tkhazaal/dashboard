@@ -15,6 +15,21 @@ const timeAgo = iso => {
 };
 const escHtml = str => String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
+// ── Campaign labels (URL path → friendly source name) ─────────────
+const CAMPAIGN_LABELS = {
+  '/fathers-repair-playbook':     'FB Posts',
+  '/the-fathers-repair-playbook': 'FB Stories',
+  '/fathers-repair-guide':        'IG Posts',
+  '/the-fathers-repair-guide':    'IG Stories',
+  '/fathers-repair-system':       'Emails',
+  '/the-fathers-repair-system':   'TikTok',
+  '/fathers-repair-bundle':       'FB Group',
+};
+const campaignName = path => {
+  const key = String(path || '').replace(/\/+$/, '').toLowerCase() || '/';
+  return CAMPAIGN_LABELS[key] || null;
+};
+
 async function api(path) {
   const r = await fetch(path);
   if (!r.ok) throw new Error(await r.text());
@@ -151,7 +166,6 @@ async function loadTrend(days) {
 async function loadPagesTable() {
   const params = new URLSearchParams();
   if (state.paDays > 0) params.set('days', state.paDays);
-  if (state.paSearch)   params.set('search', state.paSearch);
 
   const rows = await api(`/api/analytics/pages?${params}`);
   state.pagesData = rows;
@@ -163,8 +177,19 @@ async function loadPagesTable() {
 }
 
 function renderPagesTable(rows) {
+  // Client-side search — matches campaign name, path, or page title
+  let filtered = rows;
+  if (state.paSearch) {
+    const q = state.paSearch.toLowerCase();
+    filtered = rows.filter(p =>
+      (campaignName(p.page_path) || '').toLowerCase().includes(q) ||
+      String(p.page_path  || '').toLowerCase().includes(q) ||
+      String(p.page_title || '').toLowerCase().includes(q)
+    );
+  }
+
   // Sort
-  const sorted = [...rows].sort((a, b) => {
+  const sorted = [...filtered].sort((a, b) => {
     if (state.paSort === 'unique_visitors') return b.unique_visitors - a.unique_visitors;
     return b.total_views - a.total_views;
   });
@@ -174,18 +199,20 @@ function renderPagesTable(rows) {
   const body = $('pagesTable');
   body.innerHTML = sorted.length === 0
     ? `<tr class="empty-row"><td colspan="5">No page views yet — add the tracking code to your pages.</td></tr>`
-    : sorted.map((p, i) => `
+    : sorted.map((p, i) => {
+        const label = campaignName(p.page_path);
+        return `
         <tr>
           <td class="rank">${i + 1}</td>
           <td>
-            <div class="name-cell">${escHtml(p.page_path)}</div>
-            ${p.page_title ? `<div class="email-cell">${escHtml(p.page_title)}</div>` : ''}
+            <div class="name-cell">${escHtml(label || p.page_title || p.page_path)}</div>
+            <div class="email-cell">${escHtml(p.page_path)}</div>
           </td>
           <td>${fmtNum(p.total_views)}</td>
           <td>${fmtNum(p.unique_visitors)}</td>
           <td class="email-cell">${timeAgo(p.last_seen)}</td>
         </tr>
-      `).join('');
+      `;}).join('');
 }
 
 function renderReferrersTable(rows) {
@@ -206,14 +233,19 @@ async function loadLiveFeed(pageFilter) {
   const rows = await api(`/api/analytics/recent?${params}`);
   $('liveFeed').innerHTML = rows.length === 0
     ? `<tr class="empty-row"><td colspan="4">No visits recorded yet.</td></tr>`
-    : rows.map(r => `
+    : rows.map(r => {
+        const label = campaignName(r.page_path);
+        return `
         <tr>
-          <td class="name-cell">${escHtml(r.page_path)}</td>
+          <td>
+            <div class="name-cell">${escHtml(label || r.page_path)}</div>
+            ${label ? `<div class="email-cell">${escHtml(r.page_path)}</div>` : ''}
+          </td>
           <td class="email-cell">${escHtml((r.referrer||'Direct').slice(0,50))}</td>
           <td class="email-cell">${escHtml(r.ip_address||'')}</td>
           <td class="email-cell">${timeAgo(r.created_at)}</td>
         </tr>
-      `).join('');
+      `;}).join('');
 }
 
 // ── SamCart loaders ───────────────────────────────────────────────
@@ -438,13 +470,9 @@ initDateBtns('pa-dateBtns', days => {
   loadPagesTable();
 });
 
-let paDebounce;
 $('pa-search').addEventListener('input', e => {
-  clearTimeout(paDebounce);
-  paDebounce = setTimeout(() => {
-    state.paSearch = e.target.value.trim();
-    loadPagesTable();
-  }, 300);
+  state.paSearch = e.target.value.trim();
+  if (state.pagesData) renderPagesTable(state.pagesData);
 });
 
 // Column sort clicks
