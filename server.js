@@ -22,7 +22,7 @@ app.get('/t.js', async (req, res) => {
   baseUrl = baseUrl.replace(/\/+$/, ''); // strip trailing slashes
 
   res.setHeader('Content-Type', 'application/javascript');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Cache-Control', 'public, max-age=300');
 
   res.send(`
 (function(){
@@ -35,8 +35,11 @@ app.get('/t.js', async (req, res) => {
     var d={url:window.location.href,path:window.location.pathname,title:document.title,referrer:document.referrer,visitorId:vid,sessionId:sid,screen:window.screen.width+'x'+window.screen.height,tz:(Intl&&Intl.DateTimeFormat)?Intl.DateTimeFormat().resolvedOptions().timeZone:''};
     var ep='${baseUrl}/track';
     var pl=JSON.stringify(d);
-    if(navigator.sendBeacon){ var b=new Blob([pl],{type:'application/json'}); navigator.sendBeacon(ep,b); }
-    else{ var x=new XMLHttpRequest(); x.open('POST',ep,true); x.setRequestHeader('Content-Type','application/json'); x.send(pl); }
+    // 1) sendBeacon with text/plain — CORS-safelisted, no preflight, works cross-site
+    var sent=false;
+    try { if(navigator.sendBeacon){ sent=navigator.sendBeacon(ep, new Blob([pl],{type:'text/plain;charset=UTF-8'})); } } catch(e){}
+    // 2) Image-pixel GET fallback — most resilient to mobile tracking prevention
+    if(!sent){ try { (new Image()).src = ep + '?d=' + encodeURIComponent(pl) + '&_=' + Date.now(); } catch(e){} }
   } catch(e){}
 })();
 `.trim());
