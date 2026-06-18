@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metric Dashboard</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">M</div>
+      <span>Metrics</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-tab="overview">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Overview
+      </a>
+      <a href="#" class="nav-item" data-tab="pages">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Page Analytics
+      </a>
+      <a href="#" class="nav-item" data-tab="customers">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Customers
+      </a>
+      <a href="#" class="nav-item" data-tab="behaviour">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Purchase Behaviour
+      </a>
+      <a href="#" class="nav-item" data-tab="paths">
+        <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+        Product Paths
+      </a>
+      <a href="#" class="nav-item" data-tab="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Settings
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="sync-btn" id="syncBtn">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Sync SamCart
+      </button>
+      <div class="sync-status" id="syncStatus"></div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+
+    <!-- ── OVERVIEW ──────────────────────────── -->
+    <section class="tab active" id="tab-overview">
+      <div class="page-header">
+        <div>
+          <h1>Overview</h1>
+          <p class="subtitle">Combined view — page analytics &amp; purchase data</p>
+        </div>
+        <div class="header-pills">
+          <span class="pill" id="scSyncedAt"></span>
+        </div>
+      </div>
+
+      <!-- Overview date filter -->
+      <div class="filter-bar">
+        <span class="filter-label">Date range</span>
+        <div class="date-btns" id="ov-dateBtns">
+          <button class="date-btn active" data-days="1">Today</button>
+          <button class="date-btn" data-days="7">7 Days</button>
+          <button class="date-btn active-default" data-days="30">30 Days</button>
+          <button class="date-btn" data-days="90">90 Days</button>
+          <button class="date-btn" data-days="0">All Time</button>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Page Views</div>
+          <div class="stat-value" id="ov-totalViews">—</div>
+          <div class="stat-sub" id="ov-todayViews"></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Unique Visitors</div>
+          <div class="stat-value" id="ov-uniqueVisitors">—</div>
+          <div class="stat-sub" id="ov-todayUnique"></div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-label">Total Customers (SamCart)</div>
+          <div class="stat-value" id="ov-totalCustomers">—</div>
+          <div class="stat-sub">Unique buyers</div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-label">Total Revenue (LTV)</div>
+          <div class="stat-value" id="ov-totalRevenue">—</div>
+          <div class="stat-sub" id="ov-avgLtv"></div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <h2>Page Views Trend</h2>
+            <div class="date-btns sm" id="trend-dateBtns">
+              <button class="date-btn" data-days="7">7d</button>
+              <button class="date-btn active" data-days="30">30d</button>
+              <button class="date-btn" data-days="90">90d</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Buyer Type Split</h2>
+          </div>
+          <div class="chart-wrap chart-sm">
+            <canvas id="buyerSplitChart"></canvas>
+          </div>
+          <div class="legend-row" id="buyerSplitLegend"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Live Page Feed</h2>
+          <div class="filter-inline">
+            <input type="search" id="feedSearch" class="search-input sm" placeholder="Filter by page…">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Page</th><th>Referrer</th><th>IP</th><th>Time</th></tr></thead>
+            <tbody id="liveFeed"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PAGE ANALYTICS ──────────────────── -->
+    <section class="tab" id="tab-pages">
+      <div class="page-header">
+        <div><h1>Page Analytics</h1><p class="subtitle">Per-page visit breakdown from your tracking code</p></div>
+      </div>
+
+      <!-- Page analytics filters -->
+      <div class="filter-bar">
+        <span class="filter-label">Date range</span>
+        <div class="date-btns" id="pa-dateBtns">
+          <button class="date-btn" data-days="1">Today</button>
+          <button class="date-btn" data-days="7">7 Days</button>
+          <button class="date-btn active" data-days="30">30 Days</button>
+          <button class="date-btn" data-days="90">90 Days</button>
+          <button class="date-btn" data-days="0">All Time</button>
+        </div>
+        <div class="filter-sep"></div>
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="pa-search" class="search-input" placeholder="Search pages…">
+        </div>
+      </div>
+
+      <div class="stat-grid four">
+        <div class="stat-card"><div class="stat-label">Total Views</div><div class="stat-value" id="pa-totalViews">—</div></div>
+        <div class="stat-card"><div class="stat-label">Unique Visitors</div><div class="stat-value" id="pa-uniqueVisitors">—</div></div>
+        <div class="stat-card"><div class="stat-label">This Week</div><div class="stat-value" id="pa-weekViews">—</div></div>
+        <div class="stat-card"><div class="stat-label">This Month</div><div class="stat-value" id="pa-monthViews">—</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header">
+            <h2>Top Pages</h2>
+            <div class="result-count" id="pa-resultCount"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Page</th>
+                  <th class="sortable active-sort" data-sort="total_views">Views ↓</th>
+                  <th class="sortable" data-sort="unique_visitors">Unique</th>
+                  <th>Last Visit</th>
+                </tr>
+              </thead>
+              <tbody id="pagesTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Top Referrers</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Source</th><th>Visits</th><th>Unique</th></tr></thead>
+              <tbody id="referrersTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CUSTOMERS ───────────────────────── -->
+    <section class="tab" id="tab-customers">
+      <div class="page-header">
+        <div><h1>Customers</h1><p class="subtitle">Highest-spending customers across SamCart</p></div>
+      </div>
+
+      <!-- Customer filters -->
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="cu-search" class="search-input" placeholder="Search by name or email…">
+        </div>
+        <div class="filter-sep"></div>
+        <span class="filter-label">Buyer type</span>
+        <select id="cu-buyerType" class="filter-select">
+          <option value="all">All buyers</option>
+          <option value="single">Single buyers only</option>
+          <option value="repeat">Repeat buyers only</option>
+        </select>
+        <div class="filter-sep"></div>
+        <span class="filter-label">LTV tier</span>
+        <select id="cu-tier" class="filter-select">
+          <option value="all">All tiers</option>
+          <option value="0-50">Under $50</option>
+          <option value="50-100">$50 – $99</option>
+          <option value="100-200">$100 – $199</option>
+          <option value="200-500">$200 – $499</option>
+          <option value="500-1000">$500 – $999</option>
+          <option value="1000+">$1,000+</option>
+        </select>
+        <div class="filter-sep"></div>
+        <span class="filter-label">Sort by</span>
+        <select id="cu-sort" class="filter-select">
+          <option value="ltv">Highest LTV</option>
+          <option value="orders">Most orders</option>
+          <option value="products">Most products</option>
+          <option value="name">Name A–Z</option>
+        </select>
+        <button class="clear-btn" id="cu-clear">Clear</button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Shown / Total</div><div class="stat-value" id="cu-shown">—</div></div>
+        <div class="stat-card"><div class="stat-label">Average LTV</div><div class="stat-value" id="cu-avgLtv">—</div></div>
+        <div class="stat-card"><div class="stat-label">Median LTV</div><div class="stat-value" id="cu-medianLtv">—</div></div>
+        <div class="stat-card"><div class="stat-label">Repeat Buyers</div><div class="stat-value" id="cu-repeat">—</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Customer List</h2>
+          <div class="result-count" id="cu-resultCount"></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Customer</th>
+                <th class="sortable" data-cu-sort="orders">Orders</th>
+                <th class="sortable" data-cu-sort="products">Products</th>
+                <th class="sortable active-sort" data-cu-sort="ltv">Lifetime Value ↓</th>
+              </tr>
+            </thead>
+            <tbody id="customersTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Revenue by Spend Tier</h2></div>
+        <div id="tiersContainer"></div>
+      </div>
+    </section>
+
+    <!-- ── PURCHASE BEHAVIOUR ──────────────── -->
+    <section class="tab" id="tab-behaviour">
+      <div class="page-header">
+        <div><h1>Purchase Behaviour</h1><p class="subtitle">How customers come back and repeat patterns</p></div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Single Buyers</div><div class="stat-value" id="pb-single">—</div><div class="stat-sub" id="pb-singlePct"></div></div>
+        <div class="stat-card"><div class="stat-label">Repeat Buyers</div><div class="stat-value" id="pb-repeat">—</div><div class="stat-sub" id="pb-repeatPct"></div></div>
+        <div class="stat-card"><div class="stat-label">Funnel Revenue</div><div class="stat-value" id="pb-funnel">—</div><div class="stat-sub">Same session upsells</div></div>
+        <div class="stat-card"><div class="stat-label">Ecosystem Return</div><div class="stat-value" id="pb-ecosystem">—</div><div class="stat-sub">Independent returners</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card insight">
+          <div class="insight-icon">💡</div>
+          <div>
+            <h3>Checkout Sequence is Working</h3>
+            <p id="insight-funnel">Calculating…</p>
+          </div>
+        </div>
+        <div class="card insight">
+          <div class="insight-icon">📈</div>
+          <div>
+            <h3>Re-Engagement Opportunity</h3>
+            <p id="insight-single">Calculating…</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><h2>Funnel Buyers</h2><span class="badge blue">Same session</span></div>
+          <div class="repeat-detail">
+            <div class="rd-row"><span>Purchase gap</span><strong>Under 24 hours</strong></div>
+            <div class="rd-row"><span>Driver</span><strong>Upsells &amp; order bumps</strong></div>
+            <div class="rd-row"><span>Count</span><strong id="rd-funnel">—</strong></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Ecosystem Returners</h2><span class="badge green">Brand loyalty</span></div>
+          <div class="repeat-detail">
+            <div class="rd-row"><span>Purchase gap</span><strong>24 hours or more</strong></div>
+            <div class="rd-row"><span>Driver</span><strong>Results → return</strong></div>
+            <div class="rd-row"><span>Count</span><strong id="rd-ecosystem">—</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PRODUCT PATHS ───────────────────── -->
+    <section class="tab" id="tab-paths">
+      <div class="page-header">
+        <div><h1>Product Paths</h1><p class="subtitle">Most common first → second purchase journeys</p></div>
+      </div>
+
+      <!-- Paths filters -->
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="path-search" class="search-input" placeholder="Search by product name…">
+        </div>
+        <div class="filter-sep"></div>
+        <span class="filter-label">Filter role</span>
+        <select id="path-role" class="filter-select">
+          <option value="any">Any position</option>
+          <option value="first">First product</option>
+          <option value="second">Second product</option>
+        </select>
+        <div class="filter-sep"></div>
+        <span class="filter-label">Min customers</span>
+        <input type="number" id="path-minCount" class="filter-number" placeholder="0" min="0" value="">
+        <button class="clear-btn" id="path-clear">Clear</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Top Purchase Journeys</h2>
+          <div class="result-count" id="path-resultCount"></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>First Product</th><th></th><th>Second Product</th><th>Customers</th><th>Volume</th></tr></thead>
+            <tbody id="pathsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SETTINGS ────────────────────────── -->
+    <section class="tab" id="tab-settings">
+      <div class="page-header">
+        <div><h1>Settings</h1><p class="subtitle">Configure your dashboard and tracking code</p></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><h2>Dashboard Settings</h2></div>
+          <form id="settingsForm" class="settings-form">
+            <label>
+              <span>Site Name</span>
+              <input type="text" name="site_name" placeholder="My Dashboard">
+            </label>
+            <label>
+              <span>Tracker URL <small>(your server's public URL)</small></span>
+              <input type="text" name="tracker_url" placeholder="http://localhost:3000">
+            </label>
+            <label>
+              <span>SamCart API Key</span>
+              <input type="password" name="samcart_api_key" placeholder="Paste new key to update">
+              <small id="apiKeyMasked" class="field-hint"></small>
+            </label>
+            <button type="submit" class="btn-primary">Save Settings</button>
+            <div id="settingsSaved" class="save-msg"></div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Your Tracking Code</h2>
+            <button class="copy-btn" id="copyCodeBtn">Copy</button>
+          </div>
+          <p class="tracking-desc">Paste this snippet before the <code>&lt;/head&gt;</code> tag on every page you want to track. It loads asynchronously and won't slow down your page.</p>
+          <pre class="code-block" id="trackingCode"></pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>How to Use the Tracking Code</h2></div>
+        <div class="instructions">
+          <div class="step"><div class="step-num">1</div><div><strong>Copy the tracking snippet</strong> — click the Copy button above.</div></div>
+          <div class="step"><div class="step-num">2</div><div><strong>Paste it on your pages</strong> — add it inside the <code>&lt;head&gt;</code> of each landing page you want to monitor.</div></div>
+          <div class="step"><div class="step-num">3</div><div><strong>See data instantly</strong> — visit a tracked page and refresh the Page Analytics tab. Each page is tracked separately.</div></div>
+          <div class="step"><div class="step-num">4</div><div><strong>Visitor IDs persist</strong> — returning visitors are identified via localStorage so unique counts stay accurate.</div></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
