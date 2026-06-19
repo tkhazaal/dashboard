@@ -120,17 +120,31 @@ const state = {
   pagesData:   [],
   // Conversion funnel (current month)
   funnelData:  null,
+  // Reporting page support data
+  reportsTrend:     null,
+  reportsReferrers: null,
 };
 
 // ── Tab navigation ────────────────────────────────────────────────
+function activateTab(tab) {
+  const item = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+  const section = $(`tab-${tab}`);
+  if (!item || !section) return;
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  item.classList.add('active');
+  section.classList.add('active');
+  if (history.replaceState) history.replaceState(null, '', '#' + tab);
+  // Charts must be built while their canvas is visible (Chart.js needs real dimensions)
+  if (tab === 'reports') loadReports();
+}
 document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', e => {
-    e.preventDefault();
-    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    item.classList.add('active');
-    $(`tab-${item.dataset.tab}`).classList.add('active');
-  });
+  item.addEventListener('click', e => { e.preventDefault(); activateTab(item.dataset.tab); });
+});
+// Deep-link: open the tab named in the URL hash on load
+window.addEventListener('DOMContentLoaded', () => {
+  const tab = (location.hash || '').replace('#', '');
+  if (tab && document.querySelector(`.nav-item[data-tab="${tab}"]`)) activateTab(tab);
 });
 
 // ── Date button groups ────────────────────────────────────────────
@@ -510,6 +524,8 @@ async function loadSamCart(force = false) {
   renderPaths();
   // Re-render the pages table so the Orders column (from SamCart) populates
   if (state.pagesData && state.pagesData.length) renderPagesTable(state.pagesData);
+  // If the Reporting tab is open, refresh its charts with the new data
+  if ($('tab-reports')?.classList.contains('active')) renderReports();
 }
 
 // ── Customer rendering (client-side filtered) ────────────────────
@@ -879,6 +895,286 @@ $('path-clear').addEventListener('click', () => {
   state.pathSearch = ''; state.pathRole = 'any'; state.pathMin = 0;
   renderPaths();
 });
+
+// ── Reporting page ────────────────────────────────────────────────
+const PALETTE = ['#5b6af0','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6','#6366f1','#a855f7'];
+const GRID = 'rgba(148,163,184,0.18)';
+const TICK = '#9ca3af';
+const reportCharts = {};
+
+function mkChart(id, config) {
+  const ctx = $(id);
+  if (!ctx) return;
+  if (reportCharts[id]) { reportCharts[id].destroy(); delete reportCharts[id]; }
+  reportCharts[id] = new Chart(ctx, config);
+}
+const moneyTick = v => '$' + (Math.abs(v) >= 1000 ? (v/1000).toFixed(v % 1000 ? 1 : 0) + 'k' : v);
+const baseScales = (extra = {}) => Object.assign({
+  x: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } },
+  y: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK }, beginAtZero: true },
+}, extra);
+const noLegend = { legend: { display: false } };
+const legendBottom = { legend: { position: 'bottom', labels: { font: { size: 10 }, color: TICK, boxWidth: 10, padding: 8 } } };
+const shorten = (s, n = 22) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+const monthLbl = m => { const [y, mo] = String(m).split('-'); return new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); };
+
+async function loadReports() {
+  // SamCart data drives most charts; ensure it's loaded, and fetch traffic trend + referrers.
+  const tasks = [
+    api('/api/analytics/trend?days=90').catch(() => []),
+    api('/api/analytics/referrers').catch(() => []),
+  ];
+  if (!state.scData) tasks.push(loadSamCart().catch(() => {}));   // populate scData if not ready
+  if (!state.funnelData) tasks.push(loadFunnel().catch(() => {}));
+  if (!state.pagesData || !state.pagesData.length) tasks.push(loadPagesTable().catch(() => {}));
+  const [trend, referrers] = await Promise.all(tasks);
+  state.reportsTrend = trend;
+  state.reportsReferrers = referrers;
+  if (state.scData?.syncedAt) $('rep-syncedAt').textContent = (state.scData.isDemo ? 'Demo data' : 'Synced ' + timeAgo(state.scData.syncedAt));
+  renderReports();
+}
+
+function renderReports() {
+  const d = state.scData;
+  renderReportKpis(d);
+  if (d) {
+    const monthly = d.monthly || [];
+    const mLabels = monthly.map(m => monthLbl(m.month));
+
+    // 1) Revenue trend (area)
+    mkChart('rep-revenue-trend', {
+      type: 'line',
+      data: { labels: mLabels, datasets: [{ label: 'Revenue', data: monthly.map(m => m.revenue), borderColor: '#5b6af0', backgroundColor: 'rgba(91,106,240,0.16)', fill: true, tension: 0.4, pointRadius: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { ...noLegend, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.raw) } } },
+        scales: baseScales({ y: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true } }) }
+    });
+
+    // 2) Orders vs AOV (bars + line, dual axis)
+    mkChart('rep-orders-aov', {
+      data: { labels: mLabels, datasets: [
+        { type: 'bar', label: 'Orders', data: monthly.map(m => m.orders), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 3, yAxisID: 'y' },
+        { type: 'line', label: 'Avg Order Value', data: monthly.map(m => m.orders ? Math.round(m.revenue / m.orders) : 0), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', tension: 0.4, pointRadius: 2, yAxisID: 'y1' },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: legendBottom,
+        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } },
+          y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK }, beginAtZero: true },
+          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#f59e0b', callback: moneyTick }, beginAtZero: true } } }
+    });
+
+    // 3) Revenue by product (horizontal bar)
+    const tp = (d.topProducts || []).slice(0, 10);
+    mkChart('rep-revenue-product', {
+      type: 'bar',
+      data: { labels: tp.map(p => shorten(p.name)), datasets: [{ label: 'Revenue', data: tp.map(p => p.revenue), backgroundColor: '#5b6af0', borderRadius: 3 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { ...noLegend, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.raw) } } },
+        scales: { x: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } } } }
+    });
+
+    // 4) Units vs revenue per product (dual axis bars)
+    mkChart('rep-units-revenue', {
+      data: { labels: tp.map(p => shorten(p.name, 14)), datasets: [
+        { type: 'bar', label: 'Units', data: tp.map(p => p.units), backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 3, yAxisID: 'y' },
+        { type: 'bar', label: 'Revenue', data: tp.map(p => p.revenue), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 3, yAxisID: 'y1' },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: legendBottom,
+        scales: { x: { grid: { display: false }, ticks: { font: { size: 8 }, color: TICK, maxRotation: 60, minRotation: 30 } },
+          y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#10b981' }, beginAtZero: true },
+          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#5b6af0', callback: moneyTick }, beginAtZero: true } } }
+    });
+
+    // 5) Revenue share by slug (doughnut, top 7 + Other)
+    const slugEntries = Object.entries(d.ordersBySlug || {}).map(([slug, v]) => ({ slug, revenue: v.revenue })).sort((a, b) => b.revenue - a.revenue);
+    const top7 = slugEntries.slice(0, 7);
+    const otherRev = slugEntries.slice(7).reduce((s, e) => s + e.revenue, 0);
+    const slugLabels = top7.map(e => e.slug).concat(otherRev > 0 ? ['Other'] : []);
+    const slugData = top7.map(e => e.revenue).concat(otherRev > 0 ? [otherRev] : []);
+    mkChart('rep-revenue-slug', {
+      type: 'doughnut',
+      data: { labels: slugLabels, datasets: [{ data: slugData, backgroundColor: PALETTE, borderWidth: 0, hoverOffset: 6 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { font: { size: 9 }, color: TICK, boxWidth: 9, padding: 6 } }, tooltip: { callbacks: { label: c => ' ' + c.label + ': ' + fmtMoney(c.raw) } } } }
+    });
+
+    // 6) Buyer mix (stacked horizontal bar)
+    mkChart('rep-buyer-mix', {
+      type: 'bar',
+      data: { labels: ['Buyers'], datasets: [
+        { label: 'Single', data: [d.singleBuyers], backgroundColor: '#e8a33d' },
+        { label: 'Funnel (<24h)', data: [d.funnelBuyers], backgroundColor: '#5b6af0' },
+        { label: 'Ecosystem (≥24h)', data: [d.ecosystemBuyers], backgroundColor: '#10b981' },
+      ] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: legendBottom,
+        scales: { x: { stacked: true, grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK } }, y: { stacked: true, grid: { display: false }, ticks: { display: false } } } }
+    });
+
+    // 7) LTV tiers (bars count + line total)
+    const tiers = d.tiers || [];
+    mkChart('rep-ltv-tiers', {
+      data: { labels: tiers.map(t => t.label), datasets: [
+        { type: 'bar', label: 'Customers', data: tiers.map(t => t.count), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 3, yAxisID: 'y' },
+        { type: 'line', label: 'Revenue', data: tiers.map(t => t.total), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.4, pointRadius: 3, yAxisID: 'y1' },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: legendBottom,
+        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } },
+          y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#5b6af0' }, beginAtZero: true },
+          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#10b981', callback: moneyTick }, beginAtZero: true } } }
+    });
+
+    // 8) Revenue concentration by tier (pie)
+    mkChart('rep-revenue-tier-pie', {
+      type: 'pie',
+      data: { labels: tiers.map(t => t.label), datasets: [{ data: tiers.map(t => t.total), backgroundColor: PALETTE, borderWidth: 0, hoverOffset: 6 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 9 }, color: TICK, boxWidth: 9, padding: 6 } }, tooltip: { callbacks: { label: c => ' ' + c.label + ': ' + fmtMoney(c.raw) } } } }
+    });
+
+    // 9) Top customers by LTV (horizontal bar)
+    const tc = (d.topCustomers || []).slice(0, 12);
+    mkChart('rep-top-customers', {
+      type: 'bar',
+      data: { labels: tc.map(c => shorten(c.name, 18)), datasets: [{ label: 'LTV', data: tc.map(c => c.ltv), backgroundColor: '#8b5cf6', borderRadius: 3 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { ...noLegend, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.raw), afterLabel: c => `${tc[c.dataIndex].orders} orders · ${tc[c.dataIndex].products} products` } } },
+        scales: { x: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } } } }
+    });
+
+    // 10) Order depth vs value (bubble: x=orders, y=ltv, r=products)
+    mkChart('rep-order-depth', {
+      type: 'bubble',
+      data: { datasets: [{ label: 'Customers', data: tc.map(c => ({ x: c.orders, y: c.ltv, r: 4 + (c.products || 1) * 2, _n: c.name })), backgroundColor: 'rgba(91,106,240,0.5)', borderColor: '#5b6af0' }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { ...noLegend, tooltip: { callbacks: { label: c => `${c.raw._n}: ${c.raw.x} orders, ${fmtMoney(c.raw.y)}` } } },
+        scales: { x: { title: { display: true, text: 'Orders', font: { size: 10 }, color: TICK }, grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK }, beginAtZero: true },
+          y: { title: { display: true, text: 'LTV', font: { size: 10 }, color: TICK }, grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true } } }
+    });
+
+    // 11) Cross-sell paths (horizontal bar)
+    const paths = (d.productPaths || []).slice(0, 8);
+    mkChart('rep-paths', {
+      type: 'bar',
+      data: { labels: paths.map(p => `${shorten(p.first, 16)} → ${shorten(p.second, 16)}`), datasets: [{ label: 'Customers', data: paths.map(p => p.count), backgroundColor: '#06b6d4', borderRadius: 3 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: noLegend,
+        scales: { x: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } } } }
+    });
+  }
+
+  // 12) Traffic trend (line) — page analytics
+  const trend = state.reportsTrend || [];
+  mkChart('rep-traffic', {
+    type: 'line',
+    data: { labels: trend.map(r => new Date(r.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })), datasets: [
+      { label: 'Views', data: trend.map(r => r.views), borderColor: '#5b6af0', backgroundColor: 'rgba(91,106,240,0.08)', fill: true, tension: 0.4, pointRadius: 0 },
+      { label: 'Unique Visitors', data: trend.map(r => r.unique_visitors), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)', fill: true, tension: 0.4, pointRadius: 0 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: legendBottom, scales: baseScales({ x: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK, maxTicksLimit: 12 } } }) }
+  });
+
+  // 13) Channel -> visitors & revenue (dual-axis bars)
+  renderChannelChart();
+
+  // 14) Landing -> Checkout -> Purchase funnel (horizontal bar)
+  const f = state.funnelData || {};
+  const purchases = state.scData?.monthToDate?.orders || 0;
+  mkChart('rep-funnel', {
+    type: 'bar',
+    data: { labels: ['Landing', 'Checkout', 'Purchase'], datasets: [{ label: 'Unique', data: [f.landingUnique || 0, f.checkoutUnique || 0, purchases], backgroundColor: ['#5b6af0', '#06b6d4', '#10b981'], borderRadius: 3 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { ...noLegend, tooltip: { callbacks: { afterLabel: c => {
+        const land = f.landingUnique || 0, chk = f.checkoutUnique || 0;
+        if (c.dataIndex === 1 && land) return `${Math.round(chk / land * 1000) / 10}% of landing`;
+        if (c.dataIndex === 2 && chk)  return `${Math.round(purchases / chk * 1000) / 10}% of checkout`;
+        return '';
+      } } } },
+      scales: { x: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 11 }, color: TICK } } } }
+  });
+
+  // 15) Top referrers (polar area, top 8 + Other)
+  const refs = (state.reportsReferrers || []).slice();
+  const top8 = refs.slice(0, 8);
+  const otherVisits = refs.slice(8).reduce((s, r) => s + r.visits, 0);
+  const refLabels = top8.map(r => shorten(r.source, 20)).concat(otherVisits ? ['Other'] : []);
+  const refData = top8.map(r => r.visits).concat(otherVisits ? [otherVisits] : []);
+  mkChart('rep-referrers', {
+    type: 'polarArea',
+    data: { labels: refLabels, datasets: [{ data: refData, backgroundColor: PALETTE.map(c => c + 'cc'), borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 9 }, color: TICK, boxWidth: 9, padding: 5 } } }, scales: { r: { grid: { color: GRID }, ticks: { display: false } } } }
+  });
+}
+
+// Channel -> visitors & attributed revenue (joins page analytics to SamCart orders)
+function renderChannelChart() {
+  const pages = state.pagesData || [];
+  const byChannel = {};
+  for (const p of pages) {
+    if (isCheckoutPage(p.page_path, p.host)) continue;      // landing pages only
+    const label = campaignName(p.page_path) || p.page_path;
+    if (!byChannel[label]) byChannel[label] = { visitors: 0, revenue: 0 };
+    byChannel[label].visitors += p.unique_visitors;
+    const ord = ordersForSlug(slugKey(p.page_path));
+    if (ord) byChannel[label].revenue += ord.revenue;
+  }
+  const rows = Object.entries(byChannel).map(([label, v]) => ({ label, ...v })).sort((a, b) => b.visitors - a.visitors).slice(0, 10);
+  mkChart('rep-channel', {
+    data: { labels: rows.map(r => r.label), datasets: [
+      { type: 'bar', label: 'Unique Visitors', data: rows.map(r => r.visitors), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 3, yAxisID: 'y' },
+      { type: 'bar', label: 'Attributed Revenue', data: rows.map(r => r.revenue), backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 3, yAxisID: 'y1' },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: legendBottom,
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } },
+        y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#5b6af0' }, beginAtZero: true },
+        y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#10b981', callback: moneyTick }, beginAtZero: true } } }
+  });
+}
+
+function renderReportKpis(d) {
+  const cards = [];
+  if (d) {
+    // 1) MoM momentum
+    if (d.momRevenue != null) {
+      const up = d.momRevenue >= 0;
+      cards.push({ cls: up ? 'good' : 'bad', label: 'Month-over-Month', value: `${up ? '▲' : '▼'} ${Math.abs(d.momRevenue)}%`,
+        text: `Revenue ${up ? 'grew' : 'fell'} and orders moved ${d.momOrders ?? 0}% in ${d.momLabel ? monthLbl(d.momLabel) : 'the last month'} vs. the prior month.` });
+    }
+    // 2) Revenue concentration (top 2 tiers = $500+)
+    const t = d.tiers || [];
+    if (t.length >= 6) {
+      const topTotal = (t[4].total || 0) + (t[5].total || 0);
+      const topCount = (t[4].count || 0) + (t[5].count || 0);
+      const smallPct = (n, total) => { const p = total ? (n / total) * 100 : 0; return p > 0 && p < 1 ? '<1%' : Math.round(p) + '%'; };
+      cards.push({ label: 'Revenue Concentration', value: smallPct(topTotal, d.totalRevenue),
+        text: `of revenue comes from $500+ customers — just ${smallPct(topCount, d.totalCustomers)} of all buyers (${fmtNum(topCount)} people). A tiny VIP slice carries the business.` });
+    }
+    // 3) Repeat strength + mean/median gap
+    cards.push({ label: 'Repeat Strength', value: `${d.repeatRate ?? 0}%`,
+      text: `of customers buy again (${d.avgOrdersPerCustomer ?? 0} orders each). Avg LTV ${fmtMoneyFull(d.avgLtv)} vs. median ${fmtMoneyFull(d.medianLtv)} — a few big spenders pull the average up.` });
+    // 4) Retention pattern — adaptive (engineered upsells vs. organic returns)
+    const repeatTotal = (d.funnelBuyers || 0) + (d.ecosystemBuyers || 0);
+    if (repeatTotal) {
+      const funnelPct = Math.round((d.funnelBuyers / repeatTotal) * 100);
+      if (funnelPct >= 50) {
+        cards.push({ label: 'Retention Is Engineered', value: funnelPct + '%',
+          text: `of repeat purchases happen within 24h as same-session upsells — your checkout sequence drives the repeats.` });
+      } else {
+        cards.push({ cls: 'good', label: 'Retention Is Organic', value: (100 - funnelPct) + '%',
+          text: `of repeat purchases are genuine returns 24h+ later — only ${funnelPct}% are same-session upsells. Strong real loyalty.` });
+      }
+    }
+    // 5) Visitor-to-customer conversion (only meaningful once tracking covers the sales window)
+    const land = state.funnelData?.landingUnique || 0;
+    const orders = d.monthToDate?.orders || 0;
+    if (land && orders <= land) {
+      cards.push({ label: 'Visitor → Customer', value: pct(orders, land),
+        text: `of unique landing-page visitors became paying customers this month — the true end-to-end conversion rate.` });
+    } else if (orders) {
+      cards.push({ label: 'Visitor → Customer', value: 'Ramping',
+        text: `Page tracking is newer than your SamCart history (${fmtNum(land)} tracked visitors vs. ${fmtNum(orders)} orders this month). This becomes accurate once a full month of traffic accrues.` });
+    }
+  }
+  $('rep-kpis').innerHTML = cards.length ? cards.map(c => `
+    <div class="kpi-card ${c.cls || ''}">
+      <div class="kpi-label">${escHtml(c.label)}</div>
+      <div class="kpi-value">${escHtml(c.value)}</div>
+      <div class="kpi-text">${c.text}</div>
+    </div>`).join('') : `<div class="kpi-card"><div class="kpi-text">Click <strong>Sync SamCart</strong> to populate sales insights.</div></div>`;
+}
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {

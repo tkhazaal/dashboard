@@ -28,6 +28,10 @@
         <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         Overview
       </a>
+      <a href="#" class="nav-item" data-tab="reports">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reporting
+      </a>
       <a href="#" class="nav-item" data-tab="pages">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Page Analytics
@@ -155,6 +159,107 @@
             <thead><tr><th>Page</th><th>Referrer</th><th>IP</th><th>Time</th></tr></thead>
             <tbody id="liveFeed"></tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── REPORTING ───────────────────────── -->
+    <section class="tab" id="tab-reports">
+      <div class="page-header">
+        <div><h1>Reporting</h1><p class="subtitle">Sales drivers, customer behaviour &amp; traffic-to-revenue — visualised</p></div>
+        <div class="header-pills"><span class="pill" id="rep-syncedAt"></span></div>
+      </div>
+
+      <!-- KPI insight callouts -->
+      <div class="kpi-row" id="rep-kpis"></div>
+
+      <!-- Sales Performance -->
+      <h3 class="section-divider">Sales Performance</h3>
+      <div class="report-grid">
+        <div class="chart-card full">
+          <div class="chart-card-head"><h3>Revenue Trend — Last 12 Months</h3></div>
+          <div class="report-chart"><canvas id="rep-revenue-trend"></canvas></div>
+          <p class="chart-insight">Is revenue climbing, flat, or declining month to month?</p>
+        </div>
+        <div class="chart-card full">
+          <div class="chart-card-head"><h3>Order Volume vs. Average Order Value</h3></div>
+          <div class="report-chart"><canvas id="rep-orders-aov"></canvas></div>
+          <p class="chart-insight">Growth from <em>more</em> orders (bars) vs. <em>higher-value</em> orders (line).</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Revenue by Product (Top 10)</h3></div>
+          <div class="report-chart"><canvas id="rep-revenue-product"></canvas></div>
+          <p class="chart-insight">Where revenue concentrates across your catalogue.</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Units vs. Revenue per Product</h3></div>
+          <div class="report-chart"><canvas id="rep-units-revenue"></canvas></div>
+          <p class="chart-insight">High-volume/low-price vs. low-volume/premium products.</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Revenue Share by Funnel Slug</h3></div>
+          <div class="report-chart"><canvas id="rep-revenue-slug"></canvas></div>
+          <p class="chart-insight">Which funnels carry the revenue load — concentration risk.</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Buyer Mix: Single vs. Funnel vs. Ecosystem</h3></div>
+          <div class="report-chart"><canvas id="rep-buyer-mix"></canvas></div>
+          <p class="chart-insight">Is repeat revenue engineered at checkout (&lt;24h) or real loyalty?</p>
+        </div>
+      </div>
+
+      <!-- Customer Behaviour -->
+      <h3 class="section-divider">Customer Behaviour &amp; Retention</h3>
+      <div class="report-grid">
+        <div class="chart-card full">
+          <div class="chart-card-head"><h3>LTV Spend-Tier Distribution</h3></div>
+          <div class="report-chart"><canvas id="rep-ltv-tiers"></canvas></div>
+          <p class="chart-insight">Customer count (bars) vs. dollars (line) — where value really sits.</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Revenue Concentration by Tier</h3></div>
+          <div class="report-chart"><canvas id="rep-revenue-tier-pie"></canvas></div>
+          <p class="chart-insight">What share of revenue each spend band contributes.</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Top Customers by LTV</h3></div>
+          <div class="report-chart"><canvas id="rep-top-customers"></canvas></div>
+          <p class="chart-insight">The individuals driving outsized value — VIP outreach targets.</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Order Depth vs. Value per Customer</h3></div>
+          <div class="report-chart"><canvas id="rep-order-depth"></canvas></div>
+          <p class="chart-insight">One big-ticket buyer vs. loyal frequent buyer (bubble = # products).</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Cross-Sell Paths: First → Second Purchase</h3></div>
+          <div class="report-chart"><canvas id="rep-paths"></canvas></div>
+          <p class="chart-insight">The proven journeys into a second purchase — sequences to systematise.</p>
+        </div>
+      </div>
+
+      <!-- Traffic & Conversion -->
+      <h3 class="section-divider">Traffic &amp; Conversion</h3>
+      <div class="report-grid">
+        <div class="chart-card full">
+          <div class="chart-card-head"><h3>Traffic vs. Unique Visitors (90 Days)</h3></div>
+          <div class="report-chart"><canvas id="rep-traffic"></canvas></div>
+          <p class="chart-insight">Traffic momentum — the leading indicator before order spikes.</p>
+        </div>
+        <div class="chart-card full">
+          <div class="chart-card-head"><h3>Channel → Visitors &amp; Revenue</h3></div>
+          <div class="report-chart"><canvas id="rep-channel"></canvas></div>
+          <p class="chart-insight">Connects each marketing channel to the orders &amp; dollars it produced.</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Landing → Checkout → Purchase</h3></div>
+          <div class="report-chart"><canvas id="rep-funnel"></canvas></div>
+          <p class="chart-insight">Where drop-off is worst (this month, unique visitors).</p>
+        </div>
+        <div class="chart-card half">
+          <div class="chart-card-head"><h3>Top Referrer Sources</h3></div>
+          <div class="report-chart"><canvas id="rep-referrers"></canvas></div>
+          <p class="chart-insight">Owned traffic (Direct/Email) vs. borrowed (social/external).</p>
         </div>
       </div>
     </section>
