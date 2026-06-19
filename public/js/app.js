@@ -32,6 +32,20 @@ const campaignName = path => {
   return CAMPAIGN_LABELS[key] || null;
 };
 
+// A page is a SamCart checkout if its host contains "samcart"
+const isCheckoutHost = host => /samcart/i.test(host || '');
+
+// Host-aware label: checkout pages get a "Checkout — <product>" label derived
+// from the last path segment; otherwise fall back to the campaign map.
+function pageLabel(path, host) {
+  if (isCheckoutHost(host)) {
+    const seg = String(path || '').split('/').filter(Boolean).pop() || '';
+    const name = seg.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return name ? `Checkout — ${name}` : 'Checkout';
+  }
+  return campaignName(path);
+}
+
 async function api(path) {
   const r = await fetch(path);
   if (!r.ok) throw new Error(await r.text());
@@ -80,6 +94,8 @@ const state = {
   scData:      null,
   // Cached raw pages data
   pagesData:   [],
+  // Conversion funnel (current month)
+  funnelData:  null,
 };
 
 // ── Tab navigation ────────────────────────────────────────────────
@@ -219,6 +235,7 @@ function buildRevenueChart(monthly) {
 function renderSalesAnalytics(d) {
   if (!d) return;
   renderGoal();
+  renderFunnel();
   $('sa-revenue').textContent   = fmtMoney(d.totalRevenue);
   $('sa-orders').textContent    = fmtNum(d.totalOrders);
   $('sa-aov').textContent       = fmtMoneyFull(d.avgOrderValue);
@@ -276,6 +293,42 @@ async function loadPaStats() {
   $('pa-monthViews').textContent     = fmtNum(overview.monthViews);
 }
 
+// ── Conversion funnel (current month, aligned with SamCart month-to-date) ──
+async function loadFunnel() {
+  const now = new Date();
+  const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0');
+  const start = `${y}-${m}-01`;
+  const end   = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
+  $('funnel-range').textContent = now.toLocaleDateString('en-US', { month: 'long' });
+  try { state.funnelData = await api(`/api/analytics/funnel?start=${start}&end=${end}`); }
+  catch { state.funnelData = null; }
+  renderFunnel();
+}
+
+function renderFunnel() {
+  const f = state.funnelData;
+  if (!f) return;
+  const landing   = f.landingViews  || 0;
+  const checkout  = f.checkoutViews || 0;
+  const purchases = state.scData?.monthToDate?.orders ?? null;
+
+  $('fn-landing').textContent      = fmtNum(landing);
+  $('fn-landing-sub').textContent  = `${fmtNum(f.landingUnique || 0)} unique`;
+  $('fn-checkout').textContent     = fmtNum(checkout);
+  $('fn-checkout-sub').textContent = `${fmtNum(f.checkoutUnique || 0)} unique`;
+  $('fn-purchases').textContent    = purchases != null ? fmtNum(purchases) : '—';
+  $('fn-purchases-sub').textContent= purchases != null ? 'from SamCart' : 'Sync SamCart';
+
+  $('fn-rate1').textContent = landing ? Math.round((checkout / landing) * 1000) / 10 + '%' : '—';
+  $('fn-rate2').textContent = (checkout && purchases != null) ? Math.round((purchases / checkout) * 1000) / 10 + '%' : '—';
+
+  if (checkout === 0) {
+    $('funnel-note').innerHTML = '⚠️ No checkout views yet — add the tracking snippet to your SamCart checkout pages to complete the funnel.';
+  } else {
+    $('funnel-note').textContent = 'Aligned to the current month. Page-tracking only covers the days since the snippet was installed, so early ratios may look off until a full month accrues.';
+  }
+}
+
 async function loadPagesTable() {
   const params = paRangeParams();
   const rows = await api(`/api/analytics/pages?${params}`);
@@ -289,12 +342,12 @@ async function loadPagesTable() {
 }
 
 function renderPagesTable(rows) {
-  // Client-side search — matches campaign name, path, or page title
+  // Client-side search — matches label, path, or page title
   let filtered = rows;
   if (state.paSearch) {
     const q = state.paSearch.toLowerCase();
     filtered = rows.filter(p =>
-      (campaignName(p.page_path) || '').toLowerCase().includes(q) ||
+      (pageLabel(p.page_path, p.host) || '').toLowerCase().includes(q) ||
       String(p.page_path  || '').toLowerCase().includes(q) ||
       String(p.page_title || '').toLowerCase().includes(q)
     );
@@ -312,13 +365,14 @@ function renderPagesTable(rows) {
   body.innerHTML = sorted.length === 0
     ? `<tr class="empty-row"><td colspan="5">No page views yet — add the tracking code to your pages.</td></tr>`
     : sorted.map((p, i) => {
-        const label = campaignName(p.page_path);
+        const checkout = isCheckoutHost(p.host);
+        const label = pageLabel(p.page_path, p.host);
         return `
         <tr>
           <td class="rank">${i + 1}</td>
           <td>
-            <div class="name-cell">${escHtml(label || p.page_title || p.page_path)}</div>
-            <div class="email-cell">${escHtml(p.page_path)}</div>
+            <div class="name-cell">${escHtml(label || p.page_title || p.page_path)}${checkout ? ' <span class="badge green">Checkout</span>' : ''}</div>
+            <div class="email-cell">${escHtml((p.host && isCheckoutHost(p.host) ? p.host : '') + p.page_path)}</div>
           </td>
           <td>${fmtNum(p.total_views)}</td>
           <td>${fmtNum(p.unique_visitors)}</td>
@@ -771,6 +825,7 @@ async function refreshAll(force = false) {
     loadTrend(state.trendDays),
     loadPagesTable(),
     loadLiveFeed($('feedSearch').value.trim()),
+    loadFunnel(),
     loadSamCart(force),
     loadSettings(),
   ]);

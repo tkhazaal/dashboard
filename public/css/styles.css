@@ -270,6 +270,29 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .goal-meta strong { color: #fff; }
 .goal-card .delta.up { color: #6ee7b7; }
 
+/* ── Conversion funnel ───────────────────── */
+.funnel { display: flex; align-items: stretch; gap: 0; padding: 16px; flex-wrap: wrap; }
+.funnel-step {
+  flex: 1; min-width: 110px; text-align: center;
+  padding: 12px 10px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.funnel-label { font-size: 10.5px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: 0.4px; }
+.funnel-value { font-size: 24px; font-weight: 800; color: var(--text); line-height: 1.1; margin-top: 4px; }
+.funnel-sub { font-size: 11px; color: var(--sub); margin-top: 2px; }
+.funnel-arrow {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 0 6px; min-width: 64px;
+}
+.funnel-rate { font-size: 13px; font-weight: 700; color: var(--accent); }
+.funnel-arrow-icon { font-size: 18px; color: var(--sub); }
+.funnel-note { padding: 0 16px 14px; font-size: 11.5px; color: var(--sub); line-height: 1.5; }
+@media (max-width: 700px) {
+  .funnel { flex-direction: column; }
+  .funnel-arrow { flex-direction: row; padding: 4px 0; }
+  .funnel-arrow-icon { transform: rotate(90deg); }
+}
+
 /* Section divider heading inside a tab */
 .section-divider {
   font-size: 12.5px; font-weight: 700; color: var(--sub);

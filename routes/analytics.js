@@ -75,4 +75,14 @@ router.get('/referrers', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.get('/funnel', async (req, res) => {
+  try {
+    const { data, error } = await supabase.rpc('analytics_funnel', {
+      days_back: safeDays(req.query.days), ...range(req)
+    });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

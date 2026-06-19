@@ -89,6 +89,7 @@ CREATE FUNCTION analytics_pages(days_back INT DEFAULT 0, search_term TEXT DEFAUL
 RETURNS TABLE(
   page_path       TEXT,
   page_title      TEXT,
+  host            TEXT,
   total_views     INT,
   unique_visitors INT,
   sessions        INT,
@@ -112,15 +113,18 @@ BEGIN
     sc := format('AND (pv.page_path ILIKE ''%%%s%%'' OR pv.page_title ILIKE ''%%%s%%'')', search_term, search_term);
   END IF;
 
+  -- Group by host as well as path so checkout pages on a different domain
+  -- (e.g. *.samcart.com) never merge with a landing page that shares a slug.
   RETURN QUERY EXECUTE format('
     SELECT pv.page_path, pv.page_title,
+      split_part(split_part(pv.page_url, ''://'', 2), ''/'', 1) AS host,
       COUNT(*)::int                   AS total_views,
       COUNT(DISTINCT visitor_id)::int AS unique_visitors,
       COUNT(DISTINCT session_id)::int AS sessions,
       MAX(created_at)                 AS last_seen
     FROM page_views pv
     WHERE 1=1 %s %s
-    GROUP BY pv.page_path, pv.page_title
+    GROUP BY pv.page_path, pv.page_title, split_part(split_part(pv.page_url, ''://'', 2), ''/'', 1)
     ORDER BY total_views DESC
     LIMIT 100
   ', dc, sc);
@@ -216,5 +220,38 @@ BEGIN
     ORDER BY visits DESC
     LIMIT 20
   ', dc);
+END;
+$$;
+
+
+-- Conversion funnel: landing-page views vs checkout-page views.
+-- Checkout pages are detected by 'samcart' appearing in the page URL.
+DROP FUNCTION IF EXISTS analytics_funnel(INT, TEXT, TEXT);
+CREATE FUNCTION analytics_funnel(days_back INT DEFAULT 0, start_date TEXT DEFAULT '', end_date TEXT DEFAULT '')
+RETURNS JSON
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  dc TEXT := '';
+  result JSON;
+BEGIN
+  IF start_date <> '' AND end_date <> '' THEN
+    dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
+  ELSIF days_back = 1 THEN
+    dc := 'AND created_at::date = CURRENT_DATE';
+  ELSIF days_back > 1 THEN
+    dc := format('AND created_at >= NOW() - INTERVAL ''%s days''', days_back);
+  END IF;
+
+  EXECUTE format('
+    SELECT json_build_object(
+      ''landingViews'',   (SELECT COUNT(*)::int               FROM page_views WHERE page_url NOT ILIKE ''%%samcart%%'' %1$s),
+      ''landingUnique'',  (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE page_url NOT ILIKE ''%%samcart%%'' %1$s),
+      ''checkoutViews'',  (SELECT COUNT(*)::int               FROM page_views WHERE page_url ILIKE ''%%samcart%%'' %1$s),
+      ''checkoutUnique'', (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE page_url ILIKE ''%%samcart%%'' %1$s)
+    )', dc)
+  INTO result;
+
+  RETURN result;
 END;
 $$;
