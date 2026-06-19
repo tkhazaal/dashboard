@@ -1,10 +1,19 @@
 const express  = require('express');
 const router   = express.Router();
 const fetch    = require('node-fetch');
+const https    = require('https');
 const supabase = require('../database');
 
 const BASE_URL  = 'https://api.samcart.com/v1';
 const CACHE_TTL = parseInt(process.env.SAMCART_CACHE_MINUTES || '60', 10) * 60 * 1000;
+
+// Smaller pages = smaller responses = far less chance of a "Premature close"
+// on slower connections (env-tunable; SamCart caps per_page at 100).
+const PAGE_SIZE = Math.min(100, Math.max(10, parseInt(process.env.SAMCART_PAGE_SIZE || '50', 10)));
+
+// Force a fresh TCP connection per request. Reusing keep-alive sockets is the
+// usual cause of "Premature close" during long crawls.
+const scAgent = new https.Agent({ keepAlive: false, maxSockets: 4 });
 
 async function getApiKey() {
   const { data } = await supabase.from('settings').select('value').eq('key', 'samcart_api_key').single();
@@ -25,17 +34,18 @@ async function setCache(key, payload) {
   );
 }
 
-const SC_HEADERS = apiKey => ({ 'sc-api': apiKey, 'Accept': 'application/json' });
+const SC_HEADERS = apiKey => ({ 'sc-api': apiKey, 'Accept': 'application/json', 'Connection': 'close' });
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Fetch one SamCart URL as JSON, retrying transient failures (network resets,
-// "Invalid response body", 5xx). Client errors (4xx) fail fast.
-async function scFetch(url, apiKey, attempts = 4) {
+// Fetch one SamCart URL as JSON, retrying transient failures ("Premature close",
+// network resets, 5xx). Reads the body fully as text before parsing so a
+// truncated response is caught and retried. Client errors (4xx) fail fast.
+async function scFetch(url, apiKey, attempts = 6) {
   let lastErr;
   for (let i = 0; i < attempts; i++) {
     try {
-      const resp = await fetch(url, { headers: SC_HEADERS(apiKey), timeout: 30000 });
+      const resp = await fetch(url, { headers: SC_HEADERS(apiKey), timeout: 45000, agent: scAgent });
       if (!resp.ok) {
         const txt = await resp.text().catch(() => '');
         if (resp.status >= 400 && resp.status < 500) {
@@ -43,20 +53,21 @@ async function scFetch(url, apiKey, attempts = 4) {
         }
         throw new Error(`SamCart API ${resp.status}`);
       }
-      return await resp.json();
+      const text = await resp.text();    // read fully (throws on premature close)
+      return JSON.parse(text);
     } catch (err) {
       if (err.fatal) throw err;          // don't retry auth/bad-request errors
       lastErr = err;
-      if (i < attempts - 1) await sleep(600 * (i + 1));
+      if (i < attempts - 1) await sleep(800 * (i + 1));   // 0.8s, 1.6s, 2.4s, ...
     }
   }
   throw lastErr;
 }
 
 // Cursor-paginated fetch — follows pagination.next until exhausted.
-async function fetchAllOrders(apiKey, { maxPages = 300, onProgress } = {}) {
+async function fetchAllOrders(apiKey, { maxPages = 1000, onProgress } = {}) {
   const all = [];
-  let url   = `${BASE_URL}/orders?per_page=100`;
+  let url   = `${BASE_URL}/orders?per_page=${PAGE_SIZE}`;
   let pages = 0;
 
   while (url && pages < maxPages) {
@@ -73,7 +84,7 @@ async function fetchAllOrders(apiKey, { maxPages = 300, onProgress } = {}) {
 // All products — used to map an order's product_id to its checkout slug.
 async function fetchProducts(apiKey, { maxPages = 30 } = {}) {
   const all = [];
-  let url   = `${BASE_URL}/products?per_page=100`;
+  let url   = `${BASE_URL}/products?per_page=${PAGE_SIZE}`;
   let pages = 0;
   while (url && pages < maxPages) {
     const json = await scFetch(url, apiKey);
