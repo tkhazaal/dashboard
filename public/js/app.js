@@ -47,6 +47,18 @@ function slugKey(path) {
 }
 const titleCase = s => String(s || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
+// SamCart orders attributed to a slug. Matches the funnel/checkout slug to a
+// product slug exactly, or after stripping a trailing variant number
+// (e.g. checkout "the-repair-map147" -> product "the-repair-map").
+function ordersForSlug(slug) {
+  const map = state.scData && state.scData.ordersBySlug;
+  if (!map || !slug) return null;
+  if (map[slug]) return map[slug];
+  const stripped = slug.replace(/\d+$/, '').replace(/-+$/, '');
+  if (stripped && map[stripped]) return map[stripped];
+  return null;
+}
+
 // Host-aware label: checkout pages get a "Checkout — <product>" label derived
 // from the last path segment; otherwise fall back to the campaign map.
 function pageLabel(path, host) {
@@ -397,6 +409,7 @@ function renderPagesTable(rows) {
   list.sort((a, b) => {
     if (state.paSort === 'unique_visitors') return b.landingUnique  - a.landingUnique;
     if (state.paSort === 'checkout_views')  return b.checkoutViews  - a.checkoutViews;
+    if (state.paSort === 'orders')          return (ordersForSlug(b.slug)?.orders || 0) - (ordersForSlug(a.slug)?.orders || 0);
     return b.landingViews - a.landingViews;
   });
 
@@ -404,9 +417,10 @@ function renderPagesTable(rows) {
 
   const body = $('pagesTable');
   body.innerHTML = list.length === 0
-    ? `<tr class="empty-row"><td colspan="6">No page views yet — add the tracking code to your pages.</td></tr>`
+    ? `<tr class="empty-row"><td colspan="7">No page views yet — add the tracking code to your pages.</td></tr>`
     : list.map((e, i) => {
         const displayPath = e.landingPath || `/${e.slug}`;
+        const ord = ordersForSlug(e.slug);
         return `
         <tr>
           <td class="rank">${i + 1}</td>
@@ -418,6 +432,9 @@ function renderPagesTable(rows) {
           <td>${fmtNum(e.landingUnique)}</td>
           <td>${e.checkoutViews
                 ? `<span class="checkout-count" title="${fmtNum(e.checkoutUnique)} unique">${fmtNum(e.checkoutViews)}</span>`
+                : '<span class="muted">—</span>'}</td>
+          <td>${ord
+                ? `<span class="orders-count" title="${fmtMoney(ord.revenue)} revenue">${fmtNum(ord.orders)}</span>`
                 : '<span class="muted">—</span>'}</td>
           <td class="email-cell">${timeAgo(e.lastSeen)}</td>
         </tr>
@@ -491,6 +508,8 @@ async function loadSamCart(force = false) {
   renderTiers(data.tiers);
   renderBehaviour(data);
   renderPaths();
+  // Re-render the pages table so the Orders column (from SamCart) populates
+  if (state.pagesData && state.pagesData.length) renderPagesTable(state.pagesData);
 }
 
 // ── Customer rendering (client-side filtered) ────────────────────

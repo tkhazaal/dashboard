@@ -361,6 +361,7 @@ tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: #fafbff; }
 
 .checkout-count { font-weight: 700; color: var(--accent2); }
+.orders-count { font-weight: 800; color: var(--accent); }
 .muted { color: var(--sub); }
 
 .rank { font-size: 11px; color: var(--sub); font-weight: 600; }

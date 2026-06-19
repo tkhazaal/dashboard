@@ -27,6 +27,32 @@ async function setCache(key, payload) {
 
 const SC_HEADERS = apiKey => ({ 'sc-api': apiKey, 'Accept': 'application/json' });
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Fetch one SamCart URL as JSON, retrying transient failures (network resets,
+// "Invalid response body", 5xx). Client errors (4xx) fail fast.
+async function scFetch(url, apiKey, attempts = 4) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const resp = await fetch(url, { headers: SC_HEADERS(apiKey), timeout: 30000 });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => '');
+        if (resp.status >= 400 && resp.status < 500) {
+          throw Object.assign(new Error(`SamCart API ${resp.status}: ${txt.slice(0, 200)}`), { fatal: true });
+        }
+        throw new Error(`SamCart API ${resp.status}`);
+      }
+      return await resp.json();
+    } catch (err) {
+      if (err.fatal) throw err;          // don't retry auth/bad-request errors
+      lastErr = err;
+      if (i < attempts - 1) await sleep(600 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
 // Cursor-paginated fetch — follows pagination.next until exhausted.
 async function fetchAllOrders(apiKey, { maxPages = 300, onProgress } = {}) {
   const all = [];
@@ -34,12 +60,7 @@ async function fetchAllOrders(apiKey, { maxPages = 300, onProgress } = {}) {
   let pages = 0;
 
   while (url && pages < maxPages) {
-    const resp = await fetch(url, { headers: SC_HEADERS(apiKey), timeout: 30000 });
-    if (!resp.ok) {
-      const txt = await resp.text();
-      throw new Error(`SamCart API ${resp.status}: ${txt.slice(0, 200)}`);
-    }
-    const json = await resp.json();
+    const json = await scFetch(url, apiKey);
     const data = Array.isArray(json) ? json : (json.data || []);
     all.push(...data);
     pages++;
@@ -49,24 +70,47 @@ async function fetchAllOrders(apiKey, { maxPages = 300, onProgress } = {}) {
   return all;
 }
 
-// Fetch a single customer's name/email by id (for top-customer enrichment).
-async function fetchCustomer(id, apiKey) {
-  try {
-    const resp = await fetch(`${BASE_URL}/customers/${id}`, { headers: SC_HEADERS(apiKey), timeout: 15000 });
-    if (!resp.ok) return null;
-    return await resp.json();
-  } catch { return null; }
+// All products — used to map an order's product_id to its checkout slug.
+async function fetchProducts(apiKey, { maxPages = 30 } = {}) {
+  const all = [];
+  let url   = `${BASE_URL}/products?per_page=100`;
+  let pages = 0;
+  while (url && pages < maxPages) {
+    const json = await scFetch(url, apiKey);
+    const data = Array.isArray(json) ? json : (json.data || []);
+    all.push(...data);
+    pages++;
+    url = json.pagination && json.pagination.next ? json.pagination.next : null;
+  }
+  return all;
 }
 
-// Primary product of an order = first non-upsell cart item (fallback: first item).
-function orderProduct(o) {
+// Fetch a single customer's name/email by id (for top-customer enrichment).
+async function fetchCustomer(id, apiKey) {
+  try { return await scFetch(`${BASE_URL}/customers/${id}`, apiKey, 2); }
+  catch { return null; }
+}
+
+// Primary cart item of an order = first non-upsell item (fallback: first item).
+function orderMainItem(o) {
   const items = o.cart_items || [];
-  const main  = items.find(it => !it.upsell_id) || items[0];
+  return items.find(it => !it.upsell_id) || items[0] || null;
+}
+function orderProduct(o) {
+  const main = orderMainItem(o);
   return (main && main.product_name) || 'Unknown Product';
 }
 
 async function computeMetrics(orders, apiKey) {
+  // Map product_id -> checkout slug so orders can be attributed to a funnel slug.
+  const slugById = {};
+  try {
+    const products = await fetchProducts(apiKey);
+    products.forEach(p => { if (p.id != null && p.slug) slugById[p.id] = String(p.slug).toLowerCase(); });
+  } catch { /* attribution is best-effort */ }
+
   const custMap = new Map();
+  const ordersBySlug = {};   // slug -> { orders, revenue }
 
   for (const o of orders) {
     if (o.test_mode) continue;                         // exclude sandbox/test orders
@@ -76,6 +120,15 @@ async function computeMetrics(orders, apiKey) {
     const amount  = (parseFloat(o.total) || 0) / 100;  // SamCart amounts are in cents
     const date    = o.order_date || null;
     const product = orderProduct(o);
+
+    // Attribute this order to the main product's slug
+    const main = orderMainItem(o);
+    const slug = main && slugById[main.product_id];
+    if (slug) {
+      if (!ordersBySlug[slug]) ordersBySlug[slug] = { orders: 0, revenue: 0 };
+      ordersBySlug[slug].orders++;
+      ordersBySlug[slug].revenue += amount;
+    }
 
     if (!custMap.has(cid)) custMap.set(cid, { cid, orders: [], products: new Set(), ltv: 0 });
     const c = custMap.get(cid);
@@ -193,6 +246,11 @@ async function computeMetrics(orders, apiKey) {
 
   const totalOrders = customers.reduce((s, c) => s + c.orders, 0);
 
+  // Round slug-attributed revenue
+  for (const k of Object.keys(ordersBySlug)) {
+    ordersBySlug[k].revenue = Math.round(ordersBySlug[k].revenue * 100) / 100;
+  }
+
   return {
     totalCustomers: total,
     totalRevenue:   Math.round(revenue * 100) / 100,
@@ -208,6 +266,7 @@ async function computeMetrics(orders, apiKey) {
     ecosystemBuyers: ecosystemCount,
     momRevenue, momOrders, momLabel, monthToDate,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
+    ordersBySlug,
   };
 }
 
