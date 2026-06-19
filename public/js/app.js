@@ -24,7 +24,7 @@ const CAMPAIGN_LABELS = {
   '/fathers-repair-system':       'Emails',
   '/the-fathers-repair-system':   'TikTok',
   '/fathers-repair-bundle':       'FB Group',
-  '/fathers-repair-blueprint':    'FB Ads',
+  '/fathers-repair-play-book':    'FB Ads',
 };
 const campaignName = path => {
   const key = String(path || '').replace(/\/+$/, '').toLowerCase() || '/';
