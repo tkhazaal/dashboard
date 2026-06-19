@@ -167,13 +167,19 @@
 
       <!-- Page analytics filters -->
       <div class="filter-bar">
-        <span class="filter-label">Date range</span>
         <div class="date-btns" id="pa-dateBtns">
           <button class="date-btn" data-days="1">Today</button>
-          <button class="date-btn" data-days="7">7 Days</button>
-          <button class="date-btn active" data-days="30">30 Days</button>
-          <button class="date-btn" data-days="90">90 Days</button>
-          <button class="date-btn" data-days="0">All Time</button>
+          <button class="date-btn" data-days="7">7D</button>
+          <button class="date-btn active" data-days="30">30D</button>
+          <button class="date-btn" data-days="90">90D</button>
+          <button class="date-btn" data-days="0">All</button>
+        </div>
+        <div class="filter-sep"></div>
+        <div class="daterange" id="pa-range">
+          <input type="date" id="pa-start" class="date-input" aria-label="Start date">
+          <span class="daterange-to">→</span>
+          <input type="date" id="pa-end" class="date-input" aria-label="End date">
+          <button class="clear-btn" id="pa-range-clear" title="Clear date range" hidden>✕</button>
         </div>
         <div class="filter-sep"></div>
         <div class="search-wrap">

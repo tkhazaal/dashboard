@@ -60,6 +60,8 @@ initTheme();
 const state = {
   ovDays:      30,
   paDays:      30,
+  paStart:     '',
+  paEnd:       '',
   paSearch:    '',
   paSort:      'total_views',
   trendDays:   30,
@@ -249,10 +251,6 @@ async function loadOverviewStats(days) {
   $('ov-uniqueVisitors').textContent = fmtNum(overview.uniqueVisitors);
   $('ov-todayViews').textContent     = `${fmtNum(overview.todayViews)} today`;
   $('ov-todayUnique').textContent    = `${fmtNum(overview.todayUnique)} today`;
-  $('pa-totalViews').textContent     = fmtNum(overview.totalViews);
-  $('pa-uniqueVisitors').textContent = fmtNum(overview.uniqueVisitors);
-  $('pa-weekViews').textContent      = fmtNum(overview.weekViews);
-  $('pa-monthViews').textContent     = fmtNum(overview.monthViews);
 }
 
 async function loadTrend(days) {
@@ -260,17 +258,32 @@ async function loadTrend(days) {
   buildTrendChart(rows);
 }
 
-async function loadPagesTable() {
-  const params = new URLSearchParams();
-  if (state.paDays > 0) params.set('days', state.paDays);
+// Build query params for Page Analytics — custom range takes priority over preset days.
+function paRangeParams() {
+  const p = new URLSearchParams();
+  if (state.paStart && state.paEnd) { p.set('start', state.paStart); p.set('end', state.paEnd); }
+  else if (state.paDays > 0)        { p.set('days', state.paDays); }
+  return p;
+}
 
+async function loadPaStats() {
+  const overview = await api(`/api/analytics/overview?${paRangeParams()}`);
+  $('pa-totalViews').textContent     = fmtNum(overview.totalViews);
+  $('pa-uniqueVisitors').textContent = fmtNum(overview.uniqueVisitors);
+  $('pa-weekViews').textContent      = fmtNum(overview.weekViews);
+  $('pa-monthViews').textContent     = fmtNum(overview.monthViews);
+}
+
+async function loadPagesTable() {
+  const params = paRangeParams();
   const rows = await api(`/api/analytics/pages?${params}`);
   state.pagesData = rows;
   renderPagesTable(rows);
 
-  // Also reload referrers with same date filter
-  const refs = await api(`/api/analytics/referrers${state.paDays > 0 ? `?days=${state.paDays}` : ''}`);
+  // Referrers + stat cards share the same date filter
+  const refs = await api(`/api/analytics/referrers?${params}`);
   renderReferrersTable(refs);
+  loadPaStats();
 }
 
 function renderPagesTable(rows) {
@@ -644,7 +657,36 @@ $('feedSearch').addEventListener('input', e => {
 // ── Wire up Page Analytics filters ───────────────────────────────
 initDateBtns('pa-dateBtns', days => {
   state.paDays = days;
-  loadOverviewStats(days);
+  // Selecting a preset clears any custom range
+  state.paStart = ''; state.paEnd = '';
+  $('pa-start').value = ''; $('pa-end').value = '';
+  $('pa-range-clear').hidden = true;
+  loadPagesTable();
+});
+
+// Custom date-range picker
+function applyDateRange() {
+  const s = $('pa-start').value, e = $('pa-end').value;
+  if (!s || !e) return;
+  // Normalize if reversed
+  state.paStart = s <= e ? s : e;
+  state.paEnd   = s <= e ? e : s;
+  $('pa-start').value = state.paStart; $('pa-end').value = state.paEnd;
+  // Deactivate preset buttons — a custom range is now in effect
+  document.querySelectorAll('#pa-dateBtns .date-btn').forEach(b => b.classList.remove('active'));
+  $('pa-range-clear').hidden = false;
+  loadPagesTable();
+}
+$('pa-start').addEventListener('change', applyDateRange);
+$('pa-end').addEventListener('change', applyDateRange);
+
+$('pa-range-clear').addEventListener('click', () => {
+  state.paStart = ''; state.paEnd = '';
+  $('pa-start').value = ''; $('pa-end').value = '';
+  $('pa-range-clear').hidden = true;
+  // Restore the default 30-day preset
+  state.paDays = 30;
+  document.querySelectorAll('#pa-dateBtns .date-btn').forEach(b => b.classList.toggle('active', b.dataset.days === '30'));
   loadPagesTable();
 });
 

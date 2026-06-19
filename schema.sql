@@ -44,8 +44,13 @@ ON CONFLICT (key) DO NOTHING;
 
 
 -- ── Analytics functions (called via RPC) ──────────────────
+-- All functions accept an optional explicit date range (start_date / end_date,
+-- 'YYYY-MM-DD'). When provided it takes priority over days_back.
+-- Re-running this section is safe — it only redefines functions, never data.
 
-CREATE OR REPLACE FUNCTION analytics_overview(days_back INT DEFAULT 0)
+DROP FUNCTION IF EXISTS analytics_overview(INT);
+DROP FUNCTION IF EXISTS analytics_overview(INT, TEXT, TEXT);
+CREATE FUNCTION analytics_overview(days_back INT DEFAULT 0, start_date TEXT DEFAULT '', end_date TEXT DEFAULT '')
 RETURNS JSON
 LANGUAGE plpgsql
 AS $$
@@ -53,7 +58,9 @@ DECLARE
   dc TEXT := '';
   result JSON;
 BEGIN
-  IF days_back = 1 THEN
+  IF start_date <> '' AND end_date <> '' THEN
+    dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
+  ELSIF days_back = 1 THEN
     dc := 'AND created_at::date = CURRENT_DATE';
   ELSIF days_back > 1 THEN
     dc := format('AND created_at >= NOW() - INTERVAL ''%s days''', days_back);
@@ -76,7 +83,9 @@ END;
 $$;
 
 
-CREATE OR REPLACE FUNCTION analytics_pages(days_back INT DEFAULT 0, search_term TEXT DEFAULT '')
+DROP FUNCTION IF EXISTS analytics_pages(INT, TEXT);
+DROP FUNCTION IF EXISTS analytics_pages(INT, TEXT, TEXT, TEXT);
+CREATE FUNCTION analytics_pages(days_back INT DEFAULT 0, search_term TEXT DEFAULT '', start_date TEXT DEFAULT '', end_date TEXT DEFAULT '')
 RETURNS TABLE(
   page_path       TEXT,
   page_title      TEXT,
@@ -91,7 +100,9 @@ DECLARE
   dc TEXT := '';
   sc TEXT := '';
 BEGIN
-  IF days_back = 1 THEN
+  IF start_date <> '' AND end_date <> '' THEN
+    dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
+  ELSIF days_back = 1 THEN
     dc := 'AND created_at::date = CURRENT_DATE';
   ELSIF days_back > 1 THEN
     dc := format('AND created_at >= NOW() - INTERVAL ''%s days''', days_back);
@@ -117,15 +128,19 @@ END;
 $$;
 
 
-CREATE OR REPLACE FUNCTION analytics_trend(days_back INT DEFAULT 30)
+DROP FUNCTION IF EXISTS analytics_trend(INT);
+DROP FUNCTION IF EXISTS analytics_trend(INT, TEXT, TEXT);
+CREATE FUNCTION analytics_trend(days_back INT DEFAULT 30, start_date TEXT DEFAULT '', end_date TEXT DEFAULT '')
 RETURNS TABLE(day DATE, views INT, unique_visitors INT)
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  where_clause TEXT := '';
+  wc TEXT := '';
 BEGIN
-  IF days_back > 0 THEN
-    where_clause := format('WHERE created_at >= NOW() - INTERVAL ''%s days''', days_back);
+  IF start_date <> '' AND end_date <> '' THEN
+    wc := format('WHERE created_at::date BETWEEN %L AND %L', start_date, end_date);
+  ELSIF days_back > 0 THEN
+    wc := format('WHERE created_at >= NOW() - INTERVAL ''%s days''', days_back);
   END IF;
 
   RETURN QUERY EXECUTE format('
@@ -136,12 +151,14 @@ BEGIN
     FROM page_views %s
     GROUP BY created_at::date
     ORDER BY day ASC
-  ', where_clause);
+  ', wc);
 END;
 $$;
 
 
-CREATE OR REPLACE FUNCTION analytics_recent(days_back INT DEFAULT 0, page_filter TEXT DEFAULT '')
+DROP FUNCTION IF EXISTS analytics_recent(INT, TEXT);
+DROP FUNCTION IF EXISTS analytics_recent(INT, TEXT, TEXT, TEXT);
+CREATE FUNCTION analytics_recent(days_back INT DEFAULT 0, page_filter TEXT DEFAULT '', start_date TEXT DEFAULT '', end_date TEXT DEFAULT '')
 RETURNS TABLE(page_path TEXT, page_title TEXT, referrer TEXT, ip_address TEXT, created_at TIMESTAMPTZ)
 LANGUAGE plpgsql
 AS $$
@@ -149,7 +166,9 @@ DECLARE
   dc TEXT := '';
   pc TEXT := '';
 BEGIN
-  IF days_back = 1 THEN
+  IF start_date <> '' AND end_date <> '' THEN
+    dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
+  ELSIF days_back = 1 THEN
     dc := 'AND created_at::date = CURRENT_DATE';
   ELSIF days_back > 1 THEN
     dc := format('AND created_at >= NOW() - INTERVAL ''%s days''', days_back);
@@ -169,14 +188,18 @@ END;
 $$;
 
 
-CREATE OR REPLACE FUNCTION analytics_referrers(days_back INT DEFAULT 0)
+DROP FUNCTION IF EXISTS analytics_referrers(INT);
+DROP FUNCTION IF EXISTS analytics_referrers(INT, TEXT, TEXT);
+CREATE FUNCTION analytics_referrers(days_back INT DEFAULT 0, start_date TEXT DEFAULT '', end_date TEXT DEFAULT '')
 RETURNS TABLE(source TEXT, visits INT, unique_visitors INT)
 LANGUAGE plpgsql
 AS $$
 DECLARE
   dc TEXT := '';
 BEGIN
-  IF days_back = 1 THEN
+  IF start_date <> '' AND end_date <> '' THEN
+    dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
+  ELSIF days_back = 1 THEN
     dc := 'AND created_at::date = CURRENT_DATE';
   ELSIF days_back > 1 THEN
     dc := format('AND created_at >= NOW() - INTERVAL ''%s days''', days_back);
