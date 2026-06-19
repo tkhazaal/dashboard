@@ -9,7 +9,7 @@ const CACHE_TTL = parseInt(process.env.SAMCART_CACHE_MINUTES || '60', 10) * 60 *
 
 // Smaller pages = smaller responses = far less chance of a "Premature close"
 // on slower connections (env-tunable; SamCart caps per_page at 100).
-const PAGE_SIZE = Math.min(100, Math.max(10, parseInt(process.env.SAMCART_PAGE_SIZE || '50', 10)));
+const PAGE_SIZE = Math.min(100, Math.max(5, parseInt(process.env.SAMCART_PAGE_SIZE || '25', 10)));
 
 // Force a fresh TCP connection per request. Reusing keep-alive sockets is the
 // usual cause of "Premature close" during long crawls.
@@ -34,7 +34,9 @@ async function setCache(key, payload) {
   );
 }
 
-const SC_HEADERS = apiKey => ({ 'sc-api': apiKey, 'Accept': 'application/json', 'Connection': 'close' });
+// Accept-Encoding: identity disables gzip — a truncated gzip stream is a common
+// source of "Premature close", and uncompressed small pages decode reliably.
+const SC_HEADERS = apiKey => ({ 'sc-api': apiKey, 'Accept': 'application/json', 'Connection': 'close', 'Accept-Encoding': 'identity' });
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
