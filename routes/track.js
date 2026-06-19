@@ -8,6 +8,14 @@ router.use(express.text({ type: '*/*', limit: '16kb' }));
 // 1x1 transparent GIF for the image-pixel fallback
 const PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
 
+// Builder / preview hosts to ignore — visits from these are the page-builder's
+// own edit & preview sessions, not real visitors.
+const BLOCKED_HOST_PATTERNS = ['leadconnectorhq', 'vibepreview.com', 'storege.io', 'clickfunnels.com'];
+function isBlockedHost(hostname) {
+  const h = (hostname || '').toLowerCase();
+  return BLOCKED_HOST_PATTERNS.some(p => h.includes(p));
+}
+
 function getPayload(req) {
   // GET pixel: data is in ?d=<json>
   if (req.method === 'GET' && req.query.d) {
@@ -28,6 +36,9 @@ async function handle(req, res, respond) {
 
     let parsed;
     try { parsed = new URL(body.url); } catch { return respond(400); }
+
+    // Silently drop builder/preview traffic (respond 204 so the beacon doesn't retry)
+    if (isBlockedHost(parsed.hostname)) return respond(204);
 
     const { error } = await supabase.from('page_views').insert({
       page_url:   String(body.url).slice(0, 500),

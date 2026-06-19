@@ -28,6 +28,10 @@ app.get('/t.js', async (req, res) => {
 (function(){
   'use strict';
   try {
+    // Ignore page-builder / preview hosts — these are edit & preview sessions, not real visitors.
+    var blocked=['leadconnectorhq','vibepreview.com','storege.io','clickfunnels.com'];
+    var host=(location.hostname||'').toLowerCase();
+    for(var bi=0;bi<blocked.length;bi++){ if(host.indexOf(blocked[bi])>-1) return; }
     var vid = localStorage.getItem('_mtd_vid');
     if(!vid){ vid='v_'+Math.random().toString(36).substr(2,9)+Date.now().toString(36); localStorage.setItem('_mtd_vid',vid); }
     var sid = sessionStorage.getItem('_mtd_sid');
