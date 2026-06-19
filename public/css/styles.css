@@ -360,6 +360,9 @@ td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--tex
 tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: #fafbff; }
 
+.checkout-count { font-weight: 700; color: var(--accent2); }
+.muted { color: var(--sub); }
+
 .rank { font-size: 11px; color: var(--sub); font-weight: 600; }
 .name-cell { font-weight: 600; }
 .email-cell { font-size: 11px; color: var(--sub); }

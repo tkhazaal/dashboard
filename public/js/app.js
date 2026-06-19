@@ -32,8 +32,20 @@ const campaignName = path => {
   return CAMPAIGN_LABELS[key] || null;
 };
 
-// A page is a SamCart checkout if its host contains "samcart"
+// A page is a SamCart checkout if its host contains "samcart" OR its path
+// starts with /product (SamCart checkout slugs come through as /product/<slug>).
 const isCheckoutHost = host => /samcart/i.test(host || '');
+const isCheckoutPage = (path, host) =>
+  isCheckoutHost(host) || /^\/products?(\/|$)/i.test(String(path || ''));
+
+// Funnel slug = the last path segment, lowercased. This is the shared key
+// between a landing page (/fathers-repair-guide) and its SamCart checkout
+// (/product/fathers-repair-guide).
+function slugKey(path) {
+  const segs = String(path || '').toLowerCase().replace(/\/+$/, '').split('/').filter(Boolean);
+  return segs.length ? segs[segs.length - 1] : '/';
+}
+const titleCase = s => String(s || '').replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 // Host-aware label: checkout pages get a "Checkout — <product>" label derived
 // from the last path segment; otherwise fall back to the campaign map.
@@ -342,41 +354,72 @@ async function loadPagesTable() {
 }
 
 function renderPagesTable(rows) {
-  // Client-side search — matches label, path, or page title
-  let filtered = rows;
+  // Aggregate by funnel slug — fold each SamCart checkout (/product/<slug>) into
+  // the landing page that shares the same slug, so one row shows both sides.
+  const map = new Map();
+  for (const r of rows) {
+    const checkout = isCheckoutPage(r.page_path, r.host);
+    const slug = slugKey(r.page_path);
+    if (!map.has(slug)) map.set(slug, {
+      slug, landingViews: 0, landingUnique: 0, checkoutViews: 0, checkoutUnique: 0,
+      landingPath: null, title: null, host: null, lastSeen: null,
+    });
+    const e = map.get(slug);
+    if (checkout) {
+      e.checkoutViews  += r.total_views;
+      e.checkoutUnique += r.unique_visitors;
+      if (!e.host) e.host = r.host;
+    } else {
+      e.landingViews  += r.total_views;
+      e.landingUnique += r.unique_visitors;
+      if (!e.landingPath) { e.landingPath = r.page_path; e.title = r.page_title; }
+    }
+    if (!e.lastSeen || new Date(r.last_seen) > new Date(e.lastSeen)) e.lastSeen = r.last_seen;
+  }
+  let list = [...map.values()];
+
+  // Label for each slug row: campaign name if it's a known landing page, else the slug
+  const rowLabel = e => e.landingPath
+    ? (campaignName(e.landingPath) || e.title || e.landingPath)
+    : `Checkout — ${titleCase(e.slug)}`;
+
+  // Client-side search — matches label, slug, or title
   if (state.paSearch) {
     const q = state.paSearch.toLowerCase();
-    filtered = rows.filter(p =>
-      (pageLabel(p.page_path, p.host) || '').toLowerCase().includes(q) ||
-      String(p.page_path  || '').toLowerCase().includes(q) ||
-      String(p.page_title || '').toLowerCase().includes(q)
+    list = list.filter(e =>
+      rowLabel(e).toLowerCase().includes(q) ||
+      e.slug.includes(q) ||
+      String(e.title || '').toLowerCase().includes(q)
     );
   }
 
   // Sort
-  const sorted = [...filtered].sort((a, b) => {
-    if (state.paSort === 'unique_visitors') return b.unique_visitors - a.unique_visitors;
-    return b.total_views - a.total_views;
+  list.sort((a, b) => {
+    if (state.paSort === 'unique_visitors') return b.landingUnique  - a.landingUnique;
+    if (state.paSort === 'checkout_views')  return b.checkoutViews  - a.checkoutViews;
+    return b.landingViews - a.landingViews;
   });
 
-  $('pa-resultCount').textContent = `${fmtNum(sorted.length)} page${sorted.length !== 1 ? 's' : ''}`;
+  $('pa-resultCount').textContent = `${fmtNum(list.length)} page${list.length !== 1 ? 's' : ''}`;
 
   const body = $('pagesTable');
-  body.innerHTML = sorted.length === 0
-    ? `<tr class="empty-row"><td colspan="5">No page views yet — add the tracking code to your pages.</td></tr>`
-    : sorted.map((p, i) => {
-        const checkout = isCheckoutHost(p.host);
-        const label = pageLabel(p.page_path, p.host);
+  body.innerHTML = list.length === 0
+    ? `<tr class="empty-row"><td colspan="6">No page views yet — add the tracking code to your pages.</td></tr>`
+    : list.map((e, i) => {
+        const displayPath = e.landingPath || `/${e.slug}`;
         return `
         <tr>
           <td class="rank">${i + 1}</td>
           <td>
-            <div class="name-cell">${escHtml(label || p.page_title || p.page_path)}${checkout ? ' <span class="badge green">Checkout</span>' : ''}</div>
-            <div class="email-cell">${escHtml((p.host && isCheckoutHost(p.host) ? p.host : '') + p.page_path)}</div>
+            <div class="name-cell">${escHtml(rowLabel(e))}</div>
+            <div class="email-cell">${escHtml(displayPath)}</div>
           </td>
-          <td>${fmtNum(p.total_views)}</td>
-          <td>${fmtNum(p.unique_visitors)}</td>
-          <td class="email-cell">${timeAgo(p.last_seen)}</td>
+          <td>${fmtNum(e.landingViews)}</td>
+          <td>${fmtNum(e.landingUnique)}</td>
+          <td>${e.checkoutViews
+                ? `<span class="checkout-count" title="${fmtNum(e.checkoutUnique)} unique">${fmtNum(e.checkoutViews)}</span>`
+                : '<span class="muted">—</span>'}</td>
+          <td class="email-cell">${timeAgo(e.lastSeen)}</td>
         </tr>
       `;}).join('');
 }
