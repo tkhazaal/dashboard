@@ -190,8 +190,8 @@ function buildTrendChart(rows) {
     data: {
       labels,
       datasets: [
-        { label: 'Page Views',      data: rows.map(r=>r.views),           borderColor: '#5b6af0', backgroundColor: 'rgba(91,106,240,0.08)', fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 5 },
-        { label: 'Unique Visitors', data: rows.map(r=>r.unique_visitors),  borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)', fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 5 },
+        { label: 'Page Views',      data: rows.map(r=>r.views),           borderColor: '#2F5D57', backgroundColor: 'rgba(47,93,87,0.08)', fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 5 },
+        { label: 'Unique Visitors', data: rows.map(r=>r.unique_visitors),  borderColor: '#3E7C5A', backgroundColor: 'rgba(62,124,90,0.06)', fill: true, tension: 0.4, pointRadius: 3, pointHoverRadius: 5 },
       ]
     },
     options: {
@@ -199,8 +199,8 @@ function buildTrendChart(rows) {
       interaction: { mode: 'index', intersect: false },
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9ca3af', maxTicksLimit: 12 } },
-        y: { grid: { color: 'rgba(148,163,184,0.18)' }, ticks: { font: { size: 11 }, color: '#9ca3af' }, beginAtZero: true }
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#8a8170', maxTicksLimit: 12 } },
+        y: { grid: { color: 'rgba(124,118,106,0.20)' }, ticks: { font: { size: 11 }, color: '#8a8170' }, beginAtZero: true }
       }
     }
   });
@@ -215,7 +215,7 @@ function buildBuyerSplitChart(single, repeat) {
     type: 'doughnut',
     data: {
       labels: ['Single Buyers', 'Repeat Buyers'],
-      datasets: [{ data: [single, repeat], backgroundColor: ['#e8eaf0', '#5b6af0'], borderWidth: 0, hoverOffset: 6 }]
+      datasets: [{ data: [single, repeat], backgroundColor: ['#e8eaf0', '#2F5D57'], borderWidth: 0, hoverOffset: 6 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '70%',
@@ -229,7 +229,7 @@ function buildBuyerSplitChart(single, repeat) {
   const legend = $('buyerSplitLegend');
   if (legend) {
     legend.innerHTML = `
-      <div class="legend-item"><div class="legend-dot" style="background:#5b6af0"></div>Repeat (${fmtNum(repeat)})</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2F5D57"></div>Repeat (${fmtNum(repeat)})</div>
       <div class="legend-item"><div class="legend-dot" style="background:#e8eaf0;border:1px solid #d1d5db"></div>Single (${fmtNum(single)})</div>
     `;
   }
@@ -250,8 +250,8 @@ function buildRevenueChart(monthly) {
     data: {
       labels,
       datasets: [
-        { type: 'bar',  label: 'Revenue', data: rows.map(r=>r.revenue), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 4, yAxisID: 'y',  order: 2 },
-        { type: 'line', label: 'Orders',  data: rows.map(r=>r.orders),  borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.4, pointRadius: 3, yAxisID: 'y1', order: 1 },
+        { type: 'bar',  label: 'Revenue', data: rows.map(r=>r.revenue), backgroundColor: 'rgba(47,93,87,0.85)', borderRadius: 4, yAxisID: 'y',  order: 2 },
+        { type: 'line', label: 'Orders',  data: rows.map(r=>r.orders),  borderColor: '#3E7C5A', backgroundColor: 'rgba(62,124,90,0.1)', tension: 0.4, pointRadius: 3, yAxisID: 'y1', order: 1 },
       ]
     },
     options: {
@@ -262,9 +262,9 @@ function buildRevenueChart(monthly) {
         tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Revenue' ? ` Revenue: ${fmtMoney(ctx.raw)}` : ` Orders: ${fmtNum(ctx.raw)}` } }
       },
       scales: {
-        x:  { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9ca3af' } },
-        y:  { position: 'left',  grid: { color: 'rgba(148,163,184,0.18)' }, ticks: { font: { size: 11 }, color: '#9ca3af', callback: v => '$' + (v >= 1000 ? (v/1000)+'k' : v) }, beginAtZero: true },
-        y1: { position: 'right', grid: { display: false },   ticks: { font: { size: 11 }, color: '#10b981' }, beginAtZero: true }
+        x:  { grid: { display: false }, ticks: { font: { size: 11 }, color: '#8a8170' } },
+        y:  { position: 'left',  grid: { color: 'rgba(124,118,106,0.20)' }, ticks: { font: { size: 11 }, color: '#8a8170', callback: v => '$' + (v >= 1000 ? (v/1000)+'k' : v) }, beginAtZero: true },
+        y1: { position: 'right', grid: { display: false },   ticks: { font: { size: 11 }, color: '#3E7C5A' }, beginAtZero: true }
       }
     }
   });
@@ -372,10 +372,6 @@ async function loadPagesTable() {
   const rows = await api(`/api/analytics/pages?${params}`);
   state.pagesData = rows;
   renderPagesTable(rows);
-
-  // Referrers + stat cards share the same date filter
-  const refs = await api(`/api/analytics/referrers?${params}`);
-  renderReferrersTable(refs);
   loadPaStats();
 }
 
@@ -423,7 +419,8 @@ function renderPagesTable(rows) {
   list.sort((a, b) => {
     if (state.paSort === 'unique_visitors') return b.landingUnique  - a.landingUnique;
     if (state.paSort === 'checkout_views')  return b.checkoutViews  - a.checkoutViews;
-    if (state.paSort === 'orders')          return (ordersForSlug(b.slug)?.orders || 0) - (ordersForSlug(a.slug)?.orders || 0);
+    if (state.paSort === 'orders')          return (ordersForSlug(b.slug)?.orders || 0)  - (ordersForSlug(a.slug)?.orders || 0);
+    if (state.paSort === 'order_value')     return (ordersForSlug(b.slug)?.revenue || 0) - (ordersForSlug(a.slug)?.revenue || 0);
     return b.landingViews - a.landingViews;
   });
 
@@ -431,7 +428,7 @@ function renderPagesTable(rows) {
 
   const body = $('pagesTable');
   body.innerHTML = list.length === 0
-    ? `<tr class="empty-row"><td colspan="7">No page views yet — add the tracking code to your pages.</td></tr>`
+    ? `<tr class="empty-row"><td colspan="8">No page views yet — add the tracking code to your pages.</td></tr>`
     : list.map((e, i) => {
         const displayPath = e.landingPath || `/${e.slug}`;
         const ord = ordersForSlug(e.slug);
@@ -448,7 +445,10 @@ function renderPagesTable(rows) {
                 ? `<span class="checkout-count" title="${fmtNum(e.checkoutUnique)} unique">${fmtNum(e.checkoutViews)}</span>`
                 : '<span class="muted">—</span>'}</td>
           <td>${ord
-                ? `<span class="orders-count" title="${fmtMoney(ord.revenue)} revenue">${fmtNum(ord.orders)}</span>`
+                ? `<span class="orders-count">${fmtNum(ord.orders)}</span>`
+                : '<span class="muted">—</span>'}</td>
+          <td>${ord
+                ? `<span class="value-count">${fmtMoney(ord.revenue)}</span>`
                 : '<span class="muted">—</span>'}</td>
           <td class="email-cell">${timeAgo(e.lastSeen)}</td>
         </tr>
@@ -897,9 +897,9 @@ $('path-clear').addEventListener('click', () => {
 });
 
 // ── Reporting page ────────────────────────────────────────────────
-const PALETTE = ['#5b6af0','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16','#f97316','#14b8a6','#6366f1','#a855f7'];
-const GRID = 'rgba(148,163,184,0.18)';
-const TICK = '#9ca3af';
+const PALETTE = ['#A9853F','#2F5D57','#3F5A6B','#9E3B34','#7A6A8F','#5D7A6B','#C0995A','#B06A4F','#4A4F6B','#8A8170','#6FA89D','#CBA35C'];
+const GRID = 'rgba(124,118,106,0.20)';
+const TICK = '#8a8170';
 const reportCharts = {};
 
 function mkChart(id, config) {
@@ -944,7 +944,7 @@ function renderReports() {
     // 1) Revenue trend (area)
     mkChart('rep-revenue-trend', {
       type: 'line',
-      data: { labels: mLabels, datasets: [{ label: 'Revenue', data: monthly.map(m => m.revenue), borderColor: '#5b6af0', backgroundColor: 'rgba(91,106,240,0.16)', fill: true, tension: 0.4, pointRadius: 2 }] },
+      data: { labels: mLabels, datasets: [{ label: 'Revenue', data: monthly.map(m => m.revenue), borderColor: '#2F5D57', backgroundColor: 'rgba(47,93,87,0.16)', fill: true, tension: 0.4, pointRadius: 2 }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { ...noLegend, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.raw) } } },
         scales: baseScales({ y: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true } }) }
     });
@@ -952,20 +952,20 @@ function renderReports() {
     // 2) Orders vs AOV (bars + line, dual axis)
     mkChart('rep-orders-aov', {
       data: { labels: mLabels, datasets: [
-        { type: 'bar', label: 'Orders', data: monthly.map(m => m.orders), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 3, yAxisID: 'y' },
-        { type: 'line', label: 'Avg Order Value', data: monthly.map(m => m.orders ? Math.round(m.revenue / m.orders) : 0), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', tension: 0.4, pointRadius: 2, yAxisID: 'y1' },
+        { type: 'bar', label: 'Orders', data: monthly.map(m => m.orders), backgroundColor: 'rgba(47,93,87,0.85)', borderRadius: 3, yAxisID: 'y' },
+        { type: 'line', label: 'Avg Order Value', data: monthly.map(m => m.orders ? Math.round(m.revenue / m.orders) : 0), borderColor: '#A9853F', backgroundColor: 'rgba(169,133,63,0.1)', tension: 0.4, pointRadius: 2, yAxisID: 'y1' },
       ] },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: legendBottom,
         scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } },
           y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK }, beginAtZero: true },
-          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#f59e0b', callback: moneyTick }, beginAtZero: true } } }
+          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#A9853F', callback: moneyTick }, beginAtZero: true } } }
     });
 
     // 3) Revenue by product (horizontal bar)
     const tp = (d.topProducts || []).slice(0, 10);
     mkChart('rep-revenue-product', {
       type: 'bar',
-      data: { labels: tp.map(p => shorten(p.name)), datasets: [{ label: 'Revenue', data: tp.map(p => p.revenue), backgroundColor: '#5b6af0', borderRadius: 3 }] },
+      data: { labels: tp.map(p => shorten(p.name)), datasets: [{ label: 'Revenue', data: tp.map(p => p.revenue), backgroundColor: '#2F5D57', borderRadius: 3 }] },
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { ...noLegend, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.raw) } } },
         scales: { x: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } } } }
     });
@@ -973,13 +973,13 @@ function renderReports() {
     // 4) Units vs revenue per product (dual axis bars)
     mkChart('rep-units-revenue', {
       data: { labels: tp.map(p => shorten(p.name, 14)), datasets: [
-        { type: 'bar', label: 'Units', data: tp.map(p => p.units), backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 3, yAxisID: 'y' },
-        { type: 'bar', label: 'Revenue', data: tp.map(p => p.revenue), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 3, yAxisID: 'y1' },
+        { type: 'bar', label: 'Units', data: tp.map(p => p.units), backgroundColor: 'rgba(62,124,90,0.85)', borderRadius: 3, yAxisID: 'y' },
+        { type: 'bar', label: 'Revenue', data: tp.map(p => p.revenue), backgroundColor: 'rgba(47,93,87,0.85)', borderRadius: 3, yAxisID: 'y1' },
       ] },
       options: { responsive: true, maintainAspectRatio: false, plugins: legendBottom,
         scales: { x: { grid: { display: false }, ticks: { font: { size: 8 }, color: TICK, maxRotation: 60, minRotation: 30 } },
-          y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#10b981' }, beginAtZero: true },
-          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#5b6af0', callback: moneyTick }, beginAtZero: true } } }
+          y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#3E7C5A' }, beginAtZero: true },
+          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#2F5D57', callback: moneyTick }, beginAtZero: true } } }
     });
 
     // 5) Revenue share by slug (doughnut, top 7 + Other)
@@ -999,24 +999,35 @@ function renderReports() {
       type: 'bar',
       data: { labels: ['Buyers'], datasets: [
         { label: 'Single', data: [d.singleBuyers], backgroundColor: '#e8a33d' },
-        { label: 'Funnel (<24h)', data: [d.funnelBuyers], backgroundColor: '#5b6af0' },
-        { label: 'Ecosystem (≥24h)', data: [d.ecosystemBuyers], backgroundColor: '#10b981' },
+        { label: 'Funnel (<24h)', data: [d.funnelBuyers], backgroundColor: '#2F5D57' },
+        { label: 'Ecosystem (≥24h)', data: [d.ecosystemBuyers], backgroundColor: '#3E7C5A' },
       ] },
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: legendBottom,
         scales: { x: { stacked: true, grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK } }, y: { stacked: true, grid: { display: false }, ticks: { display: false } } } }
+    });
+
+    // 6b) Gross revenue vs refunds (monthly)
+    if (d.refundRate != null) $('rep-refund-rate').textContent = `${fmtMoney(d.totalRefunded || 0)} refunded · ${d.refundRate}%`;
+    mkChart('rep-refunds', {
+      data: { labels: mLabels, datasets: [
+        { type: 'bar',  label: 'Gross Revenue', data: monthly.map(m => m.revenue), backgroundColor: 'rgba(47,93,87,0.80)', borderRadius: 3, yAxisID: 'y' },
+        { type: 'line', label: 'Refunds', data: monthly.map(m => m.refunds || 0), borderColor: '#9E3B34', backgroundColor: 'rgba(158,59,52,0.12)', fill: true, tension: 0.35, pointRadius: 2, yAxisID: 'y' },
+      ] },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { ...legendBottom, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${fmtMoney(c.raw)}` } } },
+        scales: baseScales({ y: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true } }) }
     });
 
     // 7) LTV tiers (bars count + line total)
     const tiers = d.tiers || [];
     mkChart('rep-ltv-tiers', {
       data: { labels: tiers.map(t => t.label), datasets: [
-        { type: 'bar', label: 'Customers', data: tiers.map(t => t.count), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 3, yAxisID: 'y' },
-        { type: 'line', label: 'Revenue', data: tiers.map(t => t.total), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.4, pointRadius: 3, yAxisID: 'y1' },
+        { type: 'bar', label: 'Customers', data: tiers.map(t => t.count), backgroundColor: 'rgba(47,93,87,0.85)', borderRadius: 3, yAxisID: 'y' },
+        { type: 'line', label: 'Revenue', data: tiers.map(t => t.total), borderColor: '#3E7C5A', backgroundColor: 'rgba(62,124,90,0.1)', tension: 0.4, pointRadius: 3, yAxisID: 'y1' },
       ] },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: legendBottom,
         scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } },
-          y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#5b6af0' }, beginAtZero: true },
-          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#10b981', callback: moneyTick }, beginAtZero: true } } }
+          y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#2F5D57' }, beginAtZero: true },
+          y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#3E7C5A', callback: moneyTick }, beginAtZero: true } } }
     });
 
     // 8) Revenue concentration by tier (pie)
@@ -1039,7 +1050,7 @@ function renderReports() {
     // 10) Order depth vs value (bubble: x=orders, y=ltv, r=products)
     mkChart('rep-order-depth', {
       type: 'bubble',
-      data: { datasets: [{ label: 'Customers', data: tc.map(c => ({ x: c.orders, y: c.ltv, r: 4 + (c.products || 1) * 2, _n: c.name })), backgroundColor: 'rgba(91,106,240,0.5)', borderColor: '#5b6af0' }] },
+      data: { datasets: [{ label: 'Customers', data: tc.map(c => ({ x: c.orders, y: c.ltv, r: 4 + (c.products || 1) * 2, _n: c.name })), backgroundColor: 'rgba(47,93,87,0.5)', borderColor: '#2F5D57' }] },
       options: { responsive: true, maintainAspectRatio: false,
         plugins: { ...noLegend, tooltip: { callbacks: { label: c => `${c.raw._n}: ${c.raw.x} orders, ${fmtMoney(c.raw.y)}` } } },
         scales: { x: { title: { display: true, text: 'Orders', font: { size: 10 }, color: TICK }, grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK }, beginAtZero: true },
@@ -1061,8 +1072,8 @@ function renderReports() {
   mkChart('rep-traffic', {
     type: 'line',
     data: { labels: trend.map(r => new Date(r.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })), datasets: [
-      { label: 'Views', data: trend.map(r => r.views), borderColor: '#5b6af0', backgroundColor: 'rgba(91,106,240,0.08)', fill: true, tension: 0.4, pointRadius: 0 },
-      { label: 'Unique Visitors', data: trend.map(r => r.unique_visitors), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.06)', fill: true, tension: 0.4, pointRadius: 0 },
+      { label: 'Views', data: trend.map(r => r.views), borderColor: '#2F5D57', backgroundColor: 'rgba(47,93,87,0.08)', fill: true, tension: 0.4, pointRadius: 0 },
+      { label: 'Unique Visitors', data: trend.map(r => r.unique_visitors), borderColor: '#3E7C5A', backgroundColor: 'rgba(62,124,90,0.06)', fill: true, tension: 0.4, pointRadius: 0 },
     ] },
     options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: legendBottom, scales: baseScales({ x: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK, maxTicksLimit: 12 } } }) }
   });
@@ -1075,7 +1086,7 @@ function renderReports() {
   const purchases = state.scData?.monthToDate?.orders || 0;
   mkChart('rep-funnel', {
     type: 'bar',
-    data: { labels: ['Landing', 'Checkout', 'Purchase'], datasets: [{ label: 'Unique', data: [f.landingUnique || 0, f.checkoutUnique || 0, purchases], backgroundColor: ['#5b6af0', '#06b6d4', '#10b981'], borderRadius: 3 }] },
+    data: { labels: ['Landing', 'Checkout', 'Purchase'], datasets: [{ label: 'Unique', data: [f.landingUnique || 0, f.checkoutUnique || 0, purchases], backgroundColor: ['#2F5D57', '#06b6d4', '#3E7C5A'], borderRadius: 3 }] },
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
       plugins: { ...noLegend, tooltip: { callbacks: { afterLabel: c => {
         const land = f.landingUnique || 0, chk = f.checkoutUnique || 0;
@@ -1114,13 +1125,13 @@ function renderChannelChart() {
   const rows = Object.entries(byChannel).map(([label, v]) => ({ label, ...v })).sort((a, b) => b.visitors - a.visitors).slice(0, 10);
   mkChart('rep-channel', {
     data: { labels: rows.map(r => r.label), datasets: [
-      { type: 'bar', label: 'Unique Visitors', data: rows.map(r => r.visitors), backgroundColor: 'rgba(91,106,240,0.85)', borderRadius: 3, yAxisID: 'y' },
-      { type: 'bar', label: 'Attributed Revenue', data: rows.map(r => r.revenue), backgroundColor: 'rgba(16,185,129,0.85)', borderRadius: 3, yAxisID: 'y1' },
+      { type: 'bar', label: 'Unique Visitors', data: rows.map(r => r.visitors), backgroundColor: 'rgba(47,93,87,0.85)', borderRadius: 3, yAxisID: 'y' },
+      { type: 'bar', label: 'Attributed Revenue', data: rows.map(r => r.revenue), backgroundColor: 'rgba(62,124,90,0.85)', borderRadius: 3, yAxisID: 'y1' },
     ] },
     options: { responsive: true, maintainAspectRatio: false, plugins: legendBottom,
       scales: { x: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } },
-        y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#5b6af0' }, beginAtZero: true },
-        y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#10b981', callback: moneyTick }, beginAtZero: true } } }
+        y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 10 }, color: '#2F5D57' }, beginAtZero: true },
+        y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, color: '#3E7C5A', callback: moneyTick }, beginAtZero: true } } }
   });
 }
 
@@ -1156,6 +1167,11 @@ function renderReportKpis(d) {
         cards.push({ cls: 'good', label: 'Retention Is Organic', value: (100 - funnelPct) + '%',
           text: `of repeat purchases are genuine returns 24h+ later — only ${funnelPct}% are same-session upsells. Strong real loyalty.` });
       }
+    }
+    // 4b) Amount refunded
+    if (d.totalRefunded != null) {
+      cards.push({ cls: d.refundRate > 5 ? 'bad' : '', label: 'Amount Refunded', value: fmtMoney(d.totalRefunded),
+        text: `${d.refundRate}% of gross revenue refunded across ${fmtNum(d.refundCount || 0)} refunds — net revenue is ${fmtMoney(d.netRevenue)}.` });
     }
     // 5) Visitor-to-customer conversion (only meaningful once tracking covers the sales window)
     const land = state.funnelData?.landingUnique || 0;

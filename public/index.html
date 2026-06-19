@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Metric Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <script>
     // Set theme before render to avoid flash
@@ -206,6 +209,11 @@
           <div class="report-chart"><canvas id="rep-buyer-mix"></canvas></div>
           <p class="chart-insight">Is repeat revenue engineered at checkout (&lt;24h) or real loyalty?</p>
         </div>
+        <div class="chart-card full">
+          <div class="chart-card-head"><h3>Gross Revenue vs. Refunds (Monthly)</h3><span class="badge green" id="rep-refund-rate"></span></div>
+          <div class="report-chart"><canvas id="rep-refunds"></canvas></div>
+          <p class="chart-insight">Revenue collected vs. dollars refunded each month — the refund line is money that left after the sale.</p>
+        </div>
       </div>
 
       <!-- Customer Behaviour -->
@@ -300,40 +308,27 @@
         <div class="stat-card"><div class="stat-label">This Month</div><div class="stat-value" id="pa-monthViews">—</div></div>
       </div>
 
-      <div class="two-col">
-        <div class="card">
-          <div class="card-header">
-            <h2>Top Pages</h2>
-            <div class="result-count" id="pa-resultCount"></div>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Page</th>
-                  <th class="sortable active-sort" data-sort="total_views">Views ↓</th>
-                  <th class="sortable" data-sort="unique_visitors">Unique</th>
-                  <th class="sortable" data-sort="checkout_views">Checkout Views</th>
-                  <th class="sortable" data-sort="orders">Orders</th>
-                  <th>Last Visit</th>
-                </tr>
-              </thead>
-              <tbody id="pagesTable"></tbody>
-            </table>
-          </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Top Pages</h2>
+          <div class="result-count" id="pa-resultCount"></div>
         </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2>Top Referrers</h2>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Source</th><th>Visits</th><th>Unique</th></tr></thead>
-              <tbody id="referrersTable"></tbody>
-            </table>
-          </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Page</th>
+                <th class="sortable active-sort" data-sort="total_views">Views ↓</th>
+                <th class="sortable" data-sort="unique_visitors">Unique</th>
+                <th class="sortable" data-sort="checkout_views">Checkout Views</th>
+                <th class="sortable" data-sort="orders">Orders</th>
+                <th class="sortable" data-sort="order_value">Order Value</th>
+                <th>Last Visit</th>
+              </tr>
+            </thead>
+            <tbody id="pagesTable"></tbody>
+          </table>
         </div>
       </div>
     </section>

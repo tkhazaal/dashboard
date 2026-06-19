@@ -98,6 +98,21 @@ async function fetchProducts(apiKey, { maxPages = 30 } = {}) {
   return all;
 }
 
+// All refunds (cursor-paginated) — for the "amount refunded" metrics.
+async function fetchAllRefunds(apiKey, { maxPages = 1000 } = {}) {
+  const all = [];
+  let url   = `${BASE_URL}/refunds?per_page=${PAGE_SIZE}`;
+  let pages = 0;
+  while (url && pages < maxPages) {
+    const json = await scFetch(url, apiKey);
+    const data = Array.isArray(json) ? json : (json.data || []);
+    all.push(...data);
+    pages++;
+    url = json.pagination && json.pagination.next ? json.pagination.next : null;
+  }
+  return all;
+}
+
 // Fetch a single customer's name/email by id (for top-customer enrichment).
 async function fetchCustomer(id, apiKey) {
   try { return await scFetch(`${BASE_URL}/customers/${id}`, apiKey, 2); }
@@ -121,6 +136,22 @@ async function computeMetrics(orders, apiKey) {
     const products = await fetchProducts(apiKey);
     products.forEach(p => { if (p.id != null && p.slug) slugById[p.id] = String(p.slug).toLowerCase(); });
   } catch { /* attribution is best-effort */ }
+
+  // Refunds — total amount refunded, by month (excludes test refunds).
+  let totalRefunded = 0, refundCount = 0;
+  const refundsByMonth = {};
+  try {
+    const refunds = await fetchAllRefunds(apiKey);
+    for (const r of refunds) {
+      if (r.test_mode) continue;
+      const amt = (parseFloat(r.refund_amount) || 0) / 100;   // cents -> dollars
+      if (!amt) continue;
+      totalRefunded += amt; refundCount++;
+      const m = String(r.created_at || '').slice(0, 7);        // YYYY-MM
+      if (m) refundsByMonth[m] = (refundsByMonth[m] || 0) + amt;
+    }
+  } catch { /* refunds are best-effort */ }
+  totalRefunded = Math.round(totalRefunded * 100) / 100;
 
   const custMap = new Map();
   const ordersBySlug = {};   // slug -> { orders, revenue }
@@ -229,7 +260,10 @@ async function computeMetrics(orders, apiKey) {
   const monthly = [...monthMap.entries()]
     .sort((a, b) => a[0] < b[0] ? -1 : 1)
     .slice(-12)
-    .map(([month, v]) => ({ month, revenue: Math.round(v.revenue * 100) / 100, orders: v.orders }));
+    .map(([month, v]) => {
+      const refunds = Math.round((refundsByMonth[month] || 0) * 100) / 100;
+      return { month, revenue: Math.round(v.revenue * 100) / 100, orders: v.orders, refunds, net: Math.round((v.revenue - refunds) * 100) / 100 };
+    });
 
   // Month-over-month — compare the two most-recent COMPLETED months.
   // The current calendar month is partial, so including it understates growth.
@@ -278,6 +312,10 @@ async function computeMetrics(orders, apiKey) {
     funnelBuyers:   funnelCount,
     ecosystemBuyers: ecosystemCount,
     momRevenue, momOrders, momLabel, monthToDate,
+    totalRefunded,
+    refundCount,
+    refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
+    netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
     ordersBySlug,
   };

@@ -1,52 +1,88 @@
 /* ── Reset & base ─────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ════════════════════════════════════════════════════════════
+   Atelier Ledger — luxury theme (ivory & obsidian · teal + gold)
+   ════════════════════════════════════════════════════════════ */
 :root {
-  --bg:       #f5f6fa;
-  --surface:  #ffffff;
-  --border:   #e8eaf0;
-  --text:     #1a1d2e;
-  --sub:      #6b7280;
-  --accent:   #5b6af0;
-  --accent2:  #10b981;
-  --warn:     #f59e0b;
-  --danger:   #ef4444;
-  --sidebar:  #1a1d2e;
-  --sidebar-text: rgba(255,255,255,0.7);
-  --sidebar-active: rgba(255,255,255,0.12);
-  --radius:   9px;
-  --shadow:   0 1px 2px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.03);
+  --bg:       #F4F2EC;
+  --surface:  #FBFAF6;
+  --surface-alt: #FFFFFF;
+  --border:   #E5DFD3;
+  --text:     #1F1D18;
+  --sub:      #7C766A;
+  --accent:   #2F5D57;
+  --accent2:  #3E7C5A;
+  --gold:     #A9853F;
+  --warn:     #A9853F;
+  --danger:   #9E3B34;
+  --sidebar:  #161C1B;
+  --sidebar-text: rgba(241,238,232,0.66);
+  --sidebar-active: rgba(169,133,63,0.16);
+  --row-hover: rgba(47,93,87,0.05);
+  --sheen: linear-gradient(180deg, rgba(255,255,255,0.5), transparent 64px);
+  --radius:   8px;
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --shadow:   0 1px 1px rgba(35,33,28,0.04), 0 6px 16px -8px rgba(35,33,28,0.10), 0 2px 4px rgba(35,33,28,0.03);
 }
 
 /* ── Dark theme ──────────────────────────── */
 [data-theme="dark"] {
-  --bg:       #0f1117;
-  --surface:  #1a1d2e;
-  --border:   #2a2f45;
-  --text:     #e5e7eb;
-  --sub:      #9aa3b2;
-  --sidebar:  #14161f;
-  --shadow:   0 1px 4px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.3);
+  --bg:       #14130F;
+  --surface:  #1C1B16;
+  --surface-alt: #24221B;
+  --border:   #322F26;
+  --text:     #ECE7DA;
+  --sub:      #9A9384;
+  --accent:   #6FA89D;
+  --accent2:  #7FA888;
+  --gold:     #CBA35C;
+  --warn:     #CBA35C;
+  --danger:   #C97A6F;
+  --sidebar:  #0F0E0A;
+  --sidebar-text: rgba(236,231,218,0.62);
+  --sidebar-active: rgba(203,163,92,0.16);
+  --row-hover: rgba(111,168,157,0.07);
+  --sheen: linear-gradient(180deg, rgba(255,255,255,0.025), transparent 64px);
+  --shadow:   0 1px 2px rgba(0,0,0,0.42), 0 12px 32px -14px rgba(0,0,0,0.55);
 }
-[data-theme="dark"] thead tr { background: #20243a; }
-[data-theme="dark"] tbody tr:hover { background: #20243a; }
+[data-theme="dark"] thead tr { background: var(--surface-alt); }
+[data-theme="dark"] tbody tr:hover { background: var(--surface-alt); }
 [data-theme="dark"] .settings-form input:focus,
 [data-theme="dark"] .search-input:focus,
 [data-theme="dark"] .filter-select:focus,
-[data-theme="dark"] .filter-number:focus { background: #20243a; color: var(--text); }
+[data-theme="dark"] .filter-number:focus { background: var(--surface-alt); color: var(--text); }
 [data-theme="dark"] .settings-form input,
 [data-theme="dark"] .search-input,
 [data-theme="dark"] .filter-select,
 [data-theme="dark"] .filter-number { color: var(--text); }
 [data-theme="dark"] .pill,
-[data-theme="dark"] .date-btn:hover { background: rgba(91,106,240,0.18); }
-[data-theme="dark"] .badge.blue  { background: rgba(91,106,240,0.20); }
-[data-theme="dark"] .badge.green { background: rgba(16,185,129,0.18); }
+[data-theme="dark"] .date-btn:hover { background: rgba(203,163,92,0.16); }
+[data-theme="dark"] .badge.blue  { background: rgba(111,168,157,0.20); }
+[data-theme="dark"] .badge.green { background: rgba(127,168,136,0.18); }
 [data-theme="dark"] .filter-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239A9384' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }
 
-html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.45; transition: background 0.2s, color 0.2s; }
+html, body { height: 100%; font-family: var(--font-body); background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.45; transition: background 0.2s, color 0.2s; -webkit-font-smoothing: antialiased; }
+
+/* Tabular lining figures everywhere numbers matter — ledger alignment */
+.stat-value, .kpi-value, td, .goal-current, .goal-target, .funnel-value,
+.tier-count, .tier-total, .ltv-cell, .result-count, .delta {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+/* Serif display headings — typeset, not rendered UI */
+.page-header h1, .card-header h2, .chart-card-head h3, .card.insight h3,
+.goal-card h2, .stat-value, .kpi-value, .funnel-value, .goal-current {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+}
+.page-header h1 { font-weight: 600; }
+.stat-value, .kpi-value { font-weight: 500; }
 
 /* ── Layout ──────────────────────────────── */
 .app { display: flex; height: 100vh; overflow: hidden; }
@@ -227,7 +263,13 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   box-shadow: var(--shadow);
 }
 
-.stat-card.highlight { border-color: transparent; background: linear-gradient(135deg, #5b6af0 0%, #7c5af0 100%); }
+.stat-card.highlight {
+  border-color: transparent; color: #F3EEDF;
+  background:
+    radial-gradient(120% 140% at 88% -10%, rgba(201,164,92,0.22), transparent 55%),
+    linear-gradient(160deg, #2A413D 0%, #1E2A28 100%);
+  border-top: 1px solid rgba(203,163,92,0.35);
+}
 .stat-card.highlight .stat-label, .stat-card.highlight .stat-sub { color: rgba(255,255,255,0.75); }
 .stat-card.highlight .stat-value { color: #fff; }
 
@@ -243,7 +285,13 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .stat-card.highlight .delta.down { color: #fca5a5; }
 
 /* ── Monthly goal card ───────────────────── */
-.goal-card { background: linear-gradient(135deg, #5b6af0 0%, #7c5cf0 100%); color: #fff; border: none; padding: 14px 16px; }
+.goal-card {
+  color: #F3EEDF; border: none; padding: 14px 16px;
+  background:
+    radial-gradient(130% 150% at 90% -10%, rgba(201,164,92,0.24), transparent 55%),
+    linear-gradient(160deg, #2A413D 0%, #1A2422 100%);
+  border-top: 1px solid rgba(203,163,92,0.4);
+}
 .goal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .goal-card h2 { color: #fff; }
 .goal-month { font-size: 12px; color: rgba(255,255,255,0.8); }
@@ -345,10 +393,15 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
 /* Section divider heading inside a tab */
 .section-divider {
-  font-size: 12.5px; font-weight: 700; color: var(--sub);
-  margin: 18px 0 10px; padding-bottom: 6px;
-  border-bottom: 1px solid var(--border, #e8eaf0);
-  text-transform: uppercase; letter-spacing: 0.4px;
+  font-family: var(--font-body);
+  font-size: 11px; font-weight: 600; color: var(--gold);
+  margin: 24px 0 12px; padding: 0; border: none;
+  text-transform: uppercase; letter-spacing: 0.14em;
+}
+.section-divider::after {
+  content: ''; display: block; margin-top: 7px;
+  width: 44px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold), transparent);
 }
 
 /* ── Cards ───────────────────────────────── */
@@ -738,3 +791,73 @@ tbody tr:hover { background: #fafbff; }
   .tab { padding: 20px 16px 40px; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ════════════════════════════════════════════════════════════
+   Atelier Ledger — signature luxury touches
+   ════════════════════════════════════════════════════════════ */
+
+/* Coated-stock sheen on surfaces */
+.card, .stat-card, .chart-card, .kpi-card, .filter-bar {
+  background-image: var(--sheen);
+  background-color: var(--surface);
+}
+
+/* Gold spine on stat cards */
+.stat-card { position: relative; overflow: hidden; }
+.stat-card::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: linear-gradient(180deg, var(--gold), transparent 80%);
+}
+.stat-card.highlight::before { background: linear-gradient(180deg, rgba(255,255,255,0.6), transparent 80%); }
+
+/* Hairline ledger tables — tracked uppercase headers, no fill in light */
+thead tr { background: transparent; }
+[data-theme="dark"] thead tr { background: transparent; }
+th {
+  font-family: var(--font-body);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 9.5px; font-weight: 600; color: var(--sub);
+  border-bottom: 1px solid var(--border);
+}
+tbody tr:hover { background: var(--row-hover); }
+[data-theme="dark"] tbody tr:hover { background: var(--row-hover); }
+
+/* Numeric value cells — right-aligned ledger columns */
+.value-count { font-weight: 600; color: var(--accent); }
+.orders-count { font-weight: 700; color: var(--gold); }
+.checkout-count { font-weight: 600; color: var(--accent2); }
+
+/* Refined section heading rule (gold eyebrow handled in markup labels) */
+.page-header h1 { line-height: 1.1; }
+
+/* Active sidebar nav — gold marker over gold-tint, never a filled block */
+.nav-item.active {
+  background: var(--sidebar-active);
+  color: #fff;
+  position: relative;
+}
+.nav-item.active::before {
+  content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px;
+  border-radius: 2px; background: var(--gold);
+}
+
+/* KPI callouts — gold spine + serif hero */
+.kpi-card { border-left-color: var(--gold); }
+.kpi-card.good { border-left-color: var(--accent2); }
+.kpi-card.bad  { border-left-color: var(--danger); }
+.kpi-card .kpi-label { letter-spacing: 0.13em; }
+
+/* Pills & badges — champagne tint */
+.pill { background: rgba(169,133,63,0.12); color: var(--gold); }
+.badge.blue  { background: rgba(47,93,87,0.10); color: var(--accent); }
+.badge.green { background: rgba(62,124,90,0.12); color: var(--accent2); }
+
+/* Logo mark — gold on ink */
+.logo-icon { background: var(--gold); }
+
+/* Sidebar logo wordmark in serif */
+.sidebar-logo span { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
+
+/* Primary buttons in deep teal */
+.btn-primary, .refresh-btn { background: var(--accent); border-color: var(--accent); }
+.date-btn.active { background: var(--accent); border-color: var(--accent); }
