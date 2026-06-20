@@ -287,7 +287,8 @@ html, body { height: 100%; font-family: var(--font-body); background: var(--bg);
 .stat-card.highlight .delta.down { color: #fca5a5; }
 
 /* ── Monthly goal card ───────────────────── */
-.goal-card {
+/* .card.goal-card (specificity 0,2,0) so the gradient beats the generic .card bg */
+.card.goal-card {
   color: #fff; border: none; padding: 14px 16px;
   background:
     radial-gradient(130% 160% at 92% -20%, rgba(255,255,255,0.18), transparent 55%),
