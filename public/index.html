@@ -6,12 +6,15 @@
   <title>Metric Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <script>
-    // Set theme before render to avoid flash
-    (function(){ try { var t = localStorage.getItem('_mtd_theme') ||
-      ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
+    // Set theme before render to avoid flash (URL ?theme= wins, then saved pref, then OS)
+    (function(){ try {
+      var q = new URLSearchParams(location.search).get('theme');
+      if (q === 'dark' || q === 'light') localStorage.setItem('_mtd_theme', q);
+      var t = localStorage.getItem('_mtd_theme') ||
+        ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
       document.documentElement.setAttribute('data-theme', t); } catch(e){} })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
