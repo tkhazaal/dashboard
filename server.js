@@ -50,9 +50,10 @@ app.get('/t.js', async (req, res) => {
 });
 
 // API routes
+const samcartRouter = require('./routes/samcart');
 app.use('/track',          require('./routes/track'));
 app.use('/api/analytics',  require('./routes/analytics'));
-app.use('/api/samcart',    require('./routes/samcart'));
+app.use('/api/samcart',    samcartRouter);
 app.use('/api/settings',   require('./routes/settings'));
 
 // Dashboard UI
@@ -65,4 +66,5 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n  Metric Tracking Dashboard`);
   console.log(`  http://localhost:${PORT}\n`);
+  if (samcartRouter.startAutoSync) samcartRouter.startAutoSync();
 });

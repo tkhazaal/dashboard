@@ -71,13 +71,18 @@ async function fetchAllOrders(apiKey, { maxPages = 1000, onProgress } = {}) {
   const all = [];
   let url   = `${BASE_URL}/orders?per_page=${PAGE_SIZE}`;
   let pages = 0;
+  let total = null;
 
   while (url && pages < maxPages) {
     const json = await scFetch(url, apiKey);
     const data = Array.isArray(json) ? json : (json.data || []);
     all.push(...data);
+    // First page exposes remaining_count → derive the grand total for the progress bar
+    if (total === null && json.pagination && typeof json.pagination.remaining_count === 'number') {
+      total = json.pagination.remaining_count + data.length;
+    }
     pages++;
-    if (onProgress) onProgress(all.length);
+    if (onProgress) onProgress(all.length, total);
     url = json.pagination && json.pagination.next ? json.pagination.next : null;
   }
   return all;
@@ -402,12 +407,17 @@ router.get('/data', async (req, res) => {
 
 // Background sync — a full crawl takes minutes, so run it detached and let
 // the dashboard poll /sync/status. Avoids reverse-proxy request timeouts.
-let syncState = { running: false, startedAt: null, finishedAt: null, orderCount: 0, error: null };
+// phase: 'orders' (crawling) → 'processing' (products/refunds/customers) → done.
+let syncState = { running: false, phase: null, startedAt: null, finishedAt: null, orderCount: 0, total: null, auto: false, error: null };
 
-async function runSync(apiKey) {
-  syncState = { running: true, startedAt: new Date().toISOString(), finishedAt: null, orderCount: 0, error: null };
+async function runSync(apiKey, { auto = false } = {}) {
+  syncState = { running: true, phase: 'orders', startedAt: new Date().toISOString(), finishedAt: null, orderCount: 0, total: null, auto, error: null };
   try {
-    const orders  = await fetchAllOrders(apiKey, { onProgress: n => { syncState.orderCount = n; } });
+    const orders = await fetchAllOrders(apiKey, {
+      onProgress: (n, total) => { syncState.orderCount = n; if (total) syncState.total = total; },
+    });
+    syncState.phase = 'processing';
+    syncState.total = orders.length;
     const metrics = await computeMetrics(orders, apiKey);
     await setCache('samcart_metrics', { ...metrics, syncedAt: new Date().toISOString(), orderCount: orders.length });
     syncState.finishedAt = new Date().toISOString();
@@ -416,17 +426,46 @@ async function runSync(apiKey) {
     console.error('SamCart sync failed:', err.message);
   } finally {
     syncState.running = false;
+    syncState.phase = null;
   }
 }
 
 router.post('/sync', async (req, res) => {
   const apiKey = await getApiKey();
   if (!apiKey) return res.status(400).json({ error: 'No SamCart API key configured.' });
-  if (syncState.running) return res.json({ started: false, running: true, orderCount: syncState.orderCount });
+  if (syncState.running) return res.json({ started: false, running: true, orderCount: syncState.orderCount, total: syncState.total });
   runSync(apiKey); // fire-and-forget
   res.json({ started: true, running: true });
 });
 
 router.get('/sync/status', (req, res) => res.json(syncState));
 
+// ── Scheduled auto-sync ───────────────────────────────────────────
+// Keeps the cache fresh automatically (default every 60 min; env-tunable).
+// Only syncs when the cache is older than the interval, so container restarts
+// don't trigger redundant crawls.
+const SYNC_MINUTES  = Math.max(0, parseInt(process.env.SAMCART_SYNC_MINUTES || '60', 10));
+const SYNC_INTERVAL = SYNC_MINUTES * 60 * 1000;
+
+async function autoSync() {
+  try {
+    if (syncState.running) return;
+    const apiKey = await getApiKey();
+    if (!apiKey) return;
+    const { data } = await supabase.from('samcart_cache').select('cached_at').eq('cache_key', 'samcart_metrics').single();
+    const age = data ? Date.now() - new Date(data.cached_at).getTime() : Infinity;
+    if (age < SYNC_INTERVAL) return;            // cache still fresh
+    console.log('  Auto-syncing SamCart (cache stale)…');
+    runSync(apiKey, { auto: true });            // fire-and-forget
+  } catch (err) { console.error('autoSync error:', err.message); }
+}
+
+function startAutoSync() {
+  if (SYNC_INTERVAL <= 0) { console.log('  SamCart auto-sync disabled (SAMCART_SYNC_MINUTES=0)'); return; }
+  console.log(`  SamCart auto-sync every ${SYNC_MINUTES} min`);
+  setTimeout(autoSync, 20000);                  // initial check ~20s after boot
+  setInterval(autoSync, Math.min(SYNC_INTERVAL, 15 * 60 * 1000)); // re-check periodically
+}
+
+router.startAutoSync = startAutoSync;
 module.exports = router;

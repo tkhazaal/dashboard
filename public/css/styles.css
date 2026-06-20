@@ -215,6 +215,15 @@ html, body { height: 100%; font-family: var(--font-body); background: var(--bg);
 
 .sync-status { font-size: 11px; color: var(--sidebar-text); text-align: center; margin-top: 8px; min-height: 14px; }
 
+/* Sync progress bar (sidebar) */
+.sync-row { display: flex; justify-content: space-between; font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,0.82); margin-bottom: 4px; }
+.sync-bar-wrap { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.12); overflow: hidden; }
+.sync-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #3b82f6, #60a5fa); transition: width 0.4s ease; }
+.sync-bar.indet { width: 100% !important; animation: syncPulse 1.1s ease-in-out infinite; }
+@keyframes syncPulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
+.sync-sub { font-size: 10px; color: var(--sidebar-text); margin-top: 4px; }
+.sync-err { color: #fca5a5; font-size: 10.5px; }
+
 /* ── Main ───────────────────────────────── */
 .main { flex: 1; overflow-y: auto; padding: 0; }
 

@@ -739,37 +739,69 @@ $('copyCodeBtn').addEventListener('click', () => {
 });
 
 // ── Sync button ───────────────────────────────────────────────────
+// ── Sync status: unified progress bar (manual + auto syncs) ───────
+let _syncWasRunning = false;
+let _syncFastTimer = null;
+
+function renderSyncProgress(s) {
+  const el = $('syncStatus');
+  if (!el) return;
+  if (s && s.running) {
+    $('syncBtn').disabled = true;
+    let pct = 0, label;
+    if (s.phase === 'processing') {
+      pct = 100; label = 'Processing…';
+    } else if (s.total) {
+      pct = Math.min(99, Math.round((s.orderCount / s.total) * 100));
+      label = `${fmtNum(s.orderCount)} / ${fmtNum(s.total)} orders`;
+    } else {
+      pct = 4; label = `${fmtNum(s.orderCount)} orders…`;
+    }
+    el.innerHTML = `
+      <div class="sync-row"><span>${s.auto ? 'Auto-syncing' : 'Syncing'}</span><span>${pct}%</span></div>
+      <div class="sync-bar-wrap"><div class="sync-bar ${s.phase === 'processing' ? 'indet' : ''}" style="width:${pct}%"></div></div>
+      <div class="sync-sub">${label}</div>`;
+  } else {
+    $('syncBtn').disabled = false;
+    if (s && s.error) el.innerHTML = `<span class="sync-err">⚠ ${escHtml(s.error.slice(0, 48))}</span>`;
+    else if (state.scData?.syncedAt && !state.scData.isDemo) el.textContent = 'Synced ' + timeAgo(state.scData.syncedAt);
+    else el.textContent = '';
+  }
+}
+
+async function pollSyncStatus() {
+  let s;
+  try { s = await api('/api/samcart/sync/status'); } catch { return; }
+  renderSyncProgress(s);
+  if (s.running) {
+    _syncWasRunning = true;
+    if (!_syncFastTimer) _syncFastTimer = setInterval(pollSyncStatus, 3000);  // poll fast while running
+  } else {
+    if (_syncFastTimer) { clearInterval(_syncFastTimer); _syncFastTimer = null; }
+    if (_syncWasRunning) {            // a sync just finished → refresh dashboard data
+      _syncWasRunning = false;
+      await loadSamCart(true);
+    }
+  }
+}
+
 $('syncBtn').addEventListener('click', async () => {
   $('syncBtn').disabled = true;
-  $('syncStatus').textContent = 'Starting sync…';
+  $('syncStatus').textContent = 'Starting…';
   try {
     const r = await fetch('/api/samcart/sync', { method: 'POST' });
     const j = await r.json();
     if (j.error) throw new Error(j.error);
-
-    // Background sync — poll status until it finishes (full crawl takes minutes)
-    await new Promise((resolve) => {
-      const poll = setInterval(async () => {
-        try {
-          const s = await api('/api/samcart/sync/status');
-          if (s.running) {
-            $('syncStatus').textContent = `Syncing… ${fmtNum(s.orderCount)} orders`;
-          } else {
-            clearInterval(poll);
-            if (s.error) $('syncStatus').textContent = 'Error: ' + s.error.slice(0, 50);
-            else         $('syncStatus').textContent = `Synced ${fmtNum(s.orderCount)} orders ✓`;
-            await loadSamCart(true);
-            resolve();
-          }
-        } catch { /* keep polling */ }
-      }, 3000);
-    });
+    pollSyncStatus();                 // kick the poller; it drives the bar + refresh
   } catch (err) {
     $('syncStatus').textContent = 'Error: ' + err.message.slice(0, 60);
-  } finally {
     $('syncBtn').disabled = false;
   }
 });
+
+// Detect auto-syncs (and in-progress syncs on load); slow heartbeat every 25s
+setInterval(pollSyncStatus, 25000);
+setTimeout(pollSyncStatus, 2000);
 
 // ── Wire up Overview filters ──────────────────────────────────────
 initDateBtns('ov-dateBtns', days => {
