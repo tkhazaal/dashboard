@@ -1412,42 +1412,57 @@ function groupOptions(selected) {
     + '<option value="__new__">＋ New group…</option>';
 }
 
-// Searchable datalists (products + pages) — typing filters the options.
-// Page display is the SHORT channel label (e.g. "IG Posts"); slug kept behind it.
-let _pageDisplayToSlug = {}, _slugToPageDisplay = {};
-function buildPageMaps(pvm) {
-  _pageDisplayToSlug = {}; _slugToPageDisplay = {};
+// Searchable page picker for funnels. Offers BOTH:
+//  • landing pages — compact channel labels (e.g. "IG Posts"), key = slug
+//  • products — deduped by title with views summed across variants, key = "prod::<title>"
+// _funnelPages: key -> { label, unique, checkout, type }
+let _funnelPages = {}, _pageDispToKey = {}, _keyToPageDisp = {};
+function buildFunnelPages(pvm) {
+  _funnelPages = {}; _pageDispToKey = {}; _keyToPageDisp = {};
   const used = {};
-  for (const sl of Object.keys(pvm)) {
-    if (!pvm[sl].isLanding) continue;
-    let disp = pvm[sl].label;
-    if (used[disp]) disp = `${disp} (${sl})`;   // disambiguate duplicate labels
+  const add = (key, label, unique, checkout, type) => {
+    let disp = label;
+    if (used[disp]) disp = type === 'product' ? `${disp} (product)` : `${disp} (${key})`;
     used[disp] = true;
-    _pageDisplayToSlug[disp] = sl;
-    _slugToPageDisplay[sl] = disp;
+    _funnelPages[key] = { label: disp, unique, checkout, type };
+    _pageDispToKey[disp] = key; _keyToPageDisp[key] = disp;
+  };
+  // Landing pages — per slug
+  for (const sl of Object.keys(pvm)) {
+    if (pvm[sl].isLanding) add(sl, pvm[sl].label, pvm[sl].unique, pvm[sl].checkout, 'landing');
   }
+  // Products — group checkout pages by title, summing views across variants
+  const byTitle = {};
+  for (const sl of Object.keys(pvm)) {
+    if (pvm[sl].isLanding || !pvm[sl].hasTitle) continue;
+    const t = pvm[sl].label;
+    (byTitle[t] || (byTitle[t] = { u: 0, c: 0 }));
+    byTitle[t].u += pvm[sl].unique; byTitle[t].c += pvm[sl].checkout;
+  }
+  for (const t of Object.keys(byTitle)) add('prod::' + t, t, byTitle[t].u, byTitle[t].c, 'product');
 }
-function pageDisplayForSlug(slug) {
-  if (!slug) return '';
-  return _slugToPageDisplay[slug] || slug;
+function pageViewsForKey(key) { return _funnelPages[key] || { unique: 0, checkout: 0 }; }
+function pageDisplayForKey(key) { return key ? (_keyToPageDisp[key] || key) : ''; }
+function pageValueToKey(v) {
+  if (!v) return '';
+  if (_pageDispToKey[v]) return _pageDispToKey[v];
+  return v.trim();
 }
 function buildFunnelDatalists(pvm) {
   const products = (state.scData && state.scData.productList) || [];
   const pd = $('fn-products'); if (pd) pd.innerHTML = products.map(n => `<option value="${escHtml(n)}"></option>`).join('');
-  buildPageMaps(pvm);
+  buildFunnelPages(pvm);
   const pg = $('fn-pages');
-  if (pg) pg.innerHTML = Object.keys(_slugToPageDisplay)
-    .map(sl => `<option value="${escHtml(_slugToPageDisplay[sl])}"></option>`).join('');
-}
-// Convert a typed/selected page value back to a slug
-function pageValueToSlug(v) {
-  if (!v) return '';
-  if (_pageDisplayToSlug[v]) return _pageDisplayToSlug[v];
-  return v.includes('/') ? v.slice(v.lastIndexOf('/') + 1).trim() : v.trim();
+  if (pg) {
+    const keys = Object.keys(_funnelPages).sort((a, b) =>
+      (_funnelPages[a].type === 'product') - (_funnelPages[b].type === 'product') ||
+      _funnelPages[a].label.localeCompare(_funnelPages[b].label));
+    pg.innerHTML = keys.map(k => `<option value="${escHtml(_funnelPages[k].label)}"></option>`).join('');
+  }
 }
 
 function funnelMemberRow(r, i, pvm, agg) {
-  const pv  = pvm[r.pageSlug] || { unique: 0, checkout: 0 };
+  const pv  = pageViewsForKey(r.pageSlug);
   const m   = prodSales(r.main), u1 = prodSales(r.upsell1), u2 = prodSales(r.upsell2);
   const rev = m.revenue + u1.revenue + u2.revenue;
   agg.U += pv.unique; agg.C += pv.checkout; agg.M += m.orders; agg.U1 += u1.orders; agg.U2 += u2.orders; agg.R += rev;
@@ -1455,7 +1470,7 @@ function funnelMemberRow(r, i, pvm, agg) {
     <tr data-row="${i}" class="fn-member">
       <td><select class="fn-grp" data-field="group">${groupOptions(r.group)}</select></td>
       <td><input class="fn-input" data-field="platform" value="${escHtml(r.platform)}"></td>
-      <td><input class="fn-page" data-field="pageSlug" list="fn-pages" placeholder="Search page…" value="${escHtml(pageDisplayForSlug(r.pageSlug))}" title="${escHtml(r.pageSlug ? '/' + r.pageSlug : '')}"></td>
+      <td><input class="fn-page" data-field="pageSlug" list="fn-pages" placeholder="Search page / product…" value="${escHtml(pageDisplayForKey(r.pageSlug))}" title="${escHtml(r.pageSlug || '')}"></td>
       <td>${fmtNum(pv.unique)}</td>
       <td>${pv.checkout ? fmtNum(pv.checkout) : '<span class="muted">—</span>'}</td>
       <td><input class="fn-prod" data-field="main" list="fn-products" placeholder="Search product…" value="${escHtml(r.main || '')}"></td>
@@ -1545,7 +1560,7 @@ $('funnelBody').addEventListener('change', e => {
     const i = +tr.dataset.row, f = cell.dataset.field;
     let v = e.target.value;
     if (f === 'group' && v === '__new__') v = uniqueGroupName('New Group');
-    if (f === 'pageSlug') v = pageValueToSlug(v);   // datalist display → slug
+    if (f === 'pageSlug') v = pageValueToKey(v);   // datalist display → slug or prod:: key
     state.funnelsConfig[i][f] = v;
     renderFunnels(); saveFunnels();
     return;
