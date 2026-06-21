@@ -426,6 +426,7 @@ function buildSlugRows(rows) {
       e.checkoutViews  += r.total_views;
       e.checkoutUnique += r.unique_visitors;
       if (!e.host) e.host = r.host;
+      if (!e.checkoutTitle && r.page_title) e.checkoutTitle = r.page_title;  // product name from checkout page
     } else {
       e.landingViews  += r.total_views;
       e.landingUnique += r.unique_visitors;
@@ -1351,8 +1352,15 @@ function ensureFunnelsConfig() {
 function pageViewsMap() {
   const m = {};
   for (const e of buildSlugRows(state.pagesData || [])) {
-    // Campaign label distinguishes channels (titles are identical across funnel pages)
-    m[e.slug] = { unique: e.landingUnique, checkout: e.checkoutViews, label: rowLabel(e), isLanding: !!e.landingPath };
+    const isLanding = !!e.landingPath;
+    // Landing → campaign label (titles are identical across funnel pages).
+    // Checkout/product → the page title (real product name). Drop title-less gibberish.
+    const label = isLanding ? rowLabel(e) : (e.checkoutTitle || '');
+    m[e.slug] = {
+      unique: e.landingUnique, checkout: e.checkoutViews,
+      label: label || `Checkout — ${titleCase(e.slug)}`,
+      isLanding, hasTitle: isLanding || !!e.checkoutTitle,
+    };
   }
   return m;
 }
@@ -1371,13 +1379,17 @@ function productOptions(selected) {
   }).join('');
 }
 function pageOptions(selected, pvm) {
-  // Only real landing pages (skip auto-generated SamCart checkout slugs), keep current pick
-  const slugs = Object.keys(pvm)
-    .filter(sl => pvm[sl].isLanding || sl === selected)
-    .sort((a, b) => (pvm[a].label || a).localeCompare(pvm[b].label || b));
+  // Keep landing pages + titled checkout/product pages; drop title-less gibberish.
+  const keep = sl => pvm[sl].hasTitle || sl === selected;
+  const opt = sl => `<option value="${escHtml(sl)}"${sl === selected ? ' selected' : ''}>${escHtml(pvm[sl].label || sl)} · /${escHtml(sl)}</option>`;
+  const byLabel = (a, b) => (pvm[a].label || a).localeCompare(pvm[b].label || b);
+  const landing  = Object.keys(pvm).filter(sl => keep(sl) && pvm[sl].isLanding).sort(byLabel);
+  const checkout = Object.keys(pvm).filter(sl => keep(sl) && !pvm[sl].isLanding).sort(byLabel);
   const extra = (selected && !pvm[selected]) ? `<option value="${escHtml(selected)}" selected>${escHtml(selected)}</option>` : '';
-  return '<option value="">— none —</option>' + extra + slugs.map(sl =>
-    `<option value="${escHtml(sl)}"${sl === selected ? ' selected' : ''}>${escHtml(pvm[sl].label || sl)} · /${escHtml(sl)}</option>`).join('');
+  let html = '<option value="">— none —</option>' + extra;
+  if (landing.length)  html += `<optgroup label="Landing pages">${landing.map(opt).join('')}</optgroup>`;
+  if (checkout.length) html += `<optgroup label="Checkout / product pages">${checkout.map(opt).join('')}</optgroup>`;
+  return html;
 }
 
 function renderFunnels() {
