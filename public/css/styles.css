@@ -858,12 +858,13 @@ table.show-upsell .upsell-col { display: table-cell; }
 
 /* ── Funnels table ───────────────────────── */
 .funnel-table td, .funnel-table th { vertical-align: middle; }
-.funnel-table .fn-sel, .funnel-table .fn-input {
-  width: 100%; min-width: 120px; max-width: 190px;
+.funnel-table .fn-sel, .funnel-table .fn-input, .funnel-table .fn-prod, .funnel-table .fn-page {
+  width: 100%; min-width: 120px; max-width: 200px;
   padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 7px;
   background: var(--bg); color: var(--text); font-size: 11.5px; font-family: inherit; outline: none;
 }
-.funnel-table .fn-sel:focus, .funnel-table .fn-input:focus { border-color: var(--accent); }
+.funnel-table .fn-sel:focus, .funnel-table .fn-input:focus,
+.funnel-table .fn-prod:focus, .funnel-table .fn-page:focus { border-color: var(--accent); }
 .funnel-table .fn-input { min-width: 90px; font-weight: 700; }
 .fn-cr { font-size: 9.5px; color: var(--sub); margin-top: 1px; }
 .fn-del {
@@ -878,7 +879,7 @@ table.show-upsell .upsell-col { display: table-cell; }
 .fn-group-row { background: var(--surface-alt); }
 .fn-group-row td { border-bottom: 1px solid var(--border); font-weight: 700; padding-top: 9px; padding-bottom: 9px; }
 .fn-grp-toggle { cursor: pointer; text-align: center; color: var(--accent); font-size: 11px; width: 26px; }
-.fn-grp-namecell { display: flex; align-items: center; gap: 6px; }
+.fn-grp-namewrap { display: flex; align-items: center; gap: 6px; }
 .fn-grp-name {
   font-family: var(--font-display); font-weight: 800; font-size: 13px;
   border: 1.5px solid transparent; border-radius: 6px; padding: 3px 6px;

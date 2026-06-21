@@ -1414,6 +1414,33 @@ function groupOptions(selected) {
     + '<option value="__new__">＋ New group…</option>';
 }
 
+// Searchable datalists (products + pages) — typing filters the options
+let _pageDisplayToSlug = {};
+function pageDisplayForSlug(slug, pvm) {
+  if (!slug) return '';
+  const p = pvm[slug];
+  return p ? `${p.label} — /${slug}` : `/${slug}`;
+}
+function buildFunnelDatalists(pvm) {
+  const products = (state.scData && state.scData.productList) || [];
+  const pd = $('fn-products'); if (pd) pd.innerHTML = products.map(n => `<option value="${escHtml(n)}"></option>`).join('');
+  _pageDisplayToSlug = {};
+  const pg = $('fn-pages');
+  if (pg) {
+    pg.innerHTML = Object.keys(pvm).filter(sl => pvm[sl].hasTitle).map(sl => {
+      const disp = `${pvm[sl].label} — /${sl}`;
+      _pageDisplayToSlug[disp] = sl;
+      return `<option value="${escHtml(disp)}"></option>`;
+    }).join('');
+  }
+}
+// Convert a typed/selected page value back to a slug
+function pageValueToSlug(v) {
+  if (!v) return '';
+  if (_pageDisplayToSlug[v]) return _pageDisplayToSlug[v];
+  return v.includes('/') ? v.slice(v.lastIndexOf('/') + 1).trim() : v.trim();
+}
+
 function funnelMemberRow(r, i, pvm, agg) {
   const pv  = pvm[r.pageSlug] || { unique: 0, checkout: 0 };
   const m   = prodSales(r.main), u1 = prodSales(r.upsell1), u2 = prodSales(r.upsell2);
@@ -1423,14 +1450,14 @@ function funnelMemberRow(r, i, pvm, agg) {
     <tr data-row="${i}" class="fn-member">
       <td><select class="fn-grp" data-field="group">${groupOptions(r.group)}</select></td>
       <td><input class="fn-input" data-field="platform" value="${escHtml(r.platform)}"></td>
-      <td><select class="fn-sel" data-field="pageSlug">${pageOptions(r.pageSlug, pvm)}</select></td>
+      <td><input class="fn-page" data-field="pageSlug" list="fn-pages" placeholder="Search page…" value="${escHtml(pageDisplayForSlug(r.pageSlug, pvm))}"></td>
       <td>${fmtNum(pv.unique)}</td>
       <td>${pv.checkout ? fmtNum(pv.checkout) : '<span class="muted">—</span>'}</td>
-      <td><select class="fn-sel" data-field="main">${productOptions(r.main)}</select></td>
+      <td><input class="fn-prod" data-field="main" list="fn-products" placeholder="Search product…" value="${escHtml(r.main || '')}"></td>
       <td><span class="orders-count">${fmtNum(m.orders)}</span><div class="fn-cr">${crPct(m.orders, pv.checkout)}</div></td>
-      <td><select class="fn-sel" data-field="upsell1">${productOptions(r.upsell1)}</select></td>
+      <td><input class="fn-prod" data-field="upsell1" list="fn-products" placeholder="Search product…" value="${escHtml(r.upsell1 || '')}"></td>
       <td><span class="upsell-count">${fmtNum(u1.orders)}</span><div class="fn-cr">${crPct(u1.orders, m.orders)}</div></td>
-      <td><select class="fn-sel" data-field="upsell2">${productOptions(r.upsell2)}</select></td>
+      <td><input class="fn-prod" data-field="upsell2" list="fn-products" placeholder="Search product…" value="${escHtml(r.upsell2 || '')}"></td>
       <td><span class="upsell-count">${fmtNum(u2.orders)}</span><div class="fn-cr">${crPct(u2.orders, u1.orders)}</div></td>
       <td><span class="value-count">${fmtMoney(rev)}</span></td>
       <td><button class="fn-del" data-row="${i}" title="Remove platform">✕</button></td>
@@ -1440,6 +1467,7 @@ function funnelMemberRow(r, i, pvm, agg) {
 function renderFunnels() {
   ensureFunnelsConfig();
   const pvm = pageViewsMap();
+  buildFunnelDatalists(pvm);
   const cfg = state.funnelsConfig;
   const grand = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
   let html = '';
@@ -1453,10 +1481,12 @@ function renderFunnels() {
     html += `
       <tr class="fn-group-row" data-grp="${escHtml(gname)}">
         <td class="fn-grp-toggle">${open ? '▾' : '▸'}</td>
-        <td class="fn-grp-namecell">
-          <input class="fn-grp-name" data-grp="${escHtml(gname)}" value="${escHtml(gname)}" title="Rename group">
-          <button class="fn-add-row" data-grp="${escHtml(gname)}" title="Add platform to this group">＋</button>
-          <span class="group-count">${idxs.length}</span>
+        <td>
+          <div class="fn-grp-namewrap">
+            <input class="fn-grp-name" data-grp="${escHtml(gname)}" value="${escHtml(gname)}" title="Rename group">
+            <button class="fn-add-row" data-grp="${escHtml(gname)}" title="Add platform to this group">＋</button>
+            <span class="group-count">${idxs.length}</span>
+          </div>
         </td>
         <td></td>
         <td>${fmtNum(g.U)}</td>
@@ -1510,6 +1540,7 @@ $('funnelBody').addEventListener('change', e => {
     const i = +tr.dataset.row, f = cell.dataset.field;
     let v = e.target.value;
     if (f === 'group' && v === '__new__') v = uniqueGroupName('New Group');
+    if (f === 'pageSlug') v = pageValueToSlug(v);   // datalist display → slug
     state.funnelsConfig[i][f] = v;
     renderFunnels(); saveFunnels();
     return;
