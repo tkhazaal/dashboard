@@ -137,10 +137,19 @@ function orderProduct(o) {
 async function computeMetrics(orders, apiKey) {
   // Map product_id -> checkout slug so orders can be attributed to a funnel slug.
   const slugById = {};
+  const productList = [];   // unique product names for the Funnels dropdowns
   try {
     const products = await fetchProducts(apiKey);
-    products.forEach(p => { if (p.id != null && p.slug) slugById[p.id] = String(p.slug).toLowerCase(); });
+    const seen = new Set();
+    products.forEach(p => {
+      if (p.id != null && p.slug) slugById[p.id] = String(p.slug).toLowerCase();
+      const name = p.product_name;
+      if (name && !seen.has(name)) { seen.add(name); productList.push(name); }
+    });
   } catch { /* attribution is best-effort */ }
+
+  // Per-product purchase counts (any cart line) — drives the Funnels table.
+  const productSales = {};   // productName -> { orders, revenue }
 
   // Refunds — total amount refunded, by month (excludes test refunds).
   let totalRefunded = 0, refundCount = 0;
@@ -179,6 +188,15 @@ async function computeMetrics(orders, apiKey) {
       if (!ordersBySlug[slug]) ordersBySlug[slug] = { orders: 0, revenue: 0 };
       ordersBySlug[slug].orders++;
       ordersBySlug[slug].revenue += amount;
+    }
+
+    // Per-product purchase counts (every cart line = one purchase of that product)
+    for (const it of (o.cart_items || [])) {
+      const pname = it.product_name;
+      if (!pname) continue;
+      const prev = ((it.initial_price && it.initial_price.total) || parseFloat(it.total) || 0) / 100;
+      if (!productSales[pname]) productSales[pname] = { orders: 0, revenue: 0 };
+      productSales[pname].orders++; productSales[pname].revenue += prev;
     }
 
     // Upsell line items (upsell_id set) — attribute to the order's main slug (channel)
@@ -325,6 +343,14 @@ async function computeMetrics(orders, apiKey) {
     .map(([name, v]) => ({ name, orders: v.orders, revenue: v.revenue }))
     .sort((a, b) => b.orders - a.orders);
 
+  // Round product-sales revenue; sort the dropdown list (real sales first, drafts last)
+  for (const n of Object.keys(productSales)) productSales[n].revenue = Math.round(productSales[n].revenue * 100) / 100;
+  const isDraft = n => /draft|turned off|^test|^sc test/i.test(n);
+  const sortedProductList = productList.sort((a, b) => {
+    const sa = (productSales[a]?.orders || 0), sb = (productSales[b]?.orders || 0);
+    return (isDraft(a) - isDraft(b)) || (sb - sa) || a.localeCompare(b);
+  });
+
   return {
     totalCustomers: total,
     totalRevenue:   Math.round(revenue * 100) / 100,
@@ -345,6 +371,7 @@ async function computeMetrics(orders, apiKey) {
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
     ordersBySlug, upsellProducts, upsellBySlug,
+    productSales, productList: sortedProductList,
   };
 }
 

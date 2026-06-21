@@ -38,6 +38,10 @@
         <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Reporting
       </a>
+      <a href="#" class="nav-item" data-tab="funnels">
+        <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Funnels
+      </a>
       <a href="#" class="nav-item" data-tab="pages">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Page Analytics
@@ -273,6 +277,43 @@
           <p class="chart-insight">Owned traffic (Direct/Email) vs. borrowed (social/external).</p>
         </div>
       </div>
+    </section>
+
+    <!-- ── FUNNELS ─────────────────────────── -->
+    <section class="tab" id="tab-funnels">
+      <div class="page-header">
+        <div><h1>Funnels</h1><p class="subtitle">Per-platform funnel — link a page &amp; pick your main + upsell products; sales update automatically</p></div>
+        <div class="header-pills">
+          <span class="pill" id="funnel-saved"></span>
+          <button class="btn-primary sm" id="funnel-add">+ Add Platform</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table id="funnelTable" class="funnel-table">
+            <thead>
+              <tr>
+                <th>Platform</th>
+                <th>Landing Page</th>
+                <th>Unique</th>
+                <th>Checkout</th>
+                <th>Main Product</th>
+                <th>Sales</th>
+                <th>Upsell 1</th>
+                <th>Sales · CR</th>
+                <th>Upsell 2 / Downsell</th>
+                <th>Sales · CR</th>
+                <th>Revenue</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="funnelBody"></tbody>
+            <tfoot id="funnelFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+      <p class="chart-insight" style="padding:0 2px;">Sales counts come from SamCart (a product's total purchases). Because your products are named per channel (e.g. “RM Upsell — CC — FB”), selecting the exact product gives that channel's numbers. Conversion rates: Checkout→Main, Main→Upsell 1, Upsell 1→Upsell 2.</p>
     </section>
 
     <!-- ── PAGE ANALYTICS ──────────────────── -->

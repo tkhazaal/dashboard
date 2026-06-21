@@ -134,6 +134,7 @@ const state = {
   paGroup:     true,
   paUpsell:    '',
   expandedGroups: new Set(),
+  funnelsConfig: null,
   trendDays:   30,
   cuSearch:    '',
   cuBuyerType: 'all',
@@ -167,6 +168,7 @@ function activateTab(tab) {
   if (history.replaceState) history.replaceState(null, '', '#' + tab);
   // Charts must be built while their canvas is visible (Chart.js needs real dimensions)
   if (tab === 'reports') loadReports();
+  if (tab === 'funnels') loadFunnels();
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', e => { e.preventDefault(); activateTab(item.dataset.tab); });
@@ -624,6 +626,7 @@ async function loadSamCart(force = false) {
   if (state.pagesData && state.pagesData.length) renderPagesTable(state.pagesData);
   // If the Reporting tab is open, refresh its charts with the new data
   if ($('tab-reports')?.classList.contains('active')) renderReports();
+  if ($('tab-funnels')?.classList.contains('active')) renderFunnels();
 }
 
 // ── Customer rendering (client-side filtered) ────────────────────
@@ -750,6 +753,7 @@ async function loadSettings() {
   if (s.monthly_goal) { form.monthly_goal.value = s.monthly_goal; $('goal-input').value = s.monthly_goal; }
   if (s.samcart_api_key_masked) $('apiKeyMasked').textContent = 'Current key: ' + s.samcart_api_key_masked;
   state.monthlyGoal = parseFloat(s.monthly_goal) || 0;
+  if (s.funnels_config) { try { state.funnelsConfig = JSON.parse(s.funnels_config); } catch {} }
   updateTrackingCode(s.tracker_url || 'http://localhost:3000');
   renderGoal();
 }
@@ -1331,6 +1335,129 @@ function renderReportKpis(d) {
       <div class="kpi-text">${c.text}</div>
     </div>`).join('') : `<div class="kpi-card"><div class="kpi-text">Click <strong>Sync SamCart</strong> to populate sales insights.</div></div>`;
 }
+
+// ── Funnels (per-platform funnel builder, saved to Supabase) ──────
+let _funnelSaveTimer = null;
+const DEFAULT_FUNNELS = ['FB Ads','FB Posts','FB Stories','IG Posts','IG Stories','TikTok','Emails','FB Group']
+  .map(p => ({ platform: p, pageSlug: '', main: '', upsell1: '', upsell2: '' }));
+
+function ensureFunnelsConfig() {
+  if (!Array.isArray(state.funnelsConfig) || !state.funnelsConfig.length) {
+    state.funnelsConfig = DEFAULT_FUNNELS.map(r => ({ ...r }));
+  }
+}
+
+// slug -> { unique, checkout, label } from tracked pages
+function pageViewsMap() {
+  const m = {};
+  for (const e of buildSlugRows(state.pagesData || [])) {
+    m[e.slug] = { unique: e.landingUnique, checkout: e.checkoutViews, label: rowLabel(e) };
+  }
+  return m;
+}
+function prodSales(name) {
+  const ps = state.scData && state.scData.productSales;
+  return (name && ps && ps[name]) || { orders: 0, revenue: 0 };
+}
+const crPct = (n, d) => d > 0 ? Math.round((n / d) * 1000) / 10 + '%' : '—';
+
+function productOptions(selected) {
+  const list = (state.scData && state.scData.productList) || [];
+  const names = (selected && !list.includes(selected)) ? [selected, ...list] : list;
+  return '<option value="">— select —</option>' + names.map(n => {
+    const s = prodSales(n).orders;
+    return `<option value="${escHtml(n)}"${n === selected ? ' selected' : ''}>${escHtml(n)}${s ? ` (${fmtNum(s)})` : ''}</option>`;
+  }).join('');
+}
+function pageOptions(selected, pvm) {
+  const slugs = Object.keys(pvm).sort();
+  const extra = (selected && !pvm[selected]) ? `<option value="${escHtml(selected)}" selected>${escHtml(selected)}</option>` : '';
+  return '<option value="">— none —</option>' + extra + slugs.map(sl =>
+    `<option value="${escHtml(sl)}"${sl === selected ? ' selected' : ''}>${escHtml(pvm[sl].label || sl)}</option>`).join('');
+}
+
+function renderFunnels() {
+  ensureFunnelsConfig();
+  const pvm = pageViewsMap();
+  const body = $('funnelBody');
+  let tU = 0, tC = 0, tM = 0, tU1 = 0, tU2 = 0, tR = 0;
+
+  body.innerHTML = state.funnelsConfig.length ? state.funnelsConfig.map((r, i) => {
+    const pv  = pvm[r.pageSlug] || { unique: 0, checkout: 0 };
+    const m   = prodSales(r.main), u1 = prodSales(r.upsell1), u2 = prodSales(r.upsell2);
+    const rev = m.revenue + u1.revenue + u2.revenue;
+    tU += pv.unique; tC += pv.checkout; tM += m.orders; tU1 += u1.orders; tU2 += u2.orders; tR += rev;
+    return `
+      <tr data-row="${i}">
+        <td><input class="fn-input" data-field="platform" value="${escHtml(r.platform)}"></td>
+        <td><select class="fn-sel" data-field="pageSlug">${pageOptions(r.pageSlug, pvm)}</select></td>
+        <td>${fmtNum(pv.unique)}</td>
+        <td>${pv.checkout ? fmtNum(pv.checkout) : '<span class="muted">—</span>'}</td>
+        <td><select class="fn-sel" data-field="main">${productOptions(r.main)}</select></td>
+        <td><span class="orders-count">${fmtNum(m.orders)}</span><div class="fn-cr">${crPct(m.orders, pv.checkout)}</div></td>
+        <td><select class="fn-sel" data-field="upsell1">${productOptions(r.upsell1)}</select></td>
+        <td><span class="upsell-count">${fmtNum(u1.orders)}</span><div class="fn-cr">${crPct(u1.orders, m.orders)}</div></td>
+        <td><select class="fn-sel" data-field="upsell2">${productOptions(r.upsell2)}</select></td>
+        <td><span class="upsell-count">${fmtNum(u2.orders)}</span><div class="fn-cr">${crPct(u2.orders, u1.orders)}</div></td>
+        <td><span class="value-count">${fmtMoney(rev)}</span></td>
+        <td><button class="fn-del" data-row="${i}" title="Remove platform">✕</button></td>
+      </tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="12">No platforms yet — click “+ Add Platform”.</td></tr>`;
+
+  $('funnelFoot').innerHTML = state.funnelsConfig.length ? `
+    <tr class="funnel-total">
+      <td>TOTAL</td><td></td><td>${fmtNum(tU)}</td><td>${fmtNum(tC)}</td>
+      <td></td><td><span class="orders-count">${fmtNum(tM)}</span></td>
+      <td></td><td><span class="upsell-count">${fmtNum(tU1)}</span></td>
+      <td></td><td><span class="upsell-count">${fmtNum(tU2)}</span></td>
+      <td><span class="value-count">${fmtMoney(tR)}</span></td><td></td>
+    </tr>` : '';
+}
+
+function saveFunnels() {
+  clearTimeout(_funnelSaveTimer);
+  $('funnel-saved').textContent = 'Saving…';
+  _funnelSaveTimer = setTimeout(async () => {
+    try {
+      await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ funnels_config: JSON.stringify(state.funnelsConfig) }) });
+      $('funnel-saved').textContent = 'Saved ✓';
+      setTimeout(() => { if ($('funnel-saved').textContent === 'Saved ✓') $('funnel-saved').textContent = ''; }, 2500);
+    } catch { $('funnel-saved').textContent = 'Save failed'; }
+  }, 600);
+}
+
+async function loadFunnels() {
+  const tasks = [];
+  if (!state.scData) tasks.push(loadSamCart().catch(() => {}));
+  if (!state.pagesData || !state.pagesData.length) tasks.push(loadPagesTable().catch(() => {}));
+  if (tasks.length) await Promise.all(tasks);
+  renderFunnels();
+}
+
+// Row edits (event delegation)
+$('funnelBody').addEventListener('change', e => {
+  const cell = e.target.closest('[data-field]'), tr = e.target.closest('[data-row]');
+  if (!cell || !tr) return;
+  state.funnelsConfig[+tr.dataset.row][cell.dataset.field] = e.target.value;
+  renderFunnels(); saveFunnels();
+});
+$('funnelBody').addEventListener('input', e => {
+  if (!e.target.classList.contains('fn-input')) return;
+  const tr = e.target.closest('[data-row]'); if (!tr) return;
+  state.funnelsConfig[+tr.dataset.row].platform = e.target.value;
+  saveFunnels();   // live-save platform name without re-render (keeps input focus)
+});
+$('funnelBody').addEventListener('click', e => {
+  const del = e.target.closest('.fn-del'); if (!del) return;
+  state.funnelsConfig.splice(+del.dataset.row, 1);
+  renderFunnels(); saveFunnels();
+});
+$('funnel-add').addEventListener('click', () => {
+  ensureFunnelsConfig();
+  state.funnelsConfig.push({ platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' });
+  renderFunnels(); saveFunnels();
+});
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {
