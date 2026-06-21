@@ -59,6 +59,33 @@ function ordersForSlug(slug) {
   return null;
 }
 
+// Upsell sales for a given main slug + upsell product name (same slug matching)
+function upsellForSlug(slug, upsellName) {
+  const map = state.scData && state.scData.upsellBySlug;
+  if (!map || !slug || !upsellName) return null;
+  const entry = map[slug] || map[slug.replace(/\d+$/, '').replace(/-+$/, '')];
+  return (entry && entry[upsellName]) || null;
+}
+
+// ── Campaign / product groups (keyword-based, editable) ───────────
+// A page belongs to the FIRST group whose keyword its slug contains.
+const PAGE_GROUPS = [
+  { name: "Father's Day",          keywords: ['fathers-repair', 'fathers'] },
+  { name: 'Cutoff Culture',        keywords: ['cutoff'] },
+  { name: 'The Repair Map',        keywords: ['repair-map', 'repairmap'] },
+  { name: 'Reconnect Starter Kit', keywords: ['reconnect'] },
+  { name: '100+ Scripts Bundle',   keywords: ['scripts', '100-scripts'] },
+  { name: "She's in Power",        keywords: ['shes-in-power', 'in-power'] },
+  { name: 'Renewal Collective',    keywords: ['renewal'] },
+  { name: 'New Year Reset',        keywords: ['new-year', 'reset'] },
+  { name: "Q&A Vault",             keywords: ['qa-vault', 'q-a-vault', 'vault'] },
+];
+function groupOf(slug, path) {
+  const s = (String(slug || '') + ' ' + String(path || '')).toLowerCase();
+  for (const g of PAGE_GROUPS) if (g.keywords.some(k => s.includes(k))) return g.name;
+  return 'Other';
+}
+
 // Host-aware label: checkout pages get a "Checkout — <product>" label derived
 // from the last path segment; otherwise fall back to the campaign map.
 function pageLabel(path, host) {
@@ -104,6 +131,9 @@ const state = {
   paEnd:       '',
   paSearch:    '',
   paSort:      'total_views',
+  paGroup:     true,
+  paUpsell:    '',
+  expandedGroups: new Set(),
   trendDays:   30,
   cuSearch:    '',
   cuBuyerType: 'all',
@@ -375,9 +405,12 @@ async function loadPagesTable() {
   loadPaStats();
 }
 
-function renderPagesTable(rows) {
-  // Aggregate by funnel slug — fold each SamCart checkout (/product/<slug>) into
-  // the landing page that shares the same slug, so one row shows both sides.
+const rowLabel = e => e.landingPath
+  ? (campaignName(e.landingPath) || e.title || e.landingPath)
+  : `Checkout — ${titleCase(e.slug)}`;
+
+// Build per-slug aggregated rows from the raw page-view rows.
+function buildSlugRows(rows) {
   const map = new Map();
   for (const r of rows) {
     const checkout = isCheckoutPage(r.page_path, r.host);
@@ -398,61 +431,125 @@ function renderPagesTable(rows) {
     }
     if (!e.lastSeen || new Date(r.last_seen) > new Date(e.lastSeen)) e.lastSeen = r.last_seen;
   }
-  let list = [...map.values()];
+  return [...map.values()];
+}
 
-  // Label for each slug row: campaign name if it's a known landing page, else the slug
-  const rowLabel = e => e.landingPath
-    ? (campaignName(e.landingPath) || e.title || e.landingPath)
-    : `Checkout — ${titleCase(e.slug)}`;
-
-  // Client-side search — matches label, slug, or title
-  if (state.paSearch) {
-    const q = state.paSearch.toLowerCase();
-    list = list.filter(e =>
-      rowLabel(e).toLowerCase().includes(q) ||
-      e.slug.includes(q) ||
-      String(e.title || '').toLowerCase().includes(q)
-    );
-  }
-
-  // Sort
-  list.sort((a, b) => {
+function sortSlugRows(list) {
+  return list.sort((a, b) => {
     if (state.paSort === 'unique_visitors') return b.landingUnique  - a.landingUnique;
     if (state.paSort === 'checkout_views')  return b.checkoutViews  - a.checkoutViews;
     if (state.paSort === 'orders')          return (ordersForSlug(b.slug)?.orders || 0)  - (ordersForSlug(a.slug)?.orders || 0);
     if (state.paSort === 'order_value')     return (ordersForSlug(b.slug)?.revenue || 0) - (ordersForSlug(a.slug)?.revenue || 0);
+    if (state.paSort === 'upsell')          return (upsellForSlug(b.slug, state.paUpsell)?.orders || 0) - (upsellForSlug(a.slug, state.paUpsell)?.orders || 0);
     return b.landingViews - a.landingViews;
   });
+}
 
-  $('pa-resultCount').textContent = `${fmtNum(list.length)} page${list.length !== 1 ? 's' : ''}`;
+// One data row (member or flat) — returns <tr> HTML
+function slugRowHtml(e, rank, indent) {
+  const ord = ordersForSlug(e.slug);
+  const ups = state.paUpsell ? upsellForSlug(e.slug, state.paUpsell) : null;
+  const displayPath = e.landingPath || `/${e.slug}`;
+  return `
+    <tr class="${indent ? 'member-row' : ''}">
+      <td class="rank">${rank}</td>
+      <td>
+        <div class="name-cell">${escHtml(rowLabel(e))}</div>
+        <div class="email-cell">${escHtml(displayPath)}</div>
+      </td>
+      <td>${fmtNum(e.landingViews)}</td>
+      <td>${fmtNum(e.landingUnique)}</td>
+      <td>${e.checkoutViews ? `<span class="checkout-count" title="${fmtNum(e.checkoutUnique)} unique">${fmtNum(e.checkoutViews)}</span>` : '<span class="muted">—</span>'}</td>
+      <td>${ord ? `<span class="orders-count">${fmtNum(ord.orders)}</span>` : '<span class="muted">—</span>'}</td>
+      <td>${ord ? `<span class="value-count">${fmtMoney(ord.revenue)}</span>` : '<span class="muted">—</span>'}</td>
+      <td class="upsell-col">${ups ? `<span class="upsell-count" title="${fmtMoney(ups.revenue)}">${fmtNum(ups.orders)}</span>` : '<span class="muted">—</span>'}</td>
+      <td class="email-cell">${timeAgo(e.lastSeen)}</td>
+    </tr>`;
+}
+
+function renderPagesTable(rows) {
+  let list = buildSlugRows(rows);
+
+  // Search
+  if (state.paSearch) {
+    const q = state.paSearch.toLowerCase();
+    list = list.filter(e => rowLabel(e).toLowerCase().includes(q) || e.slug.includes(q) || String(e.title || '').toLowerCase().includes(q));
+  }
+
+  // Toggle the upsell column on the table
+  const tableEl = $('pagesTableEl');
+  if (tableEl) tableEl.classList.toggle('show-upsell', !!state.paUpsell);
 
   const body = $('pagesTable');
-  body.innerHTML = list.length === 0
-    ? `<tr class="empty-row"><td colspan="8">No page views yet — add the tracking code to your pages.</td></tr>`
-    : list.map((e, i) => {
-        const displayPath = e.landingPath || `/${e.slug}`;
-        const ord = ordersForSlug(e.slug);
-        return `
-        <tr>
-          <td class="rank">${i + 1}</td>
-          <td>
-            <div class="name-cell">${escHtml(rowLabel(e))}</div>
-            <div class="email-cell">${escHtml(displayPath)}</div>
-          </td>
-          <td>${fmtNum(e.landingViews)}</td>
-          <td>${fmtNum(e.landingUnique)}</td>
-          <td>${e.checkoutViews
-                ? `<span class="checkout-count" title="${fmtNum(e.checkoutUnique)} unique">${fmtNum(e.checkoutViews)}</span>`
-                : '<span class="muted">—</span>'}</td>
-          <td>${ord
-                ? `<span class="orders-count">${fmtNum(ord.orders)}</span>`
-                : '<span class="muted">—</span>'}</td>
-          <td>${ord
-                ? `<span class="value-count">${fmtMoney(ord.revenue)}</span>`
-                : '<span class="muted">—</span>'}</td>
-          <td class="email-cell">${timeAgo(e.lastSeen)}</td>
-        </tr>
-      `;}).join('');
+  if (!list.length) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="9">No page views yet — add the tracking code to your pages.</td></tr>`;
+    $('pa-resultCount').textContent = '0 pages';
+    return;
+  }
+
+  if (!state.paGroup) {
+    // Flat view
+    sortSlugRows(list);
+    $('pa-resultCount').textContent = `${fmtNum(list.length)} page${list.length !== 1 ? 's' : ''}`;
+    body.innerHTML = list.map((e, i) => slugRowHtml(e, i + 1, false)).join('');
+    return;
+  }
+
+  // Grouped view — aggregate slug rows into campaign/product groups
+  const groups = {};
+  for (const e of list) {
+    const gname = groupOf(e.slug, e.landingPath);
+    if (!groups[gname]) groups[gname] = { name: gname, rows: [], landingViews: 0, landingUnique: 0, checkoutViews: 0, orders: 0, value: 0, upsellOrders: 0, upsellRevenue: 0, lastSeen: null };
+    const g = groups[gname];
+    g.rows.push(e);
+    g.landingViews += e.landingViews; g.landingUnique += e.landingUnique; g.checkoutViews += e.checkoutViews;
+    const ord = ordersForSlug(e.slug); if (ord) { g.orders += ord.orders; g.value += ord.revenue; }
+    const ups = state.paUpsell ? upsellForSlug(e.slug, state.paUpsell) : null; if (ups) { g.upsellOrders += ups.orders; g.upsellRevenue += ups.revenue; }
+    if (!g.lastSeen || new Date(e.lastSeen) > new Date(g.lastSeen)) g.lastSeen = e.lastSeen;
+  }
+  const groupList = Object.values(groups).sort((a, b) =>
+    (a.name === 'Other') - (b.name === 'Other') || b.landingViews - a.landingViews);
+
+  $('pa-resultCount').textContent = `${groupList.length} group${groupList.length !== 1 ? 's' : ''} · ${fmtNum(list.length)} pages`;
+
+  body.innerHTML = groupList.map(g => {
+    const open = state.expandedGroups.has(g.name);
+    const header = `
+      <tr class="group-row ${open ? 'open' : ''}" data-group="${escHtml(g.name)}">
+        <td class="group-toggle">${open ? '▾' : '▸'}</td>
+        <td><span class="group-name">${escHtml(g.name)}</span> <span class="group-count">${g.rows.length}</span></td>
+        <td>${fmtNum(g.landingViews)}</td>
+        <td>${fmtNum(g.landingUnique)}</td>
+        <td>${g.checkoutViews ? `<span class="checkout-count">${fmtNum(g.checkoutViews)}</span>` : '<span class="muted">—</span>'}</td>
+        <td>${g.orders ? `<span class="orders-count">${fmtNum(g.orders)}</span>` : '<span class="muted">—</span>'}</td>
+        <td>${g.value ? `<span class="value-count">${fmtMoney(g.value)}</span>` : '<span class="muted">—</span>'}</td>
+        <td class="upsell-col">${g.upsellOrders ? `<span class="upsell-count" title="${fmtMoney(g.upsellRevenue)}">${fmtNum(g.upsellOrders)}</span>` : '<span class="muted">—</span>'}</td>
+        <td></td>
+      </tr>`;
+    const members = open ? sortSlugRows(g.rows).map((e, i) => slugRowHtml(e, i + 1, true)).join('') : '';
+    return header + members;
+  }).join('');
+}
+
+// Expand / collapse groups (event delegation)
+$('pagesTable').addEventListener('click', e => {
+  const row = e.target.closest('.group-row');
+  if (!row) return;
+  const name = row.dataset.group;
+  if (state.expandedGroups.has(name)) state.expandedGroups.delete(name);
+  else state.expandedGroups.add(name);
+  if (state.pagesData) renderPagesTable(state.pagesData);
+});
+
+// Populate the upsell dropdown from SamCart data
+function populateUpsellDropdown() {
+  const sel = $('pa-upsell');
+  if (!sel) return;
+  const items = (state.scData && state.scData.upsellProducts) || [];
+  const cur = state.paUpsell;
+  sel.innerHTML = '<option value="">None</option>' +
+    items.map(u => `<option value="${escHtml(u.name)}">${escHtml(u.name)} (${fmtNum(u.orders)})</option>`).join('');
+  sel.value = cur;
 }
 
 function renderReferrersTable(rows) {
@@ -522,7 +619,8 @@ async function loadSamCart(force = false) {
   renderTiers(data.tiers);
   renderBehaviour(data);
   renderPaths();
-  // Re-render the pages table so the Orders column (from SamCart) populates
+  populateUpsellDropdown();
+  // Re-render the pages table so the Orders/Upsell columns (from SamCart) populate
   if (state.pagesData && state.pagesData.length) renderPagesTable(state.pagesData);
   // If the Reporting tab is open, refresh its charts with the new data
   if ($('tab-reports')?.classList.contains('active')) renderReports();
@@ -858,6 +956,16 @@ $('pa-range-clear').addEventListener('click', () => {
 
 $('pa-search').addEventListener('input', e => {
   state.paSearch = e.target.value.trim();
+  if (state.pagesData) renderPagesTable(state.pagesData);
+});
+
+$('pa-group').addEventListener('change', e => {
+  state.paGroup = e.target.checked;
+  if (state.pagesData) renderPagesTable(state.pagesData);
+});
+
+$('pa-upsell').addEventListener('change', e => {
+  state.paUpsell = e.target.value;
   if (state.pagesData) renderPagesTable(state.pagesData);
 });
 

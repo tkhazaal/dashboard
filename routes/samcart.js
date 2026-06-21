@@ -160,6 +160,8 @@ async function computeMetrics(orders, apiKey) {
 
   const custMap = new Map();
   const ordersBySlug = {};   // slug -> { orders, revenue }
+  const upsellTotals = {};   // upsellName -> { orders, revenue }
+  const upsellBySlug = {};   // mainSlug -> { upsellName -> { orders, revenue } }
 
   for (const o of orders) {
     if (o.test_mode) continue;                         // exclude sandbox/test orders
@@ -177,6 +179,20 @@ async function computeMetrics(orders, apiKey) {
       if (!ordersBySlug[slug]) ordersBySlug[slug] = { orders: 0, revenue: 0 };
       ordersBySlug[slug].orders++;
       ordersBySlug[slug].revenue += amount;
+    }
+
+    // Upsell line items (upsell_id set) — attribute to the order's main slug (channel)
+    for (const it of (o.cart_items || [])) {
+      if (!it.upsell_id) continue;
+      const uname = it.product_name || `Product #${it.product_id}`;
+      const urev  = ((it.initial_price && it.initial_price.total) || parseFloat(it.total) || 0) / 100;
+      if (!upsellTotals[uname]) upsellTotals[uname] = { orders: 0, revenue: 0 };
+      upsellTotals[uname].orders++; upsellTotals[uname].revenue += urev;
+      if (slug) {
+        if (!upsellBySlug[slug]) upsellBySlug[slug] = {};
+        if (!upsellBySlug[slug][uname]) upsellBySlug[slug][uname] = { orders: 0, revenue: 0 };
+        upsellBySlug[slug][uname].orders++; upsellBySlug[slug][uname].revenue += urev;
+      }
     }
 
     if (!custMap.has(cid)) custMap.set(cid, { cid, orders: [], products: new Set(), ltv: 0 });
@@ -302,6 +318,12 @@ async function computeMetrics(orders, apiKey) {
   for (const k of Object.keys(ordersBySlug)) {
     ordersBySlug[k].revenue = Math.round(ordersBySlug[k].revenue * 100) / 100;
   }
+  // Round upsell revenue + build sorted dropdown list
+  for (const u of Object.keys(upsellTotals)) upsellTotals[u].revenue = Math.round(upsellTotals[u].revenue * 100) / 100;
+  for (const s of Object.keys(upsellBySlug)) for (const u of Object.keys(upsellBySlug[s])) upsellBySlug[s][u].revenue = Math.round(upsellBySlug[s][u].revenue * 100) / 100;
+  const upsellProducts = Object.entries(upsellTotals)
+    .map(([name, v]) => ({ name, orders: v.orders, revenue: v.revenue }))
+    .sort((a, b) => b.orders - a.orders);
 
   return {
     totalCustomers: total,
@@ -322,7 +344,7 @@ async function computeMetrics(orders, apiKey) {
     refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
-    ordersBySlug,
+    ordersBySlug, upsellProducts, upsellBySlug,
   };
 }
 

@@ -302,6 +302,11 @@
           <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="search" id="pa-search" class="search-input" placeholder="Search pages…">
         </div>
+        <div class="filter-sep"></div>
+        <label class="grouptoggle"><input type="checkbox" id="pa-group" checked> Group by campaign</label>
+        <div class="filter-sep"></div>
+        <span class="filter-label">Upsell</span>
+        <select id="pa-upsell" class="filter-select"><option value="">None</option></select>
       </div>
 
       <div class="stat-grid four">
@@ -317,7 +322,7 @@
           <div class="result-count" id="pa-resultCount"></div>
         </div>
         <div class="table-wrap">
-          <table>
+          <table id="pagesTableEl">
             <thead>
               <tr>
                 <th>#</th>
@@ -327,6 +332,7 @@
                 <th class="sortable" data-sort="checkout_views">Checkout Views</th>
                 <th class="sortable" data-sort="orders">Orders</th>
                 <th class="sortable" data-sort="order_value">Order Value</th>
+                <th class="upsell-col" data-sort="upsell">Upsell Orders</th>
                 <th>Last Visit</th>
               </tr>
             </thead>

@@ -831,6 +831,30 @@ tbody tr:hover { background: var(--row-hover); }
 .value-count  { font-weight: 700; color: var(--accent2); }
 .orders-count { font-weight: 800; color: var(--accent); }
 .checkout-count { font-weight: 700; color: #8b5cf6; }
+.upsell-count { font-weight: 800; color: #ec4899; }
+
+/* Upsell column — only shown when an upsell product is selected */
+.upsell-col { display: none; }
+table.show-upsell .upsell-col { display: table-cell; }
+
+/* Grouped page-analytics rows */
+.group-row { cursor: pointer; background: var(--surface-alt); }
+.group-row:hover { background: var(--row-hover); }
+.group-row td { border-bottom: 1px solid var(--border); font-weight: 700; }
+.group-toggle { width: 26px; text-align: center; color: var(--accent); font-size: 11px; }
+.group-name { font-family: var(--font-display); font-weight: 800; font-size: 13px; }
+.group-count {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
+  background: rgba(37,99,235,0.12); color: var(--accent); font-size: 10px; font-weight: 700;
+  vertical-align: middle;
+}
+.member-row td:first-child { padding-left: 26px; }
+.member-row td:nth-child(2) { padding-left: 18px; }
+.member-row { font-size: 12px; }
+
+/* Group-by toggle + upsell label */
+.grouptoggle { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--sub); cursor: pointer; white-space: nowrap; }
+.grouptoggle input { accent-color: var(--accent); cursor: pointer; }
 
 .page-header h1 { line-height: 1.1; }
 
