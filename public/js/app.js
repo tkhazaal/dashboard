@@ -1425,7 +1425,8 @@ function buildFunnelDatalists(pvm) {
   _pageDisplayToSlug = {};
   const pg = $('fn-pages');
   if (pg) {
-    pg.innerHTML = Object.keys(pvm).filter(sl => pvm[sl].hasTitle).map(sl => {
+    // Landing pages only — products belong in the Main/Upsell pickers
+    pg.innerHTML = Object.keys(pvm).filter(sl => pvm[sl].isLanding).map(sl => {
       const disp = `${pvm[sl].label} — /${sl}`;
       _pageDisplayToSlug[disp] = sl;
       return `<option value="${escHtml(disp)}"></option>`;
