@@ -546,13 +546,11 @@ $('pagesTable').addEventListener('click', e => {
 
 // Populate the upsell dropdown from SamCart data
 function populateUpsellDropdown() {
-  const sel = $('pa-upsell');
-  if (!sel) return;
+  const list = $('pa-upsell-list'), input = $('pa-upsell');
+  if (!list || !input) return;
   const items = (state.scData && state.scData.upsellProducts) || [];
-  const cur = state.paUpsell;
-  sel.innerHTML = '<option value="">None</option>' +
-    items.map(u => `<option value="${escHtml(u.name)}">${escHtml(u.name)} (${fmtNum(u.orders)})</option>`).join('');
-  sel.value = cur;
+  list.innerHTML = items.map(u => `<option value="${escHtml(u.name)}">${fmtNum(u.orders)} orders</option>`).join('');
+  input.value = state.paUpsell || '';
 }
 
 function renderReferrersTable(rows) {
