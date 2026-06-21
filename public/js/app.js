@@ -1347,11 +1347,12 @@ function ensureFunnelsConfig() {
   }
 }
 
-// slug -> { unique, checkout, label } from tracked pages
+// slug -> { unique, checkout, label, isLanding } from tracked pages
 function pageViewsMap() {
   const m = {};
   for (const e of buildSlugRows(state.pagesData || [])) {
-    m[e.slug] = { unique: e.landingUnique, checkout: e.checkoutViews, label: rowLabel(e) };
+    // Campaign label distinguishes channels (titles are identical across funnel pages)
+    m[e.slug] = { unique: e.landingUnique, checkout: e.checkoutViews, label: rowLabel(e), isLanding: !!e.landingPath };
   }
   return m;
 }
@@ -1370,10 +1371,13 @@ function productOptions(selected) {
   }).join('');
 }
 function pageOptions(selected, pvm) {
-  const slugs = Object.keys(pvm).sort();
+  // Only real landing pages (skip auto-generated SamCart checkout slugs), keep current pick
+  const slugs = Object.keys(pvm)
+    .filter(sl => pvm[sl].isLanding || sl === selected)
+    .sort((a, b) => (pvm[a].label || a).localeCompare(pvm[b].label || b));
   const extra = (selected && !pvm[selected]) ? `<option value="${escHtml(selected)}" selected>${escHtml(selected)}</option>` : '';
   return '<option value="">— none —</option>' + extra + slugs.map(sl =>
-    `<option value="${escHtml(sl)}"${sl === selected ? ' selected' : ''}>${escHtml(pvm[sl].label || sl)}</option>`).join('');
+    `<option value="${escHtml(sl)}"${sl === selected ? ' selected' : ''}>${escHtml(pvm[sl].label || sl)} · /${escHtml(sl)}</option>`).join('');
 }
 
 function renderFunnels() {
