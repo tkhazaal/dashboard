@@ -1412,26 +1412,32 @@ function groupOptions(selected) {
     + '<option value="__new__">＋ New group…</option>';
 }
 
-// Searchable datalists (products + pages) — typing filters the options
-let _pageDisplayToSlug = {};
-function pageDisplayForSlug(slug, pvm) {
+// Searchable datalists (products + pages) — typing filters the options.
+// Page display is the SHORT channel label (e.g. "IG Posts"); slug kept behind it.
+let _pageDisplayToSlug = {}, _slugToPageDisplay = {};
+function buildPageMaps(pvm) {
+  _pageDisplayToSlug = {}; _slugToPageDisplay = {};
+  const used = {};
+  for (const sl of Object.keys(pvm)) {
+    if (!pvm[sl].isLanding) continue;
+    let disp = pvm[sl].label;
+    if (used[disp]) disp = `${disp} (${sl})`;   // disambiguate duplicate labels
+    used[disp] = true;
+    _pageDisplayToSlug[disp] = sl;
+    _slugToPageDisplay[sl] = disp;
+  }
+}
+function pageDisplayForSlug(slug) {
   if (!slug) return '';
-  const p = pvm[slug];
-  return p ? `${p.label} — /${slug}` : `/${slug}`;
+  return _slugToPageDisplay[slug] || slug;
 }
 function buildFunnelDatalists(pvm) {
   const products = (state.scData && state.scData.productList) || [];
   const pd = $('fn-products'); if (pd) pd.innerHTML = products.map(n => `<option value="${escHtml(n)}"></option>`).join('');
-  _pageDisplayToSlug = {};
+  buildPageMaps(pvm);
   const pg = $('fn-pages');
-  if (pg) {
-    // Landing pages only — products belong in the Main/Upsell pickers
-    pg.innerHTML = Object.keys(pvm).filter(sl => pvm[sl].isLanding).map(sl => {
-      const disp = `${pvm[sl].label} — /${sl}`;
-      _pageDisplayToSlug[disp] = sl;
-      return `<option value="${escHtml(disp)}"></option>`;
-    }).join('');
-  }
+  if (pg) pg.innerHTML = Object.keys(_slugToPageDisplay)
+    .map(sl => `<option value="${escHtml(_slugToPageDisplay[sl])}"></option>`).join('');
 }
 // Convert a typed/selected page value back to a slug
 function pageValueToSlug(v) {
@@ -1449,7 +1455,7 @@ function funnelMemberRow(r, i, pvm, agg) {
     <tr data-row="${i}" class="fn-member">
       <td><select class="fn-grp" data-field="group">${groupOptions(r.group)}</select></td>
       <td><input class="fn-input" data-field="platform" value="${escHtml(r.platform)}"></td>
-      <td><input class="fn-page" data-field="pageSlug" list="fn-pages" placeholder="Search page…" value="${escHtml(pageDisplayForSlug(r.pageSlug, pvm))}"></td>
+      <td><input class="fn-page" data-field="pageSlug" list="fn-pages" placeholder="Search page…" value="${escHtml(pageDisplayForSlug(r.pageSlug))}" title="${escHtml(r.pageSlug ? '/' + r.pageSlug : '')}"></td>
       <td>${fmtNum(pv.unique)}</td>
       <td>${pv.checkout ? fmtNum(pv.checkout) : '<span class="muted">—</span>'}</td>
       <td><input class="fn-prod" data-field="main" list="fn-products" placeholder="Search product…" value="${escHtml(r.main || '')}"></td>
