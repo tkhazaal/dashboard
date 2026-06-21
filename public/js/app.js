@@ -1340,12 +1340,27 @@ function renderReportKpis(d) {
 // ── Funnels (per-platform funnel builder, saved to Supabase) ──────
 let _funnelSaveTimer = null;
 const DEFAULT_FUNNELS = ['FB Ads','FB Posts','FB Stories','IG Posts','IG Stories','TikTok','Emails','FB Group']
-  .map(p => ({ platform: p, pageSlug: '', main: '', upsell1: '', upsell2: '' }));
+  .map(p => ({ group: "Father's Day", platform: p, pageSlug: '', main: '', upsell1: '', upsell2: '' }));
+
+const funnelCollapsed = new Set();   // collapsed group names (default: expanded)
 
 function ensureFunnelsConfig() {
   if (!Array.isArray(state.funnelsConfig) || !state.funnelsConfig.length) {
     state.funnelsConfig = DEFAULT_FUNNELS.map(r => ({ ...r }));
   }
+  state.funnelsConfig.forEach(r => { if (r.group == null) r.group = 'Ungrouped'; });
+}
+function funnelGroupNames() {
+  ensureFunnelsConfig();
+  const names = [];
+  for (const r of state.funnelsConfig) if (!names.includes(r.group)) names.push(r.group);
+  return names;
+}
+function uniqueGroupName(base) {
+  const names = funnelGroupNames();
+  if (!names.includes(base)) return base;
+  let i = 2; while (names.includes(`${base} ${i}`)) i++;
+  return `${base} ${i}`;
 }
 
 // slug -> { unique, checkout, label, isLanding } from tracked pages
@@ -1392,41 +1407,77 @@ function pageOptions(selected, pvm) {
   return html;
 }
 
+function groupOptions(selected) {
+  const names = funnelGroupNames();
+  if (selected && !names.includes(selected)) names.unshift(selected);
+  return names.map(n => `<option value="${escHtml(n)}"${n === selected ? ' selected' : ''}>${escHtml(n)}</option>`).join('')
+    + '<option value="__new__">＋ New group…</option>';
+}
+
+function funnelMemberRow(r, i, pvm, agg) {
+  const pv  = pvm[r.pageSlug] || { unique: 0, checkout: 0 };
+  const m   = prodSales(r.main), u1 = prodSales(r.upsell1), u2 = prodSales(r.upsell2);
+  const rev = m.revenue + u1.revenue + u2.revenue;
+  agg.U += pv.unique; agg.C += pv.checkout; agg.M += m.orders; agg.U1 += u1.orders; agg.U2 += u2.orders; agg.R += rev;
+  return `
+    <tr data-row="${i}" class="fn-member">
+      <td><select class="fn-grp" data-field="group">${groupOptions(r.group)}</select></td>
+      <td><input class="fn-input" data-field="platform" value="${escHtml(r.platform)}"></td>
+      <td><select class="fn-sel" data-field="pageSlug">${pageOptions(r.pageSlug, pvm)}</select></td>
+      <td>${fmtNum(pv.unique)}</td>
+      <td>${pv.checkout ? fmtNum(pv.checkout) : '<span class="muted">—</span>'}</td>
+      <td><select class="fn-sel" data-field="main">${productOptions(r.main)}</select></td>
+      <td><span class="orders-count">${fmtNum(m.orders)}</span><div class="fn-cr">${crPct(m.orders, pv.checkout)}</div></td>
+      <td><select class="fn-sel" data-field="upsell1">${productOptions(r.upsell1)}</select></td>
+      <td><span class="upsell-count">${fmtNum(u1.orders)}</span><div class="fn-cr">${crPct(u1.orders, m.orders)}</div></td>
+      <td><select class="fn-sel" data-field="upsell2">${productOptions(r.upsell2)}</select></td>
+      <td><span class="upsell-count">${fmtNum(u2.orders)}</span><div class="fn-cr">${crPct(u2.orders, u1.orders)}</div></td>
+      <td><span class="value-count">${fmtMoney(rev)}</span></td>
+      <td><button class="fn-del" data-row="${i}" title="Remove platform">✕</button></td>
+    </tr>`;
+}
+
 function renderFunnels() {
   ensureFunnelsConfig();
   const pvm = pageViewsMap();
-  const body = $('funnelBody');
-  let tU = 0, tC = 0, tM = 0, tU1 = 0, tU2 = 0, tR = 0;
+  const cfg = state.funnelsConfig;
+  const grand = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
+  let html = '';
 
-  body.innerHTML = state.funnelsConfig.length ? state.funnelsConfig.map((r, i) => {
-    const pv  = pvm[r.pageSlug] || { unique: 0, checkout: 0 };
-    const m   = prodSales(r.main), u1 = prodSales(r.upsell1), u2 = prodSales(r.upsell2);
-    const rev = m.revenue + u1.revenue + u2.revenue;
-    tU += pv.unique; tC += pv.checkout; tM += m.orders; tU1 += u1.orders; tU2 += u2.orders; tR += rev;
-    return `
-      <tr data-row="${i}">
-        <td><input class="fn-input" data-field="platform" value="${escHtml(r.platform)}"></td>
-        <td><select class="fn-sel" data-field="pageSlug">${pageOptions(r.pageSlug, pvm)}</select></td>
-        <td>${fmtNum(pv.unique)}</td>
-        <td>${pv.checkout ? fmtNum(pv.checkout) : '<span class="muted">—</span>'}</td>
-        <td><select class="fn-sel" data-field="main">${productOptions(r.main)}</select></td>
-        <td><span class="orders-count">${fmtNum(m.orders)}</span><div class="fn-cr">${crPct(m.orders, pv.checkout)}</div></td>
-        <td><select class="fn-sel" data-field="upsell1">${productOptions(r.upsell1)}</select></td>
-        <td><span class="upsell-count">${fmtNum(u1.orders)}</span><div class="fn-cr">${crPct(u1.orders, m.orders)}</div></td>
-        <td><select class="fn-sel" data-field="upsell2">${productOptions(r.upsell2)}</select></td>
-        <td><span class="upsell-count">${fmtNum(u2.orders)}</span><div class="fn-cr">${crPct(u2.orders, u1.orders)}</div></td>
-        <td><span class="value-count">${fmtMoney(rev)}</span></td>
-        <td><button class="fn-del" data-row="${i}" title="Remove platform">✕</button></td>
+  for (const gname of funnelGroupNames()) {
+    const idxs = cfg.map((_, i) => i).filter(i => cfg[i].group === gname);
+    const g = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
+    const members = idxs.map(i => funnelMemberRow(cfg[i], i, pvm, g)).join('');
+    grand.U += g.U; grand.C += g.C; grand.M += g.M; grand.U1 += g.U1; grand.U2 += g.U2; grand.R += g.R;
+    const open = !funnelCollapsed.has(gname);
+    html += `
+      <tr class="fn-group-row" data-grp="${escHtml(gname)}">
+        <td class="fn-grp-toggle">${open ? '▾' : '▸'}</td>
+        <td class="fn-grp-namecell">
+          <input class="fn-grp-name" data-grp="${escHtml(gname)}" value="${escHtml(gname)}" title="Rename group">
+          <button class="fn-add-row" data-grp="${escHtml(gname)}" title="Add platform to this group">＋</button>
+          <span class="group-count">${idxs.length}</span>
+        </td>
+        <td></td>
+        <td>${fmtNum(g.U)}</td>
+        <td>${fmtNum(g.C)}</td>
+        <td></td><td><span class="orders-count">${fmtNum(g.M)}</span></td>
+        <td></td><td><span class="upsell-count">${fmtNum(g.U1)}</span></td>
+        <td></td><td><span class="upsell-count">${fmtNum(g.U2)}</span></td>
+        <td><span class="value-count">${fmtMoney(g.R)}</span></td>
+        <td><button class="fn-del-grp" data-grp="${escHtml(gname)}" title="Delete group">✕</button></td>
       </tr>`;
-  }).join('') : `<tr class="empty-row"><td colspan="12">No platforms yet — click “+ Add Platform”.</td></tr>`;
+    if (open) html += members;
+  }
 
-  $('funnelFoot').innerHTML = state.funnelsConfig.length ? `
+  $('funnelBody').innerHTML = html || `<tr class="empty-row"><td colspan="13">No platforms yet — click “+ Group”.</td></tr>`;
+  $('funnelFoot').innerHTML = cfg.length ? `
     <tr class="funnel-total">
-      <td>TOTAL</td><td></td><td>${fmtNum(tU)}</td><td>${fmtNum(tC)}</td>
-      <td></td><td><span class="orders-count">${fmtNum(tM)}</span></td>
-      <td></td><td><span class="upsell-count">${fmtNum(tU1)}</span></td>
-      <td></td><td><span class="upsell-count">${fmtNum(tU2)}</span></td>
-      <td><span class="value-count">${fmtMoney(tR)}</span></td><td></td>
+      <td></td><td>TOTAL</td><td></td><td>${fmtNum(grand.U)}</td><td>${fmtNum(grand.C)}</td>
+      <td></td><td><span class="orders-count">${fmtNum(grand.M)}</span></td>
+      <td></td><td><span class="upsell-count">${fmtNum(grand.U1)}</span></td>
+      <td></td><td><span class="upsell-count">${fmtNum(grand.U2)}</span></td>
+      <td><span class="value-count">${fmtMoney(grand.R)}</span></td><td></td>
     </tr>` : '';
 }
 
@@ -1451,12 +1502,28 @@ async function loadFunnels() {
   renderFunnels();
 }
 
-// Row edits (event delegation)
+// Row + group edits (event delegation)
 $('funnelBody').addEventListener('change', e => {
+  // Row field (product / page / group selectors)
   const cell = e.target.closest('[data-field]'), tr = e.target.closest('[data-row]');
-  if (!cell || !tr) return;
-  state.funnelsConfig[+tr.dataset.row][cell.dataset.field] = e.target.value;
-  renderFunnels(); saveFunnels();
+  if (cell && tr) {
+    const i = +tr.dataset.row, f = cell.dataset.field;
+    let v = e.target.value;
+    if (f === 'group' && v === '__new__') v = uniqueGroupName('New Group');
+    state.funnelsConfig[i][f] = v;
+    renderFunnels(); saveFunnels();
+    return;
+  }
+  // Group rename
+  const gn = e.target.closest('.fn-grp-name');
+  if (gn) {
+    const oldN = gn.dataset.grp, newN = e.target.value.trim() || oldN;
+    if (newN !== oldN) {
+      state.funnelsConfig.forEach(r => { if (r.group === oldN) r.group = newN; });
+      if (funnelCollapsed.has(oldN)) { funnelCollapsed.delete(oldN); funnelCollapsed.add(newN); }
+      renderFunnels(); saveFunnels();
+    }
+  }
 });
 $('funnelBody').addEventListener('input', e => {
   if (!e.target.classList.contains('fn-input')) return;
@@ -1465,13 +1532,23 @@ $('funnelBody').addEventListener('input', e => {
   saveFunnels();   // live-save platform name without re-render (keeps input focus)
 });
 $('funnelBody').addEventListener('click', e => {
-  const del = e.target.closest('.fn-del'); if (!del) return;
-  state.funnelsConfig.splice(+del.dataset.row, 1);
-  renderFunnels(); saveFunnels();
+  const del = e.target.closest('.fn-del');
+  if (del) { state.funnelsConfig.splice(+del.dataset.row, 1); renderFunnels(); saveFunnels(); return; }
+  const tog = e.target.closest('.fn-grp-toggle');
+  if (tog) { const g = tog.closest('[data-grp]').dataset.grp; funnelCollapsed.has(g) ? funnelCollapsed.delete(g) : funnelCollapsed.add(g); renderFunnels(); return; }
+  const addr = e.target.closest('.fn-add-row');
+  if (addr) { state.funnelsConfig.push({ group: addr.dataset.grp, platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' }); renderFunnels(); saveFunnels(); return; }
+  const delg = e.target.closest('.fn-del-grp');
+  if (delg) { const g = delg.dataset.grp; state.funnelsConfig = state.funnelsConfig.filter(r => r.group !== g); renderFunnels(); saveFunnels(); return; }
 });
 $('funnel-add').addEventListener('click', () => {
   ensureFunnelsConfig();
-  state.funnelsConfig.push({ platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' });
+  state.funnelsConfig.push({ group: funnelGroupNames()[0] || 'Ungrouped', platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' });
+  renderFunnels(); saveFunnels();
+});
+$('funnel-add-group').addEventListener('click', () => {
+  const g = uniqueGroupName('New Group');
+  state.funnelsConfig.push({ group: g, platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' });
   renderFunnels(); saveFunnels();
 });
 

@@ -872,7 +872,30 @@ table.show-upsell .upsell-col { display: table-cell; }
 }
 .fn-del:hover { background: rgba(239,68,68,0.12); color: var(--danger); }
 .funnel-total td { border-top: 2px solid var(--border); font-weight: 800; font-size: 12.5px; padding-top: 10px; }
-.funnel-total td:first-child { font-family: var(--font-display); letter-spacing: 0.04em; color: var(--sub); }
+.funnel-total td:nth-child(2) { font-family: var(--font-display); letter-spacing: 0.04em; color: var(--sub); }
+
+/* Funnel groups */
+.fn-group-row { background: var(--surface-alt); }
+.fn-group-row td { border-bottom: 1px solid var(--border); font-weight: 700; padding-top: 9px; padding-bottom: 9px; }
+.fn-grp-toggle { cursor: pointer; text-align: center; color: var(--accent); font-size: 11px; width: 26px; }
+.fn-grp-namecell { display: flex; align-items: center; gap: 6px; }
+.fn-grp-name {
+  font-family: var(--font-display); font-weight: 800; font-size: 13px;
+  border: 1.5px solid transparent; border-radius: 6px; padding: 3px 6px;
+  background: transparent; color: var(--text); width: 150px; outline: none;
+}
+.fn-grp-name:hover { border-color: var(--border); }
+.fn-grp-name:focus { border-color: var(--accent); background: var(--surface); }
+.fn-add-row {
+  border: 1px solid var(--border); background: transparent; color: var(--accent);
+  width: 20px; height: 20px; border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; flex-shrink: 0;
+}
+.fn-add-row:hover { background: rgba(37,99,235,0.12); }
+.fn-del-grp { border: none; background: transparent; color: var(--sub); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 6px; }
+.fn-del-grp:hover { background: rgba(239,68,68,0.12); color: var(--danger); }
+.fn-grp { width: 100%; min-width: 110px; padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); font-size: 11px; outline: none; }
+.fn-grp:focus { border-color: var(--accent); }
+.fn-member td:first-child { padding-left: 18px; }
 
 .page-header h1 { line-height: 1.1; }
 
