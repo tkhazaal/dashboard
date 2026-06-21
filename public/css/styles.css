@@ -859,10 +859,14 @@ table.show-upsell .upsell-col { display: table-cell; }
 /* ── Funnels table ───────────────────────── */
 .funnel-table td, .funnel-table th { vertical-align: middle; }
 .funnel-table .fn-sel, .funnel-table .fn-input, .funnel-table .fn-prod, .funnel-table .fn-page {
-  width: 100%; min-width: 120px; max-width: 200px;
+  width: 100%; min-width: 150px;
   padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 7px;
   background: var(--bg); color: var(--text); font-size: 11.5px; font-family: inherit; outline: none;
 }
+/* Product / page pickers carry long names — give them room so datalist popups are readable */
+.funnel-table .fn-prod, .funnel-table .fn-page { min-width: 210px; }
+.funnel-table .fn-input { min-width: 110px; }
+.funnel-table .fn-grp { min-width: 120px; }
 .funnel-table .fn-sel:focus, .funnel-table .fn-input:focus,
 .funnel-table .fn-prod:focus, .funnel-table .fn-page:focus { border-color: var(--accent); }
 .funnel-table .fn-input { min-width: 90px; font-weight: 700; }
