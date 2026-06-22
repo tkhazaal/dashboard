@@ -989,6 +989,7 @@ table.show-upsell .upsell-col { display: table-cell; }
 
 /* Pills & badges — vivid blue tint */
 .pill { background: rgba(37,99,235,0.12); color: var(--accent); font-weight: 700; }
+.pill-danger { background: rgba(239,68,68,0.14); color: var(--danger); cursor: help; }
 .badge.blue  { background: rgba(37,99,235,0.12); color: var(--accent); }
 .badge.green { background: rgba(16,185,129,0.14); color: var(--accent2); }
 

@@ -1679,14 +1679,22 @@ function renderFunnels() {
 
 function saveFunnels() {
   clearTimeout(_funnelSaveTimer);
-  $('funnel-saved').textContent = 'Saving…';
+  const pill = $('funnel-saved');
+  pill.textContent = 'Saving…'; pill.className = 'pill';
   _funnelSaveTimer = setTimeout(async () => {
     try {
-      await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const res  = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ funnels_config: JSON.stringify(state.funnelsConfig) }) });
-      $('funnel-saved').textContent = 'Saved ✓';
-      setTimeout(() => { if ($('funnel-saved').textContent === 'Saved ✓') $('funnel-saved').textContent = ''; }, 2500);
-    } catch { $('funnel-saved').textContent = 'Save failed'; }
+      const body = await res.json().catch(() => ({}));
+      // fetch() does NOT throw on HTTP errors, and an out-of-date server can return
+      // success without persisting — so confirm funnels_config is in `updated`.
+      if (!res.ok || !((body.updated || []).includes('funnels_config'))) throw new Error('not persisted');
+      pill.textContent = 'Saved ✓'; pill.className = 'pill';
+      setTimeout(() => { if (pill.textContent === 'Saved ✓') pill.textContent = ''; }, 2500);
+    } catch {
+      pill.textContent = '⚠ Not saved'; pill.className = 'pill pill-danger';
+      pill.title = 'The server did not confirm the save. Your dashboard may be running an outdated build — redeploy the latest version.';
+    }
   }, 600);
 }
 
