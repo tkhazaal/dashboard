@@ -124,14 +124,19 @@ async function fetchCustomer(id, apiKey) {
   catch { return null; }
 }
 
+// Product identity = internal_product_name (channel-specific, matches SamCart's
+// "Sales by Product"); fall back to the customer-facing product_name.
+function itemName(it) {
+  return (it && (it.internal_product_name || it.product_name)) || 'Unknown Product';
+}
+
 // Primary cart item of an order = first non-upsell item (fallback: first item).
 function orderMainItem(o) {
   const items = o.cart_items || [];
   return items.find(it => !it.upsell_id) || items[0] || null;
 }
 function orderProduct(o) {
-  const main = orderMainItem(o);
-  return (main && main.product_name) || 'Unknown Product';
+  return itemName(orderMainItem(o));
 }
 
 async function computeMetrics(orders, apiKey) {
@@ -143,7 +148,7 @@ async function computeMetrics(orders, apiKey) {
     const seen = new Set();
     products.forEach(p => {
       if (p.id != null && p.slug) slugById[p.id] = String(p.slug).toLowerCase();
-      const name = p.product_name;
+      const name = p.internal_product_name || p.product_name;   // channel-specific name (like SamCart)
       if (name && !seen.has(name)) { seen.add(name); productList.push(name); }
     });
   } catch { /* attribution is best-effort */ }
@@ -192,8 +197,8 @@ async function computeMetrics(orders, apiKey) {
 
     // Per-product purchase counts (every cart line = one purchase of that product)
     for (const it of (o.cart_items || [])) {
-      const pname = it.product_name;
-      if (!pname) continue;
+      const pname = itemName(it);
+      if (!pname || pname === 'Unknown Product') continue;
       const prev = ((it.initial_price && it.initial_price.total) || parseFloat(it.total) || 0) / 100;
       if (!productSales[pname]) productSales[pname] = { orders: 0, revenue: 0 };
       productSales[pname].orders++; productSales[pname].revenue += prev;
@@ -202,7 +207,7 @@ async function computeMetrics(orders, apiKey) {
     // Upsell line items (upsell_id set) — attribute to the order's main slug (channel)
     for (const it of (o.cart_items || [])) {
       if (!it.upsell_id) continue;
-      const uname = it.product_name || `Product #${it.product_id}`;
+      const uname = itemName(it) || `Product #${it.product_id}`;
       const urev  = ((it.initial_price && it.initial_price.total) || parseFloat(it.total) || 0) / 100;
       if (!upsellTotals[uname]) upsellTotals[uname] = { orders: 0, revenue: 0 };
       upsellTotals[uname].orders++; upsellTotals[uname].revenue += urev;
