@@ -66,15 +66,16 @@ BEGIN
     dc := format('AND created_at >= NOW() - INTERVAL ''%s days''', days_back);
   END IF;
 
+  -- Exclude GoHighLevel /complete/<id> order-confirmation pages from view counts
   EXECUTE format('
     SELECT json_build_object(
-      ''totalViews'',     (SELECT COUNT(*)::int               FROM page_views WHERE 1=1 %1$s),
-      ''uniqueVisitors'', (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE 1=1 %1$s),
-      ''uniqueSessions'', (SELECT COUNT(DISTINCT session_id)::int FROM page_views WHERE 1=1 %1$s),
-      ''todayViews'',     (SELECT COUNT(*)::int               FROM page_views WHERE created_at::date = CURRENT_DATE),
-      ''todayUnique'',    (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE created_at::date = CURRENT_DATE),
-      ''weekViews'',      (SELECT COUNT(*)::int               FROM page_views WHERE created_at >= NOW() - INTERVAL ''7 days''),
-      ''monthViews'',     (SELECT COUNT(*)::int               FROM page_views WHERE created_at >= NOW() - INTERVAL ''30 days'')
+      ''totalViews'',     (SELECT COUNT(*)::int               FROM page_views WHERE page_path NOT LIKE ''/complete/%%'' %1$s),
+      ''uniqueVisitors'', (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE page_path NOT LIKE ''/complete/%%'' %1$s),
+      ''uniqueSessions'', (SELECT COUNT(DISTINCT session_id)::int FROM page_views WHERE page_path NOT LIKE ''/complete/%%'' %1$s),
+      ''todayViews'',     (SELECT COUNT(*)::int               FROM page_views WHERE created_at::date = CURRENT_DATE AND page_path NOT LIKE ''/complete/%%''),
+      ''todayUnique'',    (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE created_at::date = CURRENT_DATE AND page_path NOT LIKE ''/complete/%%''),
+      ''weekViews'',      (SELECT COUNT(*)::int               FROM page_views WHERE created_at >= NOW() - INTERVAL ''7 days'' AND page_path NOT LIKE ''/complete/%%''),
+      ''monthViews'',     (SELECT COUNT(*)::int               FROM page_views WHERE created_at >= NOW() - INTERVAL ''30 days'' AND page_path NOT LIKE ''/complete/%%'')
     )', dc)
   INTO result;
 
@@ -123,7 +124,7 @@ BEGIN
       COUNT(DISTINCT session_id)::int AS sessions,
       MAX(created_at)                 AS last_seen
     FROM page_views pv
-    WHERE 1=1 %s %s
+    WHERE pv.page_path NOT LIKE ''/complete/%%'' %s %s
     GROUP BY pv.page_path, pv.page_title, split_part(split_part(pv.page_url, ''://'', 2), ''/'', 1)
     ORDER BY total_views DESC
     LIMIT 100
@@ -145,6 +146,13 @@ BEGIN
     wc := format('WHERE created_at::date BETWEEN %L AND %L', start_date, end_date);
   ELSIF days_back > 0 THEN
     wc := format('WHERE created_at >= NOW() - INTERVAL ''%s days''', days_back);
+  END IF;
+
+  -- Exclude GoHighLevel /complete/<id> confirmation pages from the trend
+  IF wc = '' THEN
+    wc := 'WHERE page_path NOT LIKE ''/complete/%''';
+  ELSE
+    wc := wc || ' AND page_path NOT LIKE ''/complete/%''';
   END IF;
 
   RETURN QUERY EXECUTE format('
@@ -243,10 +251,11 @@ BEGIN
     dc := format('AND created_at >= NOW() - INTERVAL ''%s days''', days_back);
   END IF;
 
+  -- Landing = non-samcart hosts, excluding /complete/<id> confirmation pages
   EXECUTE format('
     SELECT json_build_object(
-      ''landingViews'',   (SELECT COUNT(*)::int               FROM page_views WHERE page_url NOT ILIKE ''%%samcart%%'' %1$s),
-      ''landingUnique'',  (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE page_url NOT ILIKE ''%%samcart%%'' %1$s),
+      ''landingViews'',   (SELECT COUNT(*)::int               FROM page_views WHERE page_url NOT ILIKE ''%%samcart%%'' AND page_path NOT LIKE ''/complete/%%'' %1$s),
+      ''landingUnique'',  (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE page_url NOT ILIKE ''%%samcart%%'' AND page_path NOT LIKE ''/complete/%%'' %1$s),
       ''checkoutViews'',  (SELECT COUNT(*)::int               FROM page_views WHERE page_url ILIKE ''%%samcart%%'' %1$s),
       ''checkoutUnique'', (SELECT COUNT(DISTINCT visitor_id)::int FROM page_views WHERE page_url ILIKE ''%%samcart%%'' %1$s)
     )', dc)

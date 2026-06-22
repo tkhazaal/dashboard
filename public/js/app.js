@@ -57,6 +57,10 @@ const isCheckoutHost = host => /samcart/i.test(host || '');
 const isCheckoutPage = (path, host) =>
   isCheckoutHost(host) || /^\/products?(\/|$)/i.test(String(path || ''));
 
+// GoHighLevel order-confirmation pages (/complete/<id>) are post-purchase, not landing
+// traffic — exclude from view/unique counts (raw rows are kept for later use).
+const isConfirmationPage = path => /^\/complete(\/|$)/i.test(String(path || ''));
+
 // Funnel slug = the last path segment, lowercased. This is the shared key
 // between a landing page (/fathers-repair-guide) and its SamCart checkout
 // (/product/fathers-repair-guide).
@@ -574,6 +578,7 @@ const rowLabel = e => e.landingPath
 function buildSlugRows(rows) {
   const map = new Map();
   for (const r of rows) {
+    if (isConfirmationPage(r.page_path)) continue;   // skip GHL /complete/<id> confirmations
     const checkout = isCheckoutPage(r.page_path, r.host);
     const slug = slugKey(r.page_path);
     if (!map.has(slug)) map.set(slug, {
