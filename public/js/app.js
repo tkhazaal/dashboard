@@ -105,10 +105,33 @@ function groupOf(slug, path) {
   return 'Other';
 }
 
-// Host-aware label: checkout pages get a "Checkout — <product>" label derived
-// from the last path segment; otherwise fall back to the campaign map.
+// SamCart checkout slug -> channel-specific product name (inverted from productSlug).
+// Lets us label a checkout page by its channel (IG Posts, FB Ads, …) instead of the slug.
+let _slug2prod = null, _slug2prodSrc = null;
+function slugToProductName(slug) {
+  const ps = state.scData && state.scData.productSlug;   // name -> slug
+  if (!ps || !slug) return null;
+  if (_slug2prodSrc !== ps) { _slug2prod = {}; for (const n in ps) if (!_slug2prod[ps[n]]) _slug2prod[ps[n]] = n; _slug2prodSrc = ps; }
+  return _slug2prod[slug] || null;
+}
+// "Cutoff Culture: IG Posts" / "RSK IG Posts" / "RSK Legacy" -> "IG Posts" / "Legacy"
+function productChannel(name) {
+  if (!name) return null;
+  let s = name; const i = s.lastIndexOf(':'); if (i >= 0) s = s.slice(i + 1);
+  return s.replace(/^\s*(RSK|CC)\s+/i, '').trim() || null;
+}
+// "Checkout — <channel>" for a SamCart checkout slug, or null if the product is unknown
+function checkoutLabel(slug) {
+  const chan = productChannel(slugToProductName(slug));
+  return chan ? `Checkout — ${chan}` : null;
+}
+
+// Host-aware label: checkout pages get a "Checkout — <channel>" label from the SamCart
+// product behind the slug (falls back to the slug); otherwise the campaign map.
 function pageLabel(path, host) {
   if (isCheckoutHost(host)) {
+    const byChannel = checkoutLabel(slugKey(path));
+    if (byChannel) return byChannel;
     const seg = String(path || '').split('/').filter(Boolean).pop() || '';
     const name = seg.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     return name ? `Checkout — ${name}` : 'Checkout';
@@ -545,7 +568,7 @@ async function loadPagesTable() {
 
 const rowLabel = e => e.landingPath
   ? (campaignName(e.landingPath) || e.title || e.landingPath)
-  : `Checkout — ${titleCase(e.slug)}`;
+  : (checkoutLabel(e.slug) || `Checkout — ${titleCase(e.slug)}`);
 
 // Build per-slug aggregated rows from the raw page-view rows.
 function buildSlugRows(rows) {
@@ -1507,13 +1530,13 @@ function pageViewsMap() {
   // Use date-scoped pages when a funnel range is active, else all-time
   for (const e of buildSlugRows(state.funnelPages || state.pagesData || [])) {
     const isLanding = !!e.landingPath;
-    // Landing → campaign label (titles are identical across funnel pages).
-    // Checkout/product → the page title (real product name). Drop title-less gibberish.
-    const label = isLanding ? rowLabel(e) : (e.checkoutTitle || '');
+    // Landing → campaign label. Checkout → channel from the SamCart product (IG Posts,
+    // FB Ads, …), falling back to the page title.
+    const label = isLanding ? rowLabel(e) : (checkoutLabel(e.slug) || e.checkoutTitle || '');
     m[e.slug] = {
       unique: e.landingUnique, checkout: e.checkoutViews,
       label: label || `Checkout — ${titleCase(e.slug)}`,
-      isLanding, hasTitle: isLanding || !!e.checkoutTitle,
+      isLanding, hasTitle: isLanding || !!e.checkoutTitle || !!checkoutLabel(e.slug),
     };
   }
   return m;
