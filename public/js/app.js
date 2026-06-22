@@ -17,6 +17,7 @@ const escHtml = str => String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 // ── Campaign labels (URL path → friendly source name) ─────────────
 const CAMPAIGN_LABELS = {
+  // Father's Day funnel (offer.taniakhazaal.com)
   '/fathers-repair-playbook':     'FB Posts',
   '/the-fathers-repair-playbook': 'FB Stories',
   '/fathers-repair-guide':        'IG Posts',
@@ -26,6 +27,24 @@ const CAMPAIGN_LABELS = {
   '/fathers-repair-bundle':       'FB Group',
   '/fathers-repair-play-book':    'FB Ads',
   '/thank-you':                   'Thank You (Conversion)',
+  // Cutoff Culture funnel (go.taniakhazaal.com) — landing pages (View / Unique)
+  '/thecutoffculture':                 'IG Posts',
+  '/cutoffculture-thenewrules':        'IG Stories',
+  '/thecutoff-culture':                'FB Posts',
+  '/cutoff-culture-thenew-rules':      'FB Stories',
+  '/the-cutoff-culture-the-new-rules': 'FB Group',
+  '/cutoff-culture':                   'Email',
+  '/the-cutoff-culture':               'Legacy',
+  '/cutoffculture':                    'TikTok',
+  // Reconnect Starter Kit funnel (go.taniakhazaal.com) — landing pages (View / Unique)
+  '/the-reconnect-starterkit':         'IG Posts',
+  '/thereconnect-starter-kit-27':      'IG Stories',
+  '/the-reconnect-starter-kit':        'FB Posts',
+  '/the-reconnectstarter-kit-27':      'FB Stories',
+  '/the-reconnectstarterkit':          'FB Group',
+  '/thereconnectstarter-kit':          'Email',
+  '/reconnect-starter-kit':            'Legacy',
+  '/thereconnectstarterkit':           'TikTok',
 };
 const campaignName = path => {
   const key = String(path || '').replace(/\/+$/, '').toLowerCase() || '/';
