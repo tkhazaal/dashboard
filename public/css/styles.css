@@ -154,6 +154,11 @@ html, body { height: 100%; font-family: var(--font-body); background: var(--bg);
   display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 800; color: #fff;
 }
+/* Brand logo — black source art rendered white on the dark sidebar */
+.logo-img { max-height: 30px; max-width: 156px; width: auto; filter: brightness(0) invert(1); }
+.sidebar-logo .brand-logo { display: flex; align-items: baseline; gap: 4px; color: #fff; line-height: 1; white-space: nowrap; }
+.sidebar-logo .brand-script { font-family: 'Dancing Script', cursive; font-weight: 700; font-size: 25px; }
+.sidebar-logo .brand-bold { font-family: var(--font-display); font-weight: 800; font-size: 14.5px; letter-spacing: 0.03em; }
 
 .sidebar-nav { padding: 10px 10px; flex: 1; }
 
@@ -996,7 +1001,6 @@ table.show-upsell .upsell-col { display: table-cell; }
 
 /* Logo mark — gradient */
 .logo-icon { background: var(--grad); }
-.sidebar-logo span { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.01em; }
 
 /* Buttons & active date pills — vivid blue */
 .btn-primary, .refresh-btn { background: var(--accent); border-color: var(--accent); }

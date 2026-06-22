@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Metric Dashboard</title>
+  <title>Tania Khazaal — Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/styles.css">
   <script>
     // Set theme before render to avoid flash (URL ?theme= wins, then saved pref, then OS)
@@ -26,8 +27,11 @@
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-icon">M</div>
-      <span>Metrics</span>
+      <!-- Uses your exact logo if present at /img/logo.png, else the styled wordmark -->
+      <img src="/img/logo.png" alt="Tania Khazaal" class="logo-img" hidden
+           onload="this.hidden=false; this.nextElementSibling.hidden=true;"
+           onerror="this.remove()">
+      <span class="brand-logo"><span class="brand-script">Tania</span><span class="brand-bold">KHAZAAL</span></span>
     </div>
     <nav class="sidebar-nav">
       <a href="#" class="nav-item active" data-tab="overview">
