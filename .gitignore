@@ -6,3 +6,6 @@ db/
 *.db-wal
 npm-debug.log*
 .DS_Store
+
+# Internal working context for Claude — NOT for GitHub
+.context/
