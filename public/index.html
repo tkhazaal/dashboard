@@ -308,7 +308,21 @@
     <section class="tab" id="tab-funnels">
       <div class="page-header">
         <div><h1>Funnels</h1><p class="subtitle">Per-platform funnel — link a page &amp; pick your main + upsell products; sales update automatically</p></div>
-        <div class="header-pills">
+        <div class="header-pills fn-actions">
+          <div class="fn-daterange">
+            <select id="fn-range-preset" class="cmp-preset" title="Date range for stats">
+              <option value="all">All time</option>
+              <option value="mtd">This month</option>
+              <option value="last">Last month</option>
+              <option value="ytd">This year</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <span class="fn-range-custom" id="fn-range-custom" hidden>
+              <input type="date" id="fn-start" class="date-input" aria-label="Start date">
+              <span class="daterange-to">→</span>
+              <input type="date" id="fn-end" class="date-input" aria-label="End date">
+            </span>
+          </div>
           <span class="pill" id="funnel-saved"></span>
           <button class="clear-btn" id="funnel-add">+ Platform</button>
           <button class="btn-primary sm" id="funnel-add-group">+ Group</button>

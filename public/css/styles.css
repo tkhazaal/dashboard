@@ -259,7 +259,7 @@ html, body { height: 100%; font-family: var(--font-body); background: var(--bg);
 .sync-err { color: #fca5a5; font-size: 10.5px; }
 
 /* ── Main ───────────────────────────────── */
-.main { flex: 1; overflow-y: auto; padding: 0; }
+.main { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0; min-width: 0; }
 
 /* ── Tabs ───────────────────────────────── */
 .tab { display: none; padding: 28px 32px 40px; animation: fadeIn 0.2s ease; }
@@ -826,13 +826,36 @@ tbody tr:hover { background: #fafbff; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Responsive ──────────────────────────── */
-@media (max-width: 768px) {
-  .sidebar { width: 60px; min-width: 60px; }
-  .sidebar-logo span, .nav-item span, .sync-btn span { display: none; }
-  .nav-item { justify-content: center; }
-  .sync-btn, .refresh-btn { padding: 9px; }
-  .tab { padding: 20px 16px 40px; }
+/* Funnel date-range control */
+.fn-actions { flex-wrap: wrap; gap: 8px; }
+.fn-daterange { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fn-range-custom[hidden] { display: none; }
+.fn-range-custom:not([hidden]) { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Mobile / responsive ─────────────────── */
+@media (max-width: 920px) {
+  /* Sidebar becomes a horizontal top bar; content gets full width */
+  .app { flex-direction: column; height: auto; min-height: 100vh; overflow: visible; }
+  .sidebar { width: 100%; min-width: 0; flex-direction: row; align-items: center; overflow-x: auto; overflow-y: hidden; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .sidebar-logo { padding: 12px 14px; border-bottom: none; flex-shrink: 0; }
+  .sidebar-nav { display: flex; flex-direction: row; gap: 4px; padding: 8px; flex: 1; overflow-x: auto; }
+  .nav-item { white-space: nowrap; margin-bottom: 0; padding: 8px 12px; }
+  .nav-item.active::before { display: none; }
+  .sidebar-footer { display: flex; align-items: center; gap: 6px; border-top: none; padding: 8px; flex-shrink: 0; }
+  .theme-btn, .refresh-btn, .sync-btn { width: auto; margin-bottom: 0; white-space: nowrap; padding: 8px 12px; }
+  .sync-status { display: none; }
+  .main { overflow-y: visible; }
+
+  .tab { padding: 18px 14px 40px; }
+  .page-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .header-pills, .cmp { flex-wrap: wrap; }
+  .two-col { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .stat-grid { grid-template-columns: 1fr; }
+  .cmp { width: 100%; }
+  .kpi-row { grid-template-columns: 1fr; }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -886,13 +909,16 @@ table.show-upsell .upsell-col { display: table-cell; }
 
 /* ── Funnels table ───────────────────────── */
 .funnel-table td, .funnel-table th { vertical-align: middle; }
+/* Funnel table is wide (13 cols) — keep a min-width and let .table-wrap scroll it
+   horizontally inside the card so it never pushes the page off-screen. */
+.funnel-table { min-width: 1180px; }
 .funnel-table .fn-sel, .funnel-table .fn-input, .funnel-table .fn-prod, .funnel-table .fn-page {
-  width: 100%; min-width: 150px;
+  width: 100%; min-width: 130px;
   padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 7px;
   background: var(--bg); color: var(--text); font-size: 11.5px; font-family: inherit; outline: none;
 }
 /* Product / page pickers carry long names — give them room so datalist popups are readable */
-.funnel-table .fn-prod, .funnel-table .fn-page { min-width: 210px; }
+.funnel-table .fn-prod, .funnel-table .fn-page { min-width: 180px; }
 .funnel-table .fn-input { min-width: 110px; }
 .funnel-table .fn-grp { min-width: 120px; }
 .funnel-table .fn-sel:focus, .funnel-table .fn-input:focus,

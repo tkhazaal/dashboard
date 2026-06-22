@@ -138,6 +138,9 @@ const state = {
   paUpsell:    '',
   expandedGroups: new Set(),
   funnelsConfig: null,
+  funnelStart:   '',
+  funnelEnd:     '',
+  funnelPages:   null,
   trendDays:   30,
   cuSearch:    '',
   cuBuyerType: 'all',
@@ -1480,7 +1483,8 @@ function uniqueGroupName(base) {
 // slug -> { unique, checkout, label, isLanding } from tracked pages
 function pageViewsMap() {
   const m = {};
-  for (const e of buildSlugRows(state.pagesData || [])) {
+  // Use date-scoped pages when a funnel range is active, else all-time
+  for (const e of buildSlugRows(state.funnelPages || state.pagesData || [])) {
     const isLanding = !!e.landingPath;
     // Landing → campaign label (titles are identical across funnel pages).
     // Checkout/product → the page title (real product name). Drop title-less gibberish.
@@ -1496,6 +1500,25 @@ function pageViewsMap() {
 function prodSales(name) {
   const ps = state.scData && state.scData.productSales;
   return (name && ps && ps[name]) || { orders: 0, revenue: 0 };
+}
+// Months 'YYYY-MM' between two YYYY-MM-DD dates (inclusive)
+function monthsInRange(s, e) {
+  const out = []; let [y, m] = s.slice(0, 7).split('-').map(Number);
+  const [ey, em] = e.slice(0, 7).split('-').map(Number);
+  let guard = 0;
+  while ((y < ey || (y === ey && m <= em)) && guard++ < 240) { out.push(`${y}-${String(m).padStart(2, '0')}`); if (++m > 12) { m = 1; y++; } }
+  return out;
+}
+// Sales for a product within the active funnel date range (else all-time)
+function prodSalesInRange(name) {
+  const sm = state.scData && state.scData.salesByMonth;
+  if (!state.funnelStart || !state.funnelEnd || !sm) return prodSales(name);
+  let o = 0, r = 0;
+  for (const mo of monthsInRange(state.funnelStart, state.funnelEnd)) {
+    const e = sm[mo] && sm[mo][name];
+    if (e) { o += e.orders; r += e.revenue; }
+  }
+  return { orders: o, revenue: Math.round(r * 100) / 100 };
 }
 const crPct = (n, d) => d > 0 ? Math.round((n / d) * 1000) / 10 + '%' : '—';
 
@@ -1580,7 +1603,7 @@ function buildFunnelDatalists(pvm) {
 
 function funnelMemberRow(r, i, pvm, agg) {
   const pv  = pageViewsForKey(r.pageSlug);
-  const m   = prodSales(r.main), u1 = prodSales(r.upsell1), u2 = prodSales(r.upsell2);
+  const m   = prodSalesInRange(r.main), u1 = prodSalesInRange(r.upsell1), u2 = prodSalesInRange(r.upsell2);
   const rev = m.revenue + u1.revenue + u2.revenue;
   agg.U += pv.unique; agg.C += pv.checkout; agg.M += m.orders; agg.U1 += u1.orders; agg.U2 += u2.orders; agg.R += rev;
   return `
@@ -1668,6 +1691,31 @@ async function loadFunnels() {
   if (tasks.length) await Promise.all(tasks);
   renderFunnels();
 }
+
+// Apply the Funnels date range — refetch page views for the range, re-render
+async function applyFunnelRange() {
+  if (state.funnelStart && state.funnelEnd) {
+    try { state.funnelPages = await api(`/api/analytics/pages?start=${state.funnelStart}&end=${state.funnelEnd}`); }
+    catch { state.funnelPages = null; }
+  } else { state.funnelPages = null; }
+  renderFunnels();
+}
+$('fn-range-preset').addEventListener('change', e => {
+  const v = e.target.value, now = new Date();
+  $('fn-range-custom').hidden = v !== 'custom';
+  if (v === 'custom') { return; }
+  if (v === 'all')       { state.funnelStart = ''; state.funnelEnd = ''; }
+  else if (v === 'mtd')  { state.funnelStart = ymd(new Date(now.getFullYear(), now.getMonth(), 1)); state.funnelEnd = ymd(now); }
+  else if (v === 'last') { state.funnelStart = ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1)); state.funnelEnd = ymd(new Date(now.getFullYear(), now.getMonth(), 0)); }
+  else if (v === 'ytd')  { state.funnelStart = ymd(new Date(now.getFullYear(), 0, 1)); state.funnelEnd = ymd(now); }
+  applyFunnelRange();
+});
+function applyFunnelCustom() {
+  const s = $('fn-start').value, e = $('fn-end').value;
+  if (s && e) { state.funnelStart = s <= e ? s : e; state.funnelEnd = s <= e ? e : s; applyFunnelRange(); }
+}
+$('fn-start').addEventListener('change', applyFunnelCustom);
+$('fn-end').addEventListener('change', applyFunnelCustom);
 
 // Row + group edits (event delegation)
 $('funnelBody').addEventListener('change', e => {

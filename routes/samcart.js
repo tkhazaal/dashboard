@@ -157,6 +157,7 @@ async function computeMetrics(orders, apiKey) {
 
   // Per-product purchase counts (any cart line) — drives the Funnels table.
   const productSales = {};   // productName -> { orders, revenue }
+  const salesByMonth = {};   // 'YYYY-MM' -> { productName -> { orders, revenue } } (for the Funnels date filter)
 
   // Refunds — total amount refunded, by month (excludes test refunds).
   let totalRefunded = 0, refundCount = 0;
@@ -198,12 +199,18 @@ async function computeMetrics(orders, apiKey) {
     }
 
     // Per-product purchase counts (every cart line = one purchase of that product)
+    const omonth = String(date || '').slice(0, 7);   // YYYY-MM for date filtering
     for (const it of (o.cart_items || [])) {
       const pname = itemName(it);
       if (!pname || pname === 'Unknown Product') continue;
       const prev = ((it.initial_price && it.initial_price.total) || parseFloat(it.total) || 0) / 100;
       if (!productSales[pname]) productSales[pname] = { orders: 0, revenue: 0 };
       productSales[pname].orders++; productSales[pname].revenue += prev;
+      if (omonth) {
+        if (!salesByMonth[omonth]) salesByMonth[omonth] = {};
+        if (!salesByMonth[omonth][pname]) salesByMonth[omonth][pname] = { orders: 0, revenue: 0 };
+        salesByMonth[omonth][pname].orders++; salesByMonth[omonth][pname].revenue += prev;
+      }
     }
 
     // Upsell line items (upsell_id set) — attribute to the order's main slug (channel)
@@ -378,7 +385,7 @@ async function computeMetrics(orders, apiKey) {
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
     ordersBySlug, upsellProducts, upsellBySlug,
-    productSales, productList: sortedProductList, productSlug,
+    productSales, productList: sortedProductList, productSlug, salesByMonth,
   };
 }
 
