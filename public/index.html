@@ -91,48 +91,84 @@
           <h1>Overview</h1>
           <p class="subtitle">Combined view — page analytics &amp; purchase data</p>
         </div>
-        <div class="header-pills">
-          <span class="pill" id="scSyncedAt"></span>
+        <div class="cmp" id="ov-compare">
+          <button class="cmp-period" id="cmp-cur">—</button>
+          <span class="cmp-vs">vs</span>
+          <button class="cmp-period prev" id="cmp-prev">—</button>
+          <select class="cmp-preset" id="cmp-preset" title="Compare periods">
+            <option value="mtd">This month vs last</option>
+            <option value="7d">Last 7d vs prior 7d</option>
+            <option value="30d">Last 30d vs prior 30d</option>
+            <option value="ytd">This year vs last</option>
+          </select>
         </div>
       </div>
 
-      <!-- Overview date filter -->
-      <div class="filter-bar">
-        <span class="filter-label">Date range</span>
-        <div class="date-btns" id="ov-dateBtns">
-          <button class="date-btn active" data-days="1">Today</button>
-          <button class="date-btn" data-days="7">7 Days</button>
-          <button class="date-btn active-default" data-days="30">30 Days</button>
-          <button class="date-btn" data-days="90">90 Days</button>
-          <button class="date-btn" data-days="0">All Time</button>
-        </div>
-      </div>
-
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total Page Views</div>
+      <div class="ov-grid">
+        <!-- KPI stat cards -->
+        <div class="stat-card span3">
+          <div class="stat-label">Page Views</div>
           <div class="stat-value" id="ov-totalViews">—</div>
-          <div class="stat-sub" id="ov-todayViews"></div>
+          <div class="stat-sub"><span id="ov-d-views" class="delta-pill flat">—</span></div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card span3">
           <div class="stat-label">Unique Visitors</div>
           <div class="stat-value" id="ov-uniqueVisitors">—</div>
-          <div class="stat-sub" id="ov-todayUnique"></div>
+          <div class="stat-sub"><span id="ov-d-visitors" class="delta-pill flat">—</span></div>
         </div>
-        <div class="stat-card highlight">
-          <div class="stat-label">Total Customers (SamCart)</div>
+        <div class="stat-card span3">
+          <div class="stat-label">Total Customers</div>
           <div class="stat-value" id="ov-totalCustomers">—</div>
-          <div class="stat-sub">Unique buyers</div>
+          <div class="stat-sub" id="ov-customersSub">Unique buyers</div>
         </div>
-        <div class="stat-card highlight">
-          <div class="stat-label">Total Revenue (LTV)</div>
+        <div class="stat-card span3">
+          <div class="stat-label">Total Revenue</div>
           <div class="stat-value" id="ov-totalRevenue">—</div>
-          <div class="stat-sub" id="ov-avgLtv"></div>
+          <div class="stat-sub"><span id="ov-d-revenue" class="delta-pill flat">—</span></div>
         </div>
-      </div>
 
-      <div class="two-col">
-        <div class="card">
+        <!-- Conversion funnel (step bars) -->
+        <div class="card span8 ov-funnel">
+          <div class="card-header">
+            <h2>Conversion Funnel</h2>
+            <span class="pill" id="ovf-range"></span>
+          </div>
+          <div class="stepbars" id="ovf-bars"></div>
+          <p class="ovf-note">Landing → Checkout → Purchase → Upsell · hover a bar for conversion &amp; drop-off.</p>
+        </div>
+
+        <!-- Insight gradient card -->
+        <div class="card ov-insight span4">
+          <div class="ovi-eyebrow">✦ Insight</div>
+          <div class="ovi-big" id="ovi-big">—</div>
+          <p class="ovi-text" id="ovi-text">Sync SamCart to surface insights.</p>
+        </div>
+
+        <!-- Gross volume (progress bars) -->
+        <div class="card ov-gross span7">
+          <div class="card-header">
+            <h2>Gross Volume</h2>
+            <div class="gross-toggle" id="ovg-toggle">
+              <button data-g="products" class="active">Products</button>
+              <button data-g="tiers">Tiers</button>
+            </div>
+          </div>
+          <div class="gross-body">
+            <div class="gross-total" id="ovg-total">—</div>
+            <div class="gross-sub" id="ovg-sub"></div>
+            <div class="gross-bars" id="ovg-bars"></div>
+          </div>
+        </div>
+
+        <!-- Buyer split -->
+        <div class="card span5">
+          <div class="card-header"><h2>Buyer Type Split</h2></div>
+          <div class="chart-wrap chart-sm"><canvas id="buyerSplitChart"></canvas></div>
+          <div class="legend-row" id="buyerSplitLegend"></div>
+        </div>
+
+        <!-- Trend -->
+        <div class="card span12">
           <div class="card-header">
             <h2>Page Views Trend</h2>
             <div class="date-btns sm" id="trend-dateBtns">
@@ -141,34 +177,23 @@
               <button class="date-btn" data-days="90">90d</button>
             </div>
           </div>
-          <div class="chart-wrap">
-            <canvas id="trendChart"></canvas>
-          </div>
+          <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
         </div>
 
-        <div class="card">
+        <!-- Live feed -->
+        <div class="card span12">
           <div class="card-header">
-            <h2>Buyer Type Split</h2>
+            <h2>Live Page Feed</h2>
+            <div class="filter-inline">
+              <input type="search" id="feedSearch" class="search-input sm" placeholder="Filter by page…">
+            </div>
           </div>
-          <div class="chart-wrap chart-sm">
-            <canvas id="buyerSplitChart"></canvas>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Page</th><th>Referrer</th><th>IP</th><th>Time</th></tr></thead>
+              <tbody id="liveFeed"></tbody>
+            </table>
           </div>
-          <div class="legend-row" id="buyerSplitLegend"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2>Live Page Feed</h2>
-          <div class="filter-inline">
-            <input type="search" id="feedSearch" class="search-input sm" placeholder="Filter by page…">
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Page</th><th>Referrer</th><th>IP</th><th>Time</th></tr></thead>
-            <tbody id="liveFeed"></tbody>
-          </table>
         </div>
       </div>
     </section>

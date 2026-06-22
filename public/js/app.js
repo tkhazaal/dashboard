@@ -126,6 +126,9 @@ initTheme();
 // ── State ─────────────────────────────────────────────────────────
 const state = {
   ovDays:      30,
+  cmpPreset:   'mtd',
+  compare:     null,
+  ovFunnel:    null,
   paDays:      30,
   paStart:     '',
   paEnd:       '',
@@ -333,13 +336,124 @@ function renderSalesAnalytics(d) {
 }
 
 // ── Analytics loaders ─────────────────────────────────────────────
-async function loadOverviewStats(days) {
-  const p = days > 0 ? `?days=${days}` : '';
-  const overview = await api(`/api/analytics/overview${p}`);
-  $('ov-totalViews').textContent     = fmtNum(overview.totalViews);
-  $('ov-uniqueVisitors').textContent = fmtNum(overview.uniqueVisitors);
-  $('ov-todayViews').textContent     = `${fmtNum(overview.todayViews)} today`;
-  $('ov-todayUnique').textContent    = `${fmtNum(overview.todayUnique)} today`;
+// ── Overview: compare-periods engine ──────────────────────────────
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const fmtRange = (a, b) => { const o = { month: 'short', day: 'numeric' }; return `${a.toLocaleDateString('en-US', o)} – ${b.toLocaleDateString('en-US', o)}`; };
+function comparePeriods(preset) {
+  const now = new Date(); const d = x => { const t = new Date(now); t.setDate(t.getDate() + x); return t; };
+  let curStart, curEnd = now, prevStart, prevEnd;
+  if (preset === '7d')       { curStart = d(-6);  prevEnd = d(-7);  prevStart = d(-13); }
+  else if (preset === '30d') { curStart = d(-29); prevEnd = d(-30); prevStart = d(-59); }
+  else if (preset === 'ytd') { curStart = new Date(now.getFullYear(), 0, 1); prevStart = new Date(now.getFullYear() - 1, 0, 1); prevEnd = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()); }
+  else                       { curStart = new Date(now.getFullYear(), now.getMonth(), 1); prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1); prevEnd = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()); }
+  return { curStart, curEnd, prevStart, prevEnd };
+}
+function setDeltaPill(id, cur, prev) {
+  const el = $(id); if (!el) return;
+  const dv = prev ? Math.round(((cur - prev) / prev) * 1000) / 10 : null;
+  if (dv == null) { el.className = 'delta-pill flat'; el.textContent = '— vs prev'; return; }
+  el.className = 'delta-pill ' + (dv >= 0 ? 'up' : 'down');
+  el.textContent = `${dv >= 0 ? '▲' : '▼'} ${Math.abs(dv)}% vs prev`;
+}
+async function applyCompare(preset) {
+  state.cmpPreset = preset;
+  const p = comparePeriods(preset);
+  state.compare = { curStart: ymd(p.curStart), curEnd: ymd(p.curEnd), prevStart: ymd(p.prevStart), prevEnd: ymd(p.prevEnd), label: fmtRange(p.curStart, p.curEnd) };
+  $('cmp-cur').textContent  = fmtRange(p.curStart, p.curEnd);
+  $('cmp-prev').textContent = fmtRange(p.prevStart, p.prevEnd);
+  $('ovf-range').textContent = state.compare.label;
+  try {
+    const [cur, prev] = await Promise.all([
+      api(`/api/analytics/overview?start=${state.compare.curStart}&end=${state.compare.curEnd}`),
+      api(`/api/analytics/overview?start=${state.compare.prevStart}&end=${state.compare.prevEnd}`),
+    ]);
+    $('ov-totalViews').textContent = fmtNum(cur.totalViews);
+    $('ov-uniqueVisitors').textContent = fmtNum(cur.uniqueVisitors);
+    setDeltaPill('ov-d-views', cur.totalViews, prev.totalViews);
+    setDeltaPill('ov-d-visitors', cur.uniqueVisitors, prev.uniqueVisitors);
+  } catch {}
+  // Revenue delta uses SamCart MoM
+  const mom = state.scData?.momRevenue;
+  const rp = $('ov-d-revenue');
+  if (rp) {
+    if (mom == null) { rp.className = 'delta-pill flat'; rp.textContent = '—'; }
+    else { rp.className = 'delta-pill ' + (mom >= 0 ? 'up' : 'down'); rp.textContent = `${mom >= 0 ? '▲' : '▼'} ${Math.abs(mom)}% MoM`; }
+  }
+  // Funnel for the current period (kept separate from the Sales-Analytics funnel)
+  try { state.ovFunnel = await api(`/api/analytics/funnel?start=${state.compare.curStart}&end=${state.compare.curEnd}`); } catch {}
+  renderOverviewFunnel();
+}
+
+// ── Overview widgets ──────────────────────────────────────────────
+function renderOverviewFunnel() {
+  const el = $('ovf-bars'); if (!el) return;
+  const f = state.ovFunnel || state.funnelData || {};
+  const purchases = state.scData?.monthToDate?.orders || 0;
+  const upsell = (state.scData?.upsellProducts || []).reduce((s, u) => s + u.orders, 0);
+  const stages = [
+    { label: 'Landing',  value: f.landingUnique || 0 },
+    { label: 'Checkout', value: f.checkoutUnique || 0 },
+    { label: 'Purchase', value: purchases },
+    { label: 'Upsell',   value: upsell },
+  ];
+  const base = Math.max(stages[0].value, ...stages.map(s => s.value), 1);
+  el.innerHTML = stages.map((s, i) => {
+    const h = Math.max(5, Math.round((s.value / base) * 100));
+    const conv = i === 0 ? 100 : (stages[i - 1].value ? Math.round((s.value / stages[i - 1].value) * 1000) / 10 : 0);
+    const drop = i === 0 ? null : Math.round((100 - conv) * 10) / 10;
+    const tip = i === 0 ? 'Top of funnel' : `Conv ${conv}% · Drop ${drop}%`;
+    return `
+      <div class="stepbar">
+        <div class="stepbar-track">
+          <div class="stepbar-fill g${i + 1}" style="height:${h}%"><span class="stepbar-tip">${tip}</span></div>
+        </div>
+        <div class="stepbar-value">${fmtNum(s.value)}</div>
+        <div class="stepbar-label">${s.label}</div>
+      </div>`;
+  }).join('');
+}
+
+let _grossMode = 'products';
+function renderGrossVolume() {
+  const d = state.scData; if (!d || !$('ovg-total')) return;
+  $('ovg-total').textContent = fmtMoney(d.totalRevenue);
+  $('ovg-sub').textContent = `Net ${fmtMoney(d.netRevenue)} · Refunds ${fmtMoney(d.totalRefunded || 0)}`;
+  const colors = ['#10b981', '#3b82f6', '#ec4899', '#f59e0b', '#6366f1'];
+  let rows;
+  if (_grossMode === 'tiers') rows = (d.tiers || []).filter(t => t.total > 0).map(t => ({ name: t.label, val: t.total }));
+  else rows = (d.topProducts || []).slice(0, 5).map(p => ({ name: p.name, val: p.revenue }));
+  const max = Math.max(...rows.map(r => r.val), 1);
+  $('ovg-bars').innerHTML = rows.map((r, i) => {
+    const w = Math.max(2, Math.round((r.val / max) * 100));
+    const share = d.totalRevenue ? Math.round((r.val / d.totalRevenue) * 1000) / 10 : 0;
+    return `
+      <div class="gross-row" title="${escHtml(r.name)}: ${fmtMoney(r.val)} · ${share}% of revenue">
+        <div class="gross-row-head">
+          <span class="gross-dot" style="background:${colors[i % colors.length]}"></span>
+          <span class="gross-name">${escHtml(r.name)}</span>
+          <span class="gross-amt">${fmtMoney(r.val)}</span>
+        </div>
+        <div class="gross-track"><div class="gross-fill" style="width:${w}%;background:${colors[i % colors.length]}"></div></div>
+      </div>`;
+  }).join('') || '<p class="muted" style="font-size:12px">No product data yet — Sync SamCart.</p>';
+}
+
+function renderInsightCard() {
+  const d = state.scData; if (!d || !$('ovi-big')) return;
+  let big, text, glyph = '', cls = '';
+  if (d.momRevenue != null) {
+    const up = d.momRevenue >= 0; glyph = up ? '▲' : '▼'; cls = up ? 'up' : 'down';
+    big = Math.abs(d.momRevenue) + '%';
+    text = `Revenue is ${up ? 'up' : 'down'} ${Math.abs(d.momRevenue)}% month-over-month, now ${fmtMoney(d.monthToDate?.revenue || 0)} this month.`;
+  } else if (d.repeatRate) {
+    big = d.repeatRate + '%';
+    text = `${d.repeatRate}% of customers are repeat buyers — your checkout sequence and ecosystem are compounding.`;
+  } else {
+    big = (100 - (d.refundRate || 0)) + '%';
+    text = `${100 - (d.refundRate || 0)}% of revenue sticks — refund rate is just ${d.refundRate || 0}%.`;
+  }
+  $('ovi-big').innerHTML = glyph ? `<span class="ovi-glyph ${cls}">${glyph}</span>${big}` : big;
+  $('ovi-text').textContent = text;
 }
 
 async function loadTrend(days) {
@@ -598,21 +712,20 @@ async function loadSamCart(force = false) {
 
   state.scData = data;
 
-  // Overview
+  // Overview KPI cards
   $('ov-totalCustomers').textContent = fmtNum(data.totalCustomers);
   $('ov-totalRevenue').textContent   = fmtMoney(data.totalRevenue);
-  $('ov-avgLtv').innerHTML           = data.momRevenue != null
-    ? momHtml(data.momRevenue)
-    : `Avg LTV: ${fmtMoneyFull(data.avgLtv)}`;
-
-  if (data.syncedAt) {
-    const label = data.isDemo ? 'Demo data — update API key in Settings' :
-                  data.stale  ? 'Stale cache — ' :
-                  data.fromCache ? 'Cached — ' : 'Live — ';
-    $('scSyncedAt').textContent = label + (data.isDemo ? '' : timeAgo(data.syncedAt));
-    $('scSyncedAt').style.background = data.isDemo ? '#fef3c7' : '';
-    $('scSyncedAt').style.color      = data.isDemo ? '#92400e' : '';
+  const cs = $('ov-customersSub'); if (cs) cs.textContent = `Avg LTV ${fmtMoneyFull(data.avgLtv)}`;
+  const rp = $('ov-d-revenue');
+  if (rp) {
+    if (data.momRevenue == null) { rp.className = 'delta-pill flat'; rp.textContent = '—'; }
+    else { rp.className = 'delta-pill ' + (data.momRevenue >= 0 ? 'up' : 'down'); rp.textContent = `${data.momRevenue >= 0 ? '▲' : '▼'} ${Math.abs(data.momRevenue)}% MoM`; }
   }
+
+  // Overview widgets
+  renderGrossVolume();
+  renderInsightCard();
+  renderOverviewFunnel();
 
   buildBuyerSplitChart(data.singleBuyers, data.repeatBuyers);
   renderSalesAnalytics(data);
@@ -905,9 +1018,12 @@ setInterval(pollSyncStatus, 25000);
 setTimeout(pollSyncStatus, 2000);
 
 // ── Wire up Overview filters ──────────────────────────────────────
-initDateBtns('ov-dateBtns', days => {
-  state.ovDays = days;
-  loadOverviewStats(days);
+$('cmp-preset').addEventListener('change', e => applyCompare(e.target.value));
+$('ovg-toggle').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-g]'); if (!btn) return;
+  _grossMode = btn.dataset.g;
+  $('ovg-toggle').querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+  renderGrossVolume();
 });
 
 initDateBtns('trend-dateBtns', days => {
@@ -1606,7 +1722,7 @@ $('funnel-add-group').addEventListener('click', () => {
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {
   await Promise.allSettled([
-    loadOverviewStats(state.ovDays),
+    applyCompare(state.cmpPreset || 'mtd'),
     loadTrend(state.trendDays),
     loadPagesTable(),
     loadLiveFeed($('feedSearch').value.trim()),
