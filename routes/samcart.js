@@ -143,6 +143,7 @@ async function computeMetrics(orders, apiKey) {
   // Map product_id -> checkout slug so orders can be attributed to a funnel slug.
   const slugById = {};
   const productList = [];   // unique product names for the Funnels dropdowns
+  const productSlug = {};   // product name -> its checkout slug (for Landing-Page picker)
   try {
     const products = await fetchProducts(apiKey);
     const seen = new Set();
@@ -150,6 +151,7 @@ async function computeMetrics(orders, apiKey) {
       if (p.id != null && p.slug) slugById[p.id] = String(p.slug).toLowerCase();
       const name = p.internal_product_name || p.product_name;   // channel-specific name (like SamCart)
       if (name && !seen.has(name)) { seen.add(name); productList.push(name); }
+      if (name && p.slug && !productSlug[name]) productSlug[name] = String(p.slug).toLowerCase();
     });
   } catch { /* attribution is best-effort */ }
 
@@ -376,7 +378,7 @@ async function computeMetrics(orders, apiKey) {
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
     ordersBySlug, upsellProducts, upsellBySlug,
-    productSales, productList: sortedProductList,
+    productSales, productList: sortedProductList, productSlug,
   };
 }
 

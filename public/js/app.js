@@ -1538,7 +1538,7 @@ function buildFunnelPages(pvm) {
   const used = {};
   const add = (key, label, unique, checkout, type) => {
     let disp = label;
-    if (used[disp]) disp = type === 'product' ? `${disp} (product)` : `${disp} (${key})`;
+    if (used[disp]) disp = `${disp} (${type === 'product' ? 'product' : key})`;
     used[disp] = true;
     _funnelPages[key] = { label: disp, unique, checkout, type };
     _pageDispToKey[disp] = key; _keyToPageDisp[key] = disp;
@@ -1547,15 +1547,16 @@ function buildFunnelPages(pvm) {
   for (const sl of Object.keys(pvm)) {
     if (pvm[sl].isLanding) add(sl, pvm[sl].label, pvm[sl].unique, pvm[sl].checkout, 'landing');
   }
-  // Products — group checkout pages by title, summing views across variants
-  const byTitle = {};
-  for (const sl of Object.keys(pvm)) {
-    if (pvm[sl].isLanding || !pvm[sl].hasTitle) continue;
-    const t = pvm[sl].label;
-    (byTitle[t] || (byTitle[t] = { u: 0, c: 0 }));
-    byTitle[t].u += pvm[sl].unique; byTitle[t].c += pvm[sl].checkout;
-  }
-  for (const t of Object.keys(byTitle)) add('prod::' + t, t, byTitle[t].u, byTitle[t].c, 'product');
+  // SamCart products (channel-specific, like SamCart's Sales by Product) — keyed by
+  // product name; checkout views pulled from the tracked page with the product's slug.
+  const ps    = (state.scData && state.scData.productSlug) || {};
+  const sales = (state.scData && state.scData.productSales) || {};
+  Object.keys(ps).forEach(name => {
+    if (!sales[name] || !sales[name].orders) return;     // only products with real sales
+    const sl = ps[name];
+    const pv = (sl && pvm[sl]) || { unique: 0, checkout: 0 };
+    add(name, name, pv.unique, pv.checkout, 'product');
+  });
 }
 function pageViewsForKey(key) { return _funnelPages[key] || { unique: 0, checkout: 0 }; }
 function pageDisplayForKey(key) { return key ? (_keyToPageDisp[key] || key) : ''; }
