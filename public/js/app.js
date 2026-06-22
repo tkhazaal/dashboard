@@ -1570,12 +1570,12 @@ function buildFunnelPages(pvm) {
   for (const sl of Object.keys(pvm)) {
     if (pvm[sl].isLanding) add(sl, pvm[sl].label, pvm[sl].unique, pvm[sl].checkout, 'landing');
   }
-  // SamCart products (channel-specific, like SamCart's Sales by Product) — keyed by
-  // product name; checkout views pulled from the tracked page with the product's slug.
-  const ps    = (state.scData && state.scData.productSlug) || {};
-  const sales = (state.scData && state.scData.productSales) || {};
-  Object.keys(ps).forEach(name => {
-    if (!sales[name] || !sales[name].orders) return;     // only products with real sales
+  // SamCart products (channel-specific, like SamCart's Sales by Product) — ALL of
+  // them, the same set the Main Product picker shows. Keyed by product name; checkout
+  // views are pulled from the tracked page carrying the product's slug (0 if untracked).
+  const list = (state.scData && state.scData.productList) || [];
+  const ps   = (state.scData && state.scData.productSlug) || {};
+  list.forEach(name => {
     const sl = ps[name];
     const pv = (sl && pvm[sl]) || { unique: 0, checkout: 0 };
     add(name, name, pv.unique, pv.checkout, 'product');
