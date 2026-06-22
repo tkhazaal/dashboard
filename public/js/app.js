@@ -1610,15 +1610,22 @@ function funnelMemberRow(r, i, pvm, agg) {
     <tr data-row="${i}" class="fn-member">
       <td><select class="fn-grp" data-field="group">${groupOptions(r.group)}</select></td>
       <td><input class="fn-input" data-field="platform" value="${escHtml(r.platform)}"></td>
-      <td><input class="fn-page" data-field="pageSlug" list="fn-pages" placeholder="Search page / product…" value="${escHtml(pageDisplayForKey(r.pageSlug))}" title="${escHtml(r.pageSlug || '')}"></td>
-      <td>${fmtNum(pv.unique)}</td>
-      <td>${pv.checkout ? fmtNum(pv.checkout) : '<span class="muted">—</span>'}</td>
-      <td><input class="fn-prod" data-field="main" list="fn-products" placeholder="Search product…" value="${escHtml(r.main || '')}"></td>
-      <td><span class="orders-count">${fmtNum(m.orders)}</span><div class="fn-cr">${crPct(m.orders, pv.checkout)}</div></td>
-      <td><input class="fn-prod" data-field="upsell1" list="fn-products" placeholder="Search product…" value="${escHtml(r.upsell1 || '')}"></td>
-      <td><span class="upsell-count">${fmtNum(u1.orders)}</span><div class="fn-cr">${crPct(u1.orders, m.orders)}</div></td>
-      <td><input class="fn-prod" data-field="upsell2" list="fn-products" placeholder="Search product…" value="${escHtml(r.upsell2 || '')}"></td>
-      <td><span class="upsell-count">${fmtNum(u2.orders)}</span><div class="fn-cr">${crPct(u2.orders, u1.orders)}</div></td>
+      <td>
+        <input class="fn-page" data-field="pageSlug" list="fn-pages" placeholder="Search page / product…" value="${escHtml(pageDisplayForKey(r.pageSlug))}" title="${escHtml(r.pageSlug || '')}">
+        <div class="fn-sub">${fmtNum(pv.unique)} uniq · ${pv.checkout ? fmtNum(pv.checkout) : '0'} chk</div>
+      </td>
+      <td>
+        <input class="fn-prod" data-field="main" list="fn-products" placeholder="Search product…" value="${escHtml(r.main || '')}">
+        <div class="fn-sub"><span class="orders-count">${fmtNum(m.orders)}</span> · ${crPct(m.orders, pv.checkout)}</div>
+      </td>
+      <td>
+        <input class="fn-prod" data-field="upsell1" list="fn-products" placeholder="Search product…" value="${escHtml(r.upsell1 || '')}">
+        <div class="fn-sub"><span class="upsell-count">${fmtNum(u1.orders)}</span> · ${crPct(u1.orders, m.orders)}</div>
+      </td>
+      <td>
+        <input class="fn-prod" data-field="upsell2" list="fn-products" placeholder="Search product…" value="${escHtml(r.upsell2 || '')}">
+        <div class="fn-sub"><span class="upsell-count">${fmtNum(u2.orders)}</span> · ${crPct(u2.orders, u1.orders)}</div>
+      </td>
       <td><span class="value-count">${fmtMoney(rev)}</span></td>
       <td><button class="fn-del" data-row="${i}" title="Remove platform">✕</button></td>
     </tr>`;
@@ -1640,33 +1647,32 @@ function renderFunnels() {
     const open = !funnelCollapsed.has(gname);
     html += `
       <tr class="fn-group-row" data-grp="${escHtml(gname)}">
-        <td class="fn-grp-toggle">${open ? '▾' : '▸'}</td>
-        <td>
+        <td colspan="2" class="fn-grp-namecell">
           <div class="fn-grp-namewrap">
+            <span class="fn-grp-toggle">${open ? '▾' : '▸'}</span>
             <input class="fn-grp-name" data-grp="${escHtml(gname)}" value="${escHtml(gname)}" title="Rename group">
             <button class="fn-add-row" data-grp="${escHtml(gname)}" title="Add platform to this group">＋</button>
             <span class="group-count">${idxs.length}</span>
           </div>
         </td>
-        <td></td>
-        <td>${fmtNum(g.U)}</td>
-        <td>${fmtNum(g.C)}</td>
-        <td></td><td><span class="orders-count">${fmtNum(g.M)}</span></td>
-        <td></td><td><span class="upsell-count">${fmtNum(g.U1)}</span></td>
-        <td></td><td><span class="upsell-count">${fmtNum(g.U2)}</span></td>
+        <td class="fn-sub">${fmtNum(g.U)} uniq · ${fmtNum(g.C)} chk</td>
+        <td><span class="orders-count">${fmtNum(g.M)}</span></td>
+        <td><span class="upsell-count">${fmtNum(g.U1)}</span></td>
+        <td><span class="upsell-count">${fmtNum(g.U2)}</span></td>
         <td><span class="value-count">${fmtMoney(g.R)}</span></td>
         <td><button class="fn-del-grp" data-grp="${escHtml(gname)}" title="Delete group">✕</button></td>
       </tr>`;
     if (open) html += members;
   }
 
-  $('funnelBody').innerHTML = html || `<tr class="empty-row"><td colspan="13">No platforms yet — click “+ Group”.</td></tr>`;
+  $('funnelBody').innerHTML = html || `<tr class="empty-row"><td colspan="8">No platforms yet — click “+ Group”.</td></tr>`;
   $('funnelFoot').innerHTML = cfg.length ? `
     <tr class="funnel-total">
-      <td></td><td>TOTAL</td><td></td><td>${fmtNum(grand.U)}</td><td>${fmtNum(grand.C)}</td>
-      <td></td><td><span class="orders-count">${fmtNum(grand.M)}</span></td>
-      <td></td><td><span class="upsell-count">${fmtNum(grand.U1)}</span></td>
-      <td></td><td><span class="upsell-count">${fmtNum(grand.U2)}</span></td>
+      <td></td><td>TOTAL</td>
+      <td class="fn-sub">${fmtNum(grand.U)} uniq · ${fmtNum(grand.C)} chk</td>
+      <td><span class="orders-count">${fmtNum(grand.M)}</span></td>
+      <td><span class="upsell-count">${fmtNum(grand.U1)}</span></td>
+      <td><span class="upsell-count">${fmtNum(grand.U2)}</span></td>
       <td><span class="value-count">${fmtMoney(grand.R)}</span></td><td></td>
     </tr>` : '';
 }
