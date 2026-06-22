@@ -828,7 +828,8 @@ tbody tr:hover { background: #fafbff; }
 /* ── Responsive ──────────────────────────── */
 /* Funnel date-range control */
 .fn-actions { flex-wrap: wrap; gap: 8px; }
-.fn-daterange { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fn-daterange { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 8px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; }
+.fn-range-label { font-size: 11.5px; font-weight: 700; color: var(--sub); white-space: nowrap; }
 .fn-range-custom[hidden] { display: none; }
 .fn-range-custom:not([hidden]) { display: inline-flex; align-items: center; gap: 6px; }
 

@@ -310,14 +310,19 @@
         <div><h1>Funnels</h1><p class="subtitle">Per-platform funnel — link a page &amp; pick your main + upsell products; sales update automatically</p></div>
         <div class="header-pills fn-actions">
           <div class="fn-daterange">
+            <span class="fn-range-label">📅 Range</span>
             <select id="fn-range-preset" class="cmp-preset" title="Date range for stats">
               <option value="all">All time</option>
-              <option value="mtd">This month</option>
-              <option value="last">Last month</option>
-              <option value="ytd">This year</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="thisweek">This week</option>
+              <option value="lastweek">Last week</option>
+              <option value="thismonth">This month</option>
+              <option value="lastmonth">Last month</option>
+              <option value="thisyear">This year</option>
               <option value="custom">Custom…</option>
             </select>
-            <span class="fn-range-custom" id="fn-range-custom" hidden>
+            <span class="fn-range-custom" id="fn-range-custom">
               <input type="date" id="fn-start" class="date-input" aria-label="Start date">
               <span class="daterange-to">→</span>
               <input type="date" id="fn-end" class="date-input" aria-label="End date">

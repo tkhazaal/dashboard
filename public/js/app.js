@@ -1456,7 +1456,9 @@ function renderReportKpis(d) {
 
 // ── Funnels (per-platform funnel builder, saved to Supabase) ──────
 let _funnelSaveTimer = null;
-const DEFAULT_FUNNELS = ['FB Ads','FB Posts','FB Stories','IG Posts','IG Stories','TikTok','Emails','FB Group']
+// Standard channel set auto-added to every new group
+const STANDARD_PLATFORMS = ['IG Posts', 'IG Stories', 'FB Posts', 'FB Stories', 'FB Group', 'Email', 'Tiktok', 'FB Ads'];
+const DEFAULT_FUNNELS = STANDARD_PLATFORMS
   .map(p => ({ group: "Father's Day", platform: p, pageSlug: '', main: '', upsell1: '', upsell2: '' }));
 
 const funnelCollapsed = new Set();   // collapsed group names (default: expanded)
@@ -1501,21 +1503,20 @@ function prodSales(name) {
   const ps = state.scData && state.scData.productSales;
   return (name && ps && ps[name]) || { orders: 0, revenue: 0 };
 }
-// Months 'YYYY-MM' between two YYYY-MM-DD dates (inclusive)
-function monthsInRange(s, e) {
-  const out = []; let [y, m] = s.slice(0, 7).split('-').map(Number);
-  const [ey, em] = e.slice(0, 7).split('-').map(Number);
+// Days 'YYYY-MM-DD' between two dates (inclusive)
+function daysInRange(s, e) {
+  const out = []; let cur = new Date(s + 'T00:00:00'); const end = new Date(e + 'T00:00:00');
   let guard = 0;
-  while ((y < ey || (y === ey && m <= em)) && guard++ < 240) { out.push(`${y}-${String(m).padStart(2, '0')}`); if (++m > 12) { m = 1; y++; } }
+  while (cur <= end && guard++ < 1500) { out.push(ymd(cur)); cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1); }
   return out;
 }
 // Sales for a product within the active funnel date range (else all-time)
 function prodSalesInRange(name) {
-  const sm = state.scData && state.scData.salesByMonth;
-  if (!state.funnelStart || !state.funnelEnd || !sm) return prodSales(name);
+  const sd = state.scData && state.scData.salesByDay;
+  if (!state.funnelStart || !state.funnelEnd || !sd) return prodSales(name);
   let o = 0, r = 0;
-  for (const mo of monthsInRange(state.funnelStart, state.funnelEnd)) {
-    const e = sm[mo] && sm[mo][name];
+  for (const day of daysInRange(state.funnelStart, state.funnelEnd)) {
+    const e = sd[day] && sd[day][name];
     if (e) { o += e.orders; r += e.revenue; }
   }
   return { orders: o, revenue: Math.round(r * 100) / 100 };
@@ -1714,19 +1715,38 @@ async function applyFunnelRange() {
   } else { state.funnelPages = null; }
   renderFunnels();
 }
+// Resolve a preset to [startDate, endDate] (Date objects, or [null,null] for all-time)
+function funnelPresetRange(v) {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  const mk = (yy, mm, dd) => new Date(yy, mm, dd);
+  const weekOffset = (now.getDay() + 6) % 7;   // days since Monday (week starts Monday)
+  switch (v) {
+    case 'today':     return [mk(y, m, d), mk(y, m, d)];
+    case 'yesterday': return [mk(y, m, d - 1), mk(y, m, d - 1)];
+    case 'thisweek':  return [mk(y, m, d - weekOffset), mk(y, m, d)];
+    case 'lastweek':  return [mk(y, m, d - weekOffset - 7), mk(y, m, d - weekOffset - 1)];
+    case 'thismonth': return [mk(y, m, 1), mk(y, m, d)];
+    case 'lastmonth': return [mk(y, m - 1, 1), mk(y, m, 0)];
+    case 'thisyear':  return [mk(y, 0, 1), mk(y, m, d)];
+    case 'all':       return [null, null];
+    default:          return undefined;   // custom → leave inputs to the user
+  }
+}
 $('fn-range-preset').addEventListener('change', e => {
-  const v = e.target.value, now = new Date();
-  $('fn-range-custom').hidden = v !== 'custom';
-  if (v === 'custom') { return; }
-  if (v === 'all')       { state.funnelStart = ''; state.funnelEnd = ''; }
-  else if (v === 'mtd')  { state.funnelStart = ymd(new Date(now.getFullYear(), now.getMonth(), 1)); state.funnelEnd = ymd(now); }
-  else if (v === 'last') { state.funnelStart = ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1)); state.funnelEnd = ymd(new Date(now.getFullYear(), now.getMonth(), 0)); }
-  else if (v === 'ytd')  { state.funnelStart = ymd(new Date(now.getFullYear(), 0, 1)); state.funnelEnd = ymd(now); }
+  const r = funnelPresetRange(e.target.value);
+  if (r === undefined) { $('fn-start').focus(); return; }   // custom
+  const [s, en] = r;
+  state.funnelStart = s ? ymd(s) : ''; state.funnelEnd = en ? ymd(en) : '';
+  $('fn-start').value = state.funnelStart;   // auto-fill the visible inputs
+  $('fn-end').value   = state.funnelEnd;
   applyFunnelRange();
 });
 function applyFunnelCustom() {
+  $('fn-range-preset').value = 'custom';     // editing a date = custom range
   const s = $('fn-start').value, e = $('fn-end').value;
-  if (s && e) { state.funnelStart = s <= e ? s : e; state.funnelEnd = s <= e ? e : s; applyFunnelRange(); }
+  if (s && e) { state.funnelStart = s <= e ? s : e; state.funnelEnd = s <= e ? e : s; }
+  else { state.funnelStart = ''; state.funnelEnd = ''; }
+  applyFunnelRange();
 }
 $('fn-start').addEventListener('change', applyFunnelCustom);
 $('fn-end').addEventListener('change', applyFunnelCustom);
@@ -1763,22 +1783,33 @@ $('funnelBody').addEventListener('input', e => {
 });
 $('funnelBody').addEventListener('click', e => {
   const del = e.target.closest('.fn-del');
-  if (del) { state.funnelsConfig.splice(+del.dataset.row, 1); renderFunnels(); saveFunnels(); return; }
+  if (del) {
+    const row = state.funnelsConfig[+del.dataset.row] || {};
+    if (!confirm(`Remove the "${row.platform || 'this'}" platform row?`)) return;
+    state.funnelsConfig.splice(+del.dataset.row, 1); renderFunnels(); saveFunnels(); return;
+  }
   const tog = e.target.closest('.fn-grp-toggle');
   if (tog) { const g = tog.closest('[data-grp]').dataset.grp; funnelCollapsed.has(g) ? funnelCollapsed.delete(g) : funnelCollapsed.add(g); renderFunnels(); return; }
   const addr = e.target.closest('.fn-add-row');
   if (addr) { state.funnelsConfig.push({ group: addr.dataset.grp, platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' }); renderFunnels(); saveFunnels(); return; }
   const delg = e.target.closest('.fn-del-grp');
-  if (delg) { const g = delg.dataset.grp; state.funnelsConfig = state.funnelsConfig.filter(r => r.group !== g); renderFunnels(); saveFunnels(); return; }
+  if (delg) {
+    const g = delg.dataset.grp, n = state.funnelsConfig.filter(r => r.group === g).length;
+    if (!confirm(`Delete group "${g}" and its ${n} platform${n === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    state.funnelsConfig = state.funnelsConfig.filter(r => r.group !== g); renderFunnels(); saveFunnels(); return;
+  }
 });
 $('funnel-add').addEventListener('click', () => {
   ensureFunnelsConfig();
   state.funnelsConfig.push({ group: funnelGroupNames()[0] || 'Ungrouped', platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' });
   renderFunnels(); saveFunnels();
 });
+// New group auto-fills the standard channel set (rename + add/remove as needed)
 $('funnel-add-group').addEventListener('click', () => {
-  const g = uniqueGroupName('New Group');
-  state.funnelsConfig.push({ group: g, platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' });
+  const name = prompt('Name this group (e.g. a product or campaign):', 'New Group');
+  if (name === null) return;   // cancelled
+  const g = uniqueGroupName(name.trim() || 'New Group');
+  STANDARD_PLATFORMS.forEach(p => state.funnelsConfig.push({ group: g, platform: p, pageSlug: '', main: '', upsell1: '', upsell2: '' }));
   renderFunnels(); saveFunnels();
 });
 
