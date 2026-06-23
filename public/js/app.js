@@ -214,6 +214,7 @@ const state = {
   repEnd:           '',
   repKajabi:        null,
   acData:           null,
+  kajabiData:       null,
 };
 
 // ── Tab navigation ────────────────────────────────────────────────
@@ -933,10 +934,20 @@ async function loadSettings() {
 }
 
 // ── Monthly goal progress ─────────────────────────────────────────
+// Kajabi revenue for the current month (counts toward the monthly goal)
+function kajabiMtdRevenue() {
+  const d = state.kajabiData;
+  if (!d || !Array.isArray(d.monthly)) return 0;
+  const mo = ymd(new Date()).slice(0, 7);
+  const row = d.monthly.find(m => m.month === mo);
+  return row ? row.revenue : 0;
+}
+
 function renderGoal() {
   const goal = state.monthlyGoal || 0;
-  const mtd  = state.scData?.monthToDate;
-  const current = mtd?.revenue || 0;
+  const scMtd = state.scData?.monthToDate?.revenue || 0;
+  const kjMtd = kajabiMtdRevenue();
+  const current = scMtd + kjMtd;   // total business revenue this month (SamCart + Kajabi)
 
   // Current month label
   const now = new Date();
@@ -964,11 +975,12 @@ function renderGoal() {
   const daysLeft = Math.max(0, daysInMonth - now.getDate());
   const remaining = Math.max(0, goal - current);
 
+  const breakdown = kjMtd > 0 ? ` <span class="muted">· SamCart ${fmtMoney(scMtd)} + Kajabi ${fmtMoney(kjMtd)}</span>` : '';
   if (reached) {
-    $('goal-meta').innerHTML = `<span class="delta up">🎉 Goal reached!</span> ${fmtMoney(current - goal)} over target with ${daysLeft} days to spare.`;
+    $('goal-meta').innerHTML = `<span class="delta up">🎉 Goal reached!</span> ${fmtMoney(current - goal)} over target with ${daysLeft} days to spare.${breakdown}`;
   } else {
     const perDay = daysLeft > 0 ? remaining / daysLeft : remaining;
-    $('goal-meta').innerHTML = `<strong>${fmtMoney(remaining)}</strong> to go · ${daysLeft} day${daysLeft!==1?'s':''} left · need <strong>${fmtMoney(Math.round(perDay))}/day</strong> to hit target`;
+    $('goal-meta').innerHTML = `<strong>${fmtMoney(remaining)}</strong> to go · ${daysLeft} day${daysLeft!==1?'s':''} left · need <strong>${fmtMoney(Math.round(perDay))}/day</strong> to hit target${breakdown}`;
   }
 }
 
@@ -2110,8 +2122,12 @@ async function loadAds() {
 
 // ══ Kajabi (reporting) ════════════════════════════════════════════
 async function loadKajabi() {
-  try { renderKajabi(await api('/api/kajabi/data')); }
+  try { const d = await api('/api/kajabi/data'); state.kajabiData = d; renderKajabi(d); }
   catch (e) { $('kajabi-status').textContent = 'Error loading'; }
+}
+// Lightweight fetch (no chart render) so the Monthly Goal can include Kajabi at boot
+async function loadKajabiData() {
+  try { state.kajabiData = await api('/api/kajabi/data'); renderGoal(); } catch {}
 }
 function renderKajabi(d) {
   const unconf = $('kajabi-unconfigured'), content = $('kajabi-content');
@@ -2336,6 +2352,7 @@ async function refreshAll(force = false) {
     loadFunnel(),
     loadSamCart(force),
     loadSettings(),
+    loadKajabiData(),
   ]);
 }
 
