@@ -12,6 +12,9 @@ router.get('/', async (req, res) => {
     if (s.samcart_api_key)      { s.samcart_api_key_masked = mask(s.samcart_api_key); delete s.samcart_api_key; }
     if (s.kajabi_client_secret) { s.kajabi_client_secret_masked = mask(s.kajabi_client_secret); delete s.kajabi_client_secret; }
     if (s.ac_api_token)         { s.ac_api_token_masked = mask(s.ac_api_token); delete s.ac_api_token; }
+    // Don't expose the remaining credential identifiers over the API either.
+    if (s.kajabi_client_id)     { s.kajabi_connected = true; delete s.kajabi_client_id; }
+    if (s.ac_api_url)           { s.ac_connected = true; delete s.ac_api_url; }
     res.json(s);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
