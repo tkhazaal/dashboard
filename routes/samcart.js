@@ -197,7 +197,8 @@ async function computeMetrics(orders, apiKey) {
   const dailyRevenue = {};   // 'YYYY-MM-DD' -> { revenue, orders } (distinct orders; for date-filtered Reporting)
 
   const custMap = new Map();
-  const ordersBySlug = {};   // slug -> { orders, revenue }
+  const ordersBySlug = {};      // slug -> { orders, revenue }  (all-time)
+  const ordersBySlugByDay = {}; // 'YYYY-MM-DD' -> { slug -> { orders, revenue } } (date-filtered Page Analytics)
   const upsellTotals = {};   // upsellName -> { orders, revenue }
   const upsellBySlug = {};   // mainSlug -> { upsellName -> { orders, revenue } }
 
@@ -221,6 +222,12 @@ async function computeMetrics(orders, apiKey) {
       if (!ordersBySlug[slug]) ordersBySlug[slug] = { orders: 0, revenue: 0 };
       ordersBySlug[slug].orders++;
       ordersBySlug[slug].revenue += amount;
+      if (dRev) {
+        if (!ordersBySlugByDay[dRev]) ordersBySlugByDay[dRev] = {};
+        if (!ordersBySlugByDay[dRev][slug]) ordersBySlugByDay[dRev][slug] = { orders: 0, revenue: 0 };
+        ordersBySlugByDay[dRev][slug].orders++;
+        ordersBySlugByDay[dRev][slug].revenue += amount;
+      }
     }
 
     // Per-product purchase counts (every cart line = one purchase of that product)
@@ -413,7 +420,7 @@ async function computeMetrics(orders, apiKey) {
     refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
-    ordersBySlug, upsellProducts, upsellBySlug,
+    ordersBySlug, ordersBySlugByDay, upsellProducts, upsellBySlug,
     productSales, productList: sortedProductList, productSlug, salesByDay,
     dailyRevenue, refundsByDay,
   };

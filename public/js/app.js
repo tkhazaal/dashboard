@@ -81,6 +81,30 @@ function ordersForSlug(slug) {
   if (stripped && map[stripped]) return map[stripped];
   return null;
 }
+// The Page-Analytics date window as [start,end], matching paRangeParams. null = all-time.
+function paEffectiveRange() {
+  if (state.paStart && state.paEnd) return [state.paStart, state.paEnd];
+  if (state.paDays > 0) { const now = new Date(); const s = new Date(now); s.setDate(s.getDate() - (state.paDays - 1)); return [ymd(s), ymd(now)]; }
+  return null;   // all time
+}
+// Page Analytics orders — date-filtered to the active window, else all-time.
+function ordersForSlugPA(slug) {
+  const range = paEffectiveRange();
+  if (!range) return ordersForSlug(slug);
+  const all = state.scData && state.scData.ordersBySlug;
+  const byDay = state.scData && state.scData.ordersBySlugByDay;
+  if (!all || !byDay) return ordersForSlug(slug);   // day-level not synced yet → fall back
+  // Pick the same key ordersForSlug would (exact, else digit-stripped)
+  let key = all[slug] ? slug : null;
+  if (!key) { const st = slug.replace(/\d+$/, '').replace(/-+$/, ''); if (st && all[st]) key = st; }
+  if (!key) return null;
+  let o = 0, r = 0;
+  for (const day of daysInRange(range[0], range[1])) {
+    const e = byDay[day] && byDay[day][key];
+    if (e) { o += e.orders; r += e.revenue; }
+  }
+  return { orders: o, revenue: r };
+}
 
 // Upsell sales for a given main slug + upsell product name (same slug matching)
 function upsellForSlug(slug, upsellName) {
@@ -632,8 +656,8 @@ function sortSlugRows(list) {
   return list.sort((a, b) => {
     if (state.paSort === 'unique_visitors') return b.landingUnique  - a.landingUnique;
     if (state.paSort === 'checkout_views')  return b.checkoutViews  - a.checkoutViews;
-    if (state.paSort === 'orders')          return (ordersForSlug(b.slug)?.orders || 0)  - (ordersForSlug(a.slug)?.orders || 0);
-    if (state.paSort === 'order_value')     return (ordersForSlug(b.slug)?.revenue || 0) - (ordersForSlug(a.slug)?.revenue || 0);
+    if (state.paSort === 'orders')          return (ordersForSlugPA(b.slug)?.orders || 0)  - (ordersForSlugPA(a.slug)?.orders || 0);
+    if (state.paSort === 'order_value')     return (ordersForSlugPA(b.slug)?.revenue || 0) - (ordersForSlugPA(a.slug)?.revenue || 0);
     if (state.paSort === 'upsell')          return (upsellForSlug(b.slug, state.paUpsell)?.orders || 0) - (upsellForSlug(a.slug, state.paUpsell)?.orders || 0);
     return b.landingViews - a.landingViews;
   });
@@ -641,7 +665,7 @@ function sortSlugRows(list) {
 
 // One data row (member or flat) — returns <tr> HTML
 function slugRowHtml(e, rank, indent) {
-  const ord = ordersForSlug(e.slug);
+  const ord = ordersForSlugPA(e.slug);
   const ups = state.paUpsell ? upsellForSlug(e.slug, state.paUpsell) : null;
   const displayPath = e.landingPath || `/${e.slug}`;
   return `
@@ -697,7 +721,7 @@ function renderPagesTable(rows) {
     const g = groups[gname];
     g.rows.push(e);
     g.landingViews += e.landingViews; g.landingUnique += e.landingUnique; g.checkoutViews += e.checkoutViews;
-    const ord = ordersForSlug(e.slug); if (ord) { g.orders += ord.orders; g.value += ord.revenue; }
+    const ord = ordersForSlugPA(e.slug); if (ord) { g.orders += ord.orders; g.value += ord.revenue; }
     const ups = state.paUpsell ? upsellForSlug(e.slug, state.paUpsell) : null; if (ups) { g.upsellOrders += ups.orders; g.upsellRevenue += ups.revenue; }
     if (!g.lastSeen || new Date(e.lastSeen) > new Date(g.lastSeen)) g.lastSeen = e.lastSeen;
   }
