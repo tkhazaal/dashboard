@@ -926,6 +926,12 @@ async function loadSettings() {
   if (s.tracker_url) form.tracker_url.value = s.tracker_url;
   if (s.monthly_goal) { form.monthly_goal.value = s.monthly_goal; $('goal-input').value = s.monthly_goal; }
   if (s.samcart_api_key_masked) $('apiKeyMasked').textContent = 'Current key: ' + s.samcart_api_key_masked;
+  if (s.ac_api_url) form.ac_api_url.value = s.ac_api_url;
+  $('kajabiHint').textContent = s.kajabi_client_id_masked
+    ? `Connected ✓ · ID ${s.kajabi_client_id_masked}${s.kajabi_client_secret_masked ? ' · secret ' + s.kajabi_client_secret_masked : ''}`
+    : 'Not connected';
+  $('acHint').textContent = s.ac_api_token_masked
+    ? `Connected ✓ · key ${s.ac_api_token_masked}` : 'Not connected';
   state.monthlyGoal = parseFloat(s.monthly_goal) || 0;
   if (s.funnels_config) { try { state.funnelsConfig = JSON.parse(s.funnels_config); } catch {} }
   if (s.ad_campaigns)   { try { state.adCampaigns   = JSON.parse(s.ad_campaigns);   } catch {} }
@@ -1008,7 +1014,6 @@ $('settingsForm').addEventListener('submit', async e => {
   const r = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
   if (r.ok) {
     $('settingsSaved').textContent = '✓ Settings saved.';
-    setTimeout(() => { $('settingsSaved').textContent = ''; }, 3000);
     updateTrackingCode(body.tracker_url || 'http://localhost:3000');
     if (body.monthly_goal !== undefined) {
       state.monthlyGoal = parseFloat(body.monthly_goal) || 0;
@@ -1016,6 +1021,13 @@ $('settingsForm').addEventListener('submit', async e => {
       renderGoal();
     }
     if (body.samcart_api_key) loadSamCart(true);
+    // Re-sync integrations whose credentials just changed
+    if (body.kajabi_client_id || body.kajabi_client_secret) { $('settingsSaved').textContent = '✓ Saved — syncing Kajabi…'; fetch('/api/kajabi/sync', { method: 'POST' }); }
+    if (body.ac_api_url || body.ac_api_token)               { $('settingsSaved').textContent = '✓ Saved — syncing Email…';  fetch('/api/ac/sync', { method: 'POST' }); }
+    e.target.reset(); loadSettings();    // clear secret fields + refresh hints
+    setTimeout(() => { $('settingsSaved').textContent = ''; }, 4000);
+  } else {
+    $('settingsSaved').textContent = '⚠ Save failed';
   }
 });
 

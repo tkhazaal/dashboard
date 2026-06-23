@@ -937,6 +937,9 @@ table.show-upsell .upsell-col { display: table-cell; }
 .funnel-table .fn-sel:focus, .funnel-table .fn-input:focus,
 .funnel-table .fn-prod:focus, .funnel-table .fn-page:focus { border-color: var(--accent); }
 .funnel-table .fn-input { font-weight: 700; }
+/* Settings — integration group divider */
+.settings-divider { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sub); border-top: 1px solid var(--border); padding-top: 14px; margin-top: 6px; }
+
 /* ── Email (ActiveCampaign) filters + status badges ──── */
 .email-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .email-filters .date-input { min-width: 170px; }

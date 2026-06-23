@@ -982,9 +982,32 @@
             </label>
             <label>
               <span>SamCart API Key</span>
-              <input type="password" name="samcart_api_key" placeholder="Paste new key to update">
+              <input type="password" name="samcart_api_key" placeholder="Paste new key to update" autocomplete="off">
               <small id="apiKeyMasked" class="field-hint"></small>
             </label>
+
+            <div class="settings-divider">Integrations</div>
+
+            <label>
+              <span>Kajabi Client ID</span>
+              <input type="text" name="kajabi_client_id" placeholder="Paste Client ID" autocomplete="off">
+            </label>
+            <label>
+              <span>Kajabi Client Secret <small>(Kajabi → Settings → Public API)</small></span>
+              <input type="password" name="kajabi_client_secret" placeholder="Paste Client Secret to update" autocomplete="off">
+              <small id="kajabiHint" class="field-hint"></small>
+            </label>
+
+            <label>
+              <span>ActiveCampaign API URL</span>
+              <input type="text" name="ac_api_url" placeholder="https://youracct.api-us1.com" autocomplete="off">
+            </label>
+            <label>
+              <span>ActiveCampaign API Key <small>(AC → Settings → Developer)</small></span>
+              <input type="password" name="ac_api_token" placeholder="Paste API key to update" autocomplete="off">
+              <small id="acHint" class="field-hint"></small>
+            </label>
+
             <button type="submit" class="btn-primary">Save Settings</button>
             <div id="settingsSaved" class="save-msg"></div>
           </form>
