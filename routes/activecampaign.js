@@ -79,18 +79,18 @@ async function computeACMetrics(creds, onProgress) {
   if (onProgress) onProgress('campaigns', 0);
   const CAMP_STATUS = { '0': 'Draft', '1': 'Scheduled', '2': 'Sending', '3': 'Paused', '4': 'Stopped', '5': 'Sent', '6': 'Disabled' };
   const camps = await acAll(base, token, 'campaigns?orders%5Bmdate%5D=DESC', 'campaigns', { maxPages: 6, limit: 100 });
-  let S = 0, UO = 0, SC = 0, HB = 0, SB = 0, UN = 0;
+  let S = 0, UO = 0, SC = 0, HB = 0, SB = 0, UN = 0, sentCount = 0;
   const campaignList = [];
-  const monthly = {};   // 'YYYY-MM' -> { sends, sent, uo, sc }
+  const monthly = {};   // 'YYYY-MM' -> { sends, sent, uo, sc, un, bo }
   for (const c of camps) {
     const st = String(c.status);
     const sent = num(c.send_amt);
     const isSent = st === '5' && sent > 0;
     const uo = num(c.uniqueopens), sc = num(c.subscriberclicks), un = num(c.unsubscribes), hb = num(c.hardbounces), sb = num(c.softbounces);
     if (isSent) {
-      S += sent; UO += uo; SC += sc; HB += hb; SB += sb; UN += un;
+      S += sent; UO += uo; SC += sc; HB += hb; SB += sb; UN += un; sentCount++;
       const m = String(c.sdate || '').slice(0, 7);
-      if (m) { (monthly[m] || (monthly[m] = { sends: 0, sent: 0, uo: 0, sc: 0 })); monthly[m].sends++; monthly[m].sent += sent; monthly[m].uo += uo; monthly[m].sc += sc; }
+      if (m) { (monthly[m] || (monthly[m] = { sends: 0, sent: 0, uo: 0, sc: 0, un: 0, bo: 0 })); monthly[m].sends++; monthly[m].sent += sent; monthly[m].uo += uo; monthly[m].sc += sc; monthly[m].un += un; monthly[m].bo += hb + sb; }
     }
     campaignList.push({
       name: c.name, date: c.sdate || c.mdate || c.cdate, status: CAMP_STATUS[st] || 'Other', sent: isSent,
@@ -101,7 +101,8 @@ async function computeACMetrics(creds, onProgress) {
   }
   campaignList.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   const deliverability = {
-    sent: S, campaigns: campaignList.length,
+    sent: S, campaigns: sentCount,
+    delivered: S - HB - SB, opened: UO, clicked: SC,
     avgOpenRate: rate(UO, S), avgClickRate: rate(SC, S), avgCtor: rate(SC, UO),
     unsubRate: rate(UN, S), bounceRate: rate(HB + SB, S), deliveryRate: rate(S - HB - SB, S),
     totalUnsubs: UN, totalBounces: HB + SB,
@@ -109,6 +110,7 @@ async function computeACMetrics(creds, onProgress) {
   const monthlyArr = Object.keys(monthly).sort().map(m => ({
     month: m, sends: monthly[m].sends, sent: monthly[m].sent,
     openRate: rate(monthly[m].uo, monthly[m].sent), clickRate: rate(monthly[m].sc, monthly[m].sent),
+    unsubRate: rate(monthly[m].un, monthly[m].sent), bounceRate: rate(monthly[m].bo, monthly[m].sent),
   }));
 
   // Automations — active count + entered/exited (completion)

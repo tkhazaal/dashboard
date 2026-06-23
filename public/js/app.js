@@ -2189,16 +2189,83 @@ function renderEmail(d) {
   ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${s}</div></div>`).join('');
 
   const m = d.monthly || [];
+  const shortName = s => { s = String(s || ''); return s.length > 20 ? s.slice(0, 20) + '…' : s; };
+  const pctOf = (n, dn) => dn ? Math.round((n / dn) * 1000) / 10 : 0;
+  const pctY = { ticks: { font: { size: 9 }, color: TICK, callback: v => v + '%' } };
+  const kY   = { font: { size: 9 }, color: TICK, callback: v => v >= 1000 ? (v / 1000) + 'k' : v };
+  const lgnd = { labels: { font: { size: 10 }, color: TICK, boxWidth: 10 } };
+
   mkChart('emailTrendChart', {
     data: { labels: m.map(x => x.month), datasets: [
-      { type: 'bar', label: 'Sent', data: m.map(x => x.sent), backgroundColor: 'rgba(37,99,235,0.45)', borderRadius: 4, yAxisID: 'y' },
+      { type: 'bar', label: 'Sent', data: m.map(x => x.sent), backgroundColor: 'rgba(37,99,235,0.4)', borderRadius: 4, yAxisID: 'y' },
       { type: 'line', label: 'Open %', data: m.map(x => x.openRate), borderColor: '#10b981', backgroundColor: '#10b981', tension: 0.3, pointRadius: 2, yAxisID: 'y1' },
+      { type: 'line', label: 'Click %', data: m.map(x => x.clickRate), borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.3, pointRadius: 2, yAxisID: 'y1' },
     ] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { font: { size: 10 }, color: TICK, boxWidth: 10 } } },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: lgnd },
       scales: { x: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } },
-        y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 9 }, color: TICK, callback: v => v >= 1000 ? (v / 1000) + 'k' : v }, beginAtZero: true },
-        y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 9 }, color: TICK, callback: v => v + '%' }, min: 0, max: 100 } } },
+        y: { position: 'left', grid: { color: GRID }, ticks: kY, beginAtZero: true },
+        y1: { position: 'right', grid: { display: false }, ...pctY, min: 0, max: 100 } } },
   });
+
+  // Engagement funnel — Sent → Delivered → Opened → Clicked
+  const fl = [['Sent', dl.sent || 0], ['Delivered', dl.delivered || 0], ['Opened', dl.opened || 0], ['Clicked', dl.clicked || 0]];
+  mkChart('emailFunnelChart', {
+    type: 'bar',
+    data: { labels: fl.map(x => x[0]), datasets: [{ data: fl.map(x => x[1]), backgroundColor: ['#2563eb', '#10b981', '#06b6d4', '#f59e0b'], borderRadius: 6 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtNum(c.raw) } } },
+      scales: { x: { grid: { color: GRID }, ticks: kY }, y: { grid: { display: false }, ticks: { font: { size: 11 }, color: TICK } } } },
+  });
+  $('email-funnel-note').textContent = `Of ${fmtNum(dl.sent || 0)} sent: ${pctOf(dl.delivered, dl.sent)}% delivered · ${pctOf(dl.opened, dl.sent)}% opened · ${pctOf(dl.clicked, dl.sent)}% clicked`;
+
+  // Campaign status mix
+  const sc = d.campaignStatusCounts || {}; const slabels = Object.keys(sc);
+  mkChart('emailStatusChart', {
+    type: 'doughnut',
+    data: { labels: slabels, datasets: [{ data: slabels.map(l => sc[l]), backgroundColor: PALETTE, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 }, color: TICK, boxWidth: 10, padding: 6 } } }, cutout: '58%' },
+  });
+
+  // Recent campaigns — Open vs Click (last 12 sent, chronological)
+  const sentCamps = (d.campaigns || []).filter(c => c.sent);
+  const recent = sentCamps.slice(0, 12).reverse();
+  mkChart('emailCompareChart', {
+    type: 'bar',
+    data: { labels: recent.map(c => shortName(c.name)), datasets: [
+      { label: 'Open %', data: recent.map(c => c.openRate), backgroundColor: '#2563eb', borderRadius: 4 },
+      { label: 'Click %', data: recent.map(c => c.clickRate), backgroundColor: '#10b981', borderRadius: 4 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: lgnd },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 8 }, color: TICK, maxRotation: 60, minRotation: 45 } }, y: { grid: { color: GRID }, ...pctY, beginAtZero: true } } },
+  });
+
+  // Top campaigns by open rate (min 50 recipients)
+  const topOpen = sentCamps.filter(c => c.recipients >= 50).sort((a, b) => b.openRate - a.openRate).slice(0, 8).reverse();
+  mkChart('emailTopOpenChart', {
+    type: 'bar',
+    data: { labels: topOpen.map(c => shortName(c.name)), datasets: [{ data: topOpen.map(c => c.openRate), backgroundColor: '#2563eb', borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + c.raw + '%' } } },
+      scales: { x: { grid: { color: GRID }, ...pctY }, y: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } } } },
+  });
+
+  // Top automations by contacts entered
+  const topAuto = ((a.list) || []).slice(0, 8).reverse();
+  mkChart('emailTopAutoChart', {
+    type: 'bar',
+    data: { labels: topAuto.map(x => shortName(x.name)), datasets: [{ data: topAuto.map(x => x.entered), backgroundColor: '#8b5cf6', borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtNum(c.raw) + ' entered' } } },
+      scales: { x: { grid: { color: GRID }, ticks: kY }, y: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } } } },
+  });
+
+  // Unsubscribe & bounce rate trend
+  mkChart('emailDelivChart', {
+    data: { labels: m.map(x => x.month), datasets: [
+      { type: 'line', label: 'Unsub %', data: m.map(x => x.unsubRate), borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.3, pointRadius: 2 },
+      { type: 'line', label: 'Bounce %', data: m.map(x => x.bounceRate), borderColor: '#ef4444', backgroundColor: '#ef4444', tension: 0.3, pointRadius: 2 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: lgnd },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } }, y: { grid: { color: GRID }, ...pctY, beginAtZero: true } } },
+  });
+
   mkChart('emailListChart', {
     type: 'doughnut',
     data: { labels: ['Active', 'Unsubscribed', 'Bounced'], datasets: [{ data: [c.active || 0, c.unsubscribed || 0, c.bounced || 0], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }] },
