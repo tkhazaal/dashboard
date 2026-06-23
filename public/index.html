@@ -213,10 +213,58 @@
     <!-- ── REPORTING ───────────────────────── -->
     <section class="tab" id="tab-reports">
       <div class="page-header">
-        <div><h1>Reporting</h1><p class="subtitle">Sales drivers, customer behaviour &amp; traffic-to-revenue — visualised</p></div>
-        <div class="header-pills"><span class="pill" id="rep-syncedAt"></span></div>
+        <div><h1>Reporting</h1><p class="subtitle">Revenue, refunds &amp; metrics — by source and date range</p></div>
+        <div class="header-pills fn-actions">
+          <select id="rep-source" class="cmp-preset" title="Data source">
+            <option value="samcart">SamCart</option>
+            <option value="kajabi">Kajabi</option>
+          </select>
+          <div class="fn-daterange">
+            <span class="fn-range-label">📅 Range</span>
+            <select id="rep-range-preset" class="cmp-preset" title="Date range">
+              <option value="all" selected>All time</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="thisweek">This week</option>
+              <option value="lastweek">Last week</option>
+              <option value="thismonth">This month</option>
+              <option value="lastmonth">Last month</option>
+              <option value="thisyear">This year</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <span class="fn-range-custom" id="rep-range-custom">
+              <input type="date" id="rep-start" class="date-input" aria-label="Start date">
+              <span class="daterange-to">→</span>
+              <input type="date" id="rep-end" class="date-input" aria-label="End date">
+            </span>
+          </div>
+          <span class="pill" id="rep-syncedAt"></span>
+        </div>
       </div>
 
+      <!-- Source + date filtered summary (both SamCart and Kajabi) -->
+      <div class="stat-grid" id="rep-summary"></div>
+      <div class="card">
+        <div class="card-header"><h2 id="rep-trend-title">Revenue trend</h2></div>
+        <div class="chart-wrap"><canvas id="rep-trend"></canvas></div>
+      </div>
+
+      <!-- Kajabi-only detail (shown when source = Kajabi) -->
+      <div id="rep-kajabi-extra" style="display:none;">
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><h2>Top offers</h2></div>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th>Offer</th><th>Orders</th><th>Revenue</th></tr></thead><tbody id="rep-kajabi-offers"></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2>Member engagement <span class="th-hint">all-time</span></h2></div>
+            <div class="stat-grid" id="rep-kajabi-engagement" style="grid-template-columns:1fr 1fr;margin-bottom:0;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SamCart lifetime analysis (shown when source = SamCart) -->
+      <div id="rep-samcart-extra">
       <!-- KPI insight callouts -->
       <div class="kpi-row" id="rep-kpis"></div>
 
@@ -314,6 +362,7 @@
           <p class="chart-insight">Owned traffic (Direct/Email) vs. borrowed (social/external).</p>
         </div>
       </div>
+      </div><!-- /rep-samcart-extra -->
     </section>
 
     <!-- ── FUNNELS ─────────────────────────── -->

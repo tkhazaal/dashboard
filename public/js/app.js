@@ -209,6 +209,10 @@ const state = {
   // Reporting page support data
   reportsTrend:     null,
   reportsReferrers: null,
+  repSource:        'samcart',
+  repStart:         '',
+  repEnd:           '',
+  repKajabi:        null,
 };
 
 // ── Tab navigation ────────────────────────────────────────────────
@@ -1246,8 +1250,86 @@ async function loadReports() {
   state.reportsTrend = trend;
   state.reportsReferrers = referrers;
   if (state.scData?.syncedAt) $('rep-syncedAt').textContent = (state.scData.isDemo ? 'Demo data' : 'Synced ' + timeAgo(state.scData.syncedAt));
-  renderReports();
+  applyReportView();
 }
+
+// Source + date aware reporting. Summary KPIs + trend work for both sources from
+// day-level data; detailed charts are source-specific.
+function applyReportView() {
+  const source = state.repSource || 'samcart';
+  $('rep-samcart-extra').style.display = source === 'samcart' ? '' : 'none';
+  $('rep-kajabi-extra').style.display  = source === 'kajabi' ? '' : 'none';
+  if (source === 'kajabi') {
+    if (!state.repKajabi) {
+      api('/api/kajabi/data').then(d => { state.repKajabi = d; renderReportSummary('kajabi', d); renderReportKajabi(d); }).catch(() => {});
+    } else { renderReportSummary('kajabi', state.repKajabi); renderReportKajabi(state.repKajabi); }
+  } else {
+    renderReportSummary('samcart', state.scData || {});
+    if (state.scData) renderReports();
+  }
+}
+function repSummaryData(d) {
+  const s = state.repStart, e = state.repEnd;
+  if (!s || !e) {   // all-time → totals + monthly trend
+    return {
+      revenue: d.totalRevenue || 0, orders: d.orderCount || 0, refunded: d.totalRefunded || 0,
+      series: (d.monthly || []).map(m => ({ label: monthLbl(m.month), value: m.revenue })),
+    };
+  }
+  const daily = d.dailyRevenue || {}, refDay = d.refundsByDay || {};
+  let revenue = 0, orders = 0, refunded = 0; const series = [];
+  for (const day of daysInRange(s, e)) {
+    const x = daily[day], r = refDay[day] || 0;
+    revenue += x ? x.revenue : 0; orders += x ? x.orders : 0; refunded += r;
+    series.push({ label: day.slice(5), value: x ? x.revenue : 0 });
+  }
+  return { revenue: Math.round(revenue * 100) / 100, orders, refunded: Math.round(refunded * 100) / 100, series };
+}
+function renderReportSummary(source, d) {
+  const sm = repSummaryData(d);
+  const net = Math.round((sm.revenue - sm.refunded) * 100) / 100;
+  const aov = sm.orders ? sm.revenue / sm.orders : 0;
+  const label = source === 'kajabi' ? 'Kajabi Revenue' : 'Revenue';
+  $('rep-summary').innerHTML = [
+    [label, fmtMoney(sm.revenue), `${fmtNum(sm.orders)} orders`],
+    ['Refunded', fmtMoney(sm.refunded), `net ${fmtMoney(net)}`],
+    ['Avg Order Value', fmtMoney(aov), 'per order'],
+    [source === 'kajabi' ? 'Contacts' : 'Customers', fmtNum(source === 'kajabi' ? (d.contactCount || 0) : (d.totalCustomers || 0)), 'all-time'],
+  ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${s}</div></div>`).join('');
+  $('rep-trend-title').textContent = (state.repStart && state.repEnd) ? 'Revenue trend (daily)' : 'Revenue trend (monthly)';
+  mkChart('rep-trend', {
+    type: 'bar',
+    data: { labels: sm.series.map(p => p.label), datasets: [{ label: 'Revenue', data: sm.series.map(p => p.value), backgroundColor: '#2563eb', borderRadius: 5 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.raw) } } },
+      scales: baseScales({ y: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true } }) },
+  });
+}
+function renderReportKajabi(d) {
+  $('rep-kajabi-offers').innerHTML = (d.topOffers || []).slice(0, 10)
+    .map(o => `<tr><td>${escHtml(o.title)}</td><td>${fmtNum(o.orders)}</td><td>${fmtMoney(o.revenue)}</td></tr>`).join('') || `<tr class="empty-row"><td colspan="3">—</td></tr>`;
+  const e = d.engagement || {};
+  $('rep-kajabi-engagement').innerHTML = [
+    ['Login Rate', (e.loginRate || 0) + '%', `${fmtNum(e.loggedIn || 0)} of ${fmtNum(e.customers || 0)}`],
+    ['Active (30d)', (e.activeRate || 0) + '%', `${fmtNum(e.active30 || 0)} members`],
+  ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${s}</div></div>`).join('');
+}
+$('rep-source').addEventListener('change', e => { state.repSource = e.target.value; applyReportView(); });
+$('rep-range-preset').addEventListener('change', e => {
+  const r = funnelPresetRange(e.target.value);
+  if (r === undefined) { $('rep-start').focus(); return; }
+  const [a, b] = r;
+  state.repStart = a ? ymd(a) : ''; state.repEnd = b ? ymd(b) : '';
+  $('rep-start').value = state.repStart; $('rep-end').value = state.repEnd;
+  applyReportView();
+});
+function repApplyCustom() {
+  $('rep-range-preset').value = 'custom';
+  const a = $('rep-start').value, b = $('rep-end').value;
+  if (a && b) { state.repStart = a <= b ? a : b; state.repEnd = a <= b ? b : a; } else { state.repStart = ''; state.repEnd = ''; }
+  applyReportView();
+}
+$('rep-start').addEventListener('change', repApplyCustom);
+$('rep-end').addEventListener('change', repApplyCustom);
 
 function renderReports() {
   const d = state.scData;

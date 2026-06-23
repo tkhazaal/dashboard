@@ -120,6 +120,7 @@ async function computeKajabiMetrics(creds, onProgress) {
   const orders = await fetchAll('orders?include=customer', creds, { maxPages: 300, includedMap: inc, onProgress: n => onProgress && onProgress('orders', n) });
   let totalRevenue = 0, grossRevenue = 0;
   const monthly = {};          // 'YYYY-MM' -> { revenue, orders }
+  const dailyRevenue = {};     // 'YYYY-MM-DD' -> { revenue, orders } (date-filtered Reporting)
   const recent = [];
   for (const o of orders) {
     const a = attrs(o);
@@ -128,6 +129,8 @@ async function computeKajabiMetrics(creds, onProgress) {
     grossRevenue += cents(a.subtotal_in_cents);
     const m = String(a.created_at || '').slice(0, 7);
     if (m) { (monthly[m] || (monthly[m] = { revenue: 0, orders: 0 })); monthly[m].revenue += rev; monthly[m].orders++; }
+    const dy = String(a.created_at || '').slice(0, 10);
+    if (dy) { (dailyRevenue[dy] || (dailyRevenue[dy] = { revenue: 0, orders: 0 })); dailyRevenue[dy].revenue += rev; dailyRevenue[dy].orders++; }
   }
   const orderCount = orders.length;
   // recent 10 (orders come oldest-first; take the last 10 reversed) with customer name
@@ -175,13 +178,19 @@ async function computeKajabiMetrics(creds, onProgress) {
 
   // Refunds & charges (transactions — needs site_id filter). action: charge | refund
   let totalRefunded = 0, refundCount = 0;
+  const refundsByDay = {};
   try {
     const siteId = await getSiteId(creds);
     if (siteId) {
       const txns = await fetchAll(`transactions?filter%5Bsite_id%5D=${siteId}`, creds, { maxPages: 300, onProgress: n => onProgress && onProgress('transactions', n) });
       for (const t of txns) {
         const a = attrs(t);
-        if (/refund/i.test(String(a.action || ''))) { totalRefunded += Math.abs(cents(a.amount_in_cents)); refundCount++; }
+        if (/refund/i.test(String(a.action || ''))) {
+          const amt = Math.abs(cents(a.amount_in_cents));
+          totalRefunded += amt; refundCount++;
+          const dy = String(a.created_at || '').slice(0, 10);
+          if (dy) refundsByDay[dy] = (refundsByDay[dy] || 0) + amt;
+        }
       }
     }
   } catch { /* refunds best-effort */ }
@@ -219,6 +228,7 @@ async function computeKajabiMetrics(creds, onProgress) {
     subscriptions: { active: subsActive, total: subsTotal, oneTime, scanned: purchasesScanned, truncated: purchasesTruncated },
     engagement: { customers: custTotal, loggedIn, loginRate: pct(loggedIn, custTotal), active30, activeRate: pct(active30, custTotal), avgSignIns: custTotal ? Math.round((signInSum / custTotal) * 10) / 10 : 0 },
     monthly: monthlyArr,
+    dailyRevenue, refundsByDay,
     topOffers,
     recent,
   };

@@ -175,9 +175,10 @@ async function computeMetrics(orders, apiKey) {
   const productSales = {};   // productName -> { orders, revenue }  (all-time)
   const salesByDay   = {};   // 'YYYY-MM-DD' -> { productName -> { orders, revenue } } (for the Funnels date filter)
 
-  // Refunds — total amount refunded, by month (excludes test refunds).
+  // Refunds — total amount refunded, by month/day (excludes test refunds).
   let totalRefunded = 0, refundCount = 0;
   const refundsByMonth = {};
+  const refundsByDay = {};
   try {
     const refunds = await fetchAllRefunds(apiKey);
     for (const r of refunds) {
@@ -187,9 +188,13 @@ async function computeMetrics(orders, apiKey) {
       totalRefunded += amt; refundCount++;
       const m = String(r.created_at || '').slice(0, 7);        // YYYY-MM
       if (m) refundsByMonth[m] = (refundsByMonth[m] || 0) + amt;
+      const dy = String(r.created_at || '').slice(0, 10);      // YYYY-MM-DD
+      if (dy) refundsByDay[dy] = (refundsByDay[dy] || 0) + amt;
     }
   } catch { /* refunds are best-effort */ }
   totalRefunded = Math.round(totalRefunded * 100) / 100;
+
+  const dailyRevenue = {};   // 'YYYY-MM-DD' -> { revenue, orders } (distinct orders; for date-filtered Reporting)
 
   const custMap = new Map();
   const ordersBySlug = {};   // slug -> { orders, revenue }
@@ -204,6 +209,10 @@ async function computeMetrics(orders, apiKey) {
     const amount  = (parseFloat(o.total) || 0) / 100;  // SamCart amounts are in cents
     const date    = o.order_date || null;
     const product = orderProduct(o);
+
+    // Daily revenue + distinct order count (drives date-filtered Reporting)
+    const dRev = String(date || '').slice(0, 10);
+    if (dRev) { (dailyRevenue[dRev] || (dailyRevenue[dRev] = { revenue: 0, orders: 0 })); dailyRevenue[dRev].revenue += amount; dailyRevenue[dRev].orders++; }
 
     // Attribute this order to the main product's slug
     const main = orderMainItem(o);
@@ -406,6 +415,7 @@ async function computeMetrics(orders, apiKey) {
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
     ordersBySlug, upsellProducts, upsellBySlug,
     productSales, productList: sortedProductList, productSlug, salesByDay,
+    dailyRevenue, refundsByDay,
   };
 }
 
