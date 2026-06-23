@@ -433,16 +433,28 @@ async function applyCompare(preset) {
     setDeltaPill('ov-d-views', cur.totalViews, prev.totalViews);
     setDeltaPill('ov-d-visitors', cur.uniqueVisitors, prev.uniqueVisitors);
   } catch {}
-  // Revenue delta uses SamCart MoM
-  const mom = state.scData?.momRevenue;
-  const rp = $('ov-d-revenue');
-  if (rp) {
-    if (mom == null) { rp.className = 'delta-pill flat'; rp.textContent = '—'; }
-    else { rp.className = 'delta-pill ' + (mom >= 0 ? 'up' : 'down'); rp.textContent = `${mom >= 0 ? '▲' : '▼'} ${Math.abs(mom)}% MoM`; }
-  }
+  // Total Revenue for the selected period (SamCart + Kajabi), delta vs previous period
+  renderOverviewRevenue();
   // Funnel for the current period (kept separate from the Sales-Analytics funnel)
   try { state.ovFunnel = await api(`/api/analytics/funnel?start=${state.compare.curStart}&end=${state.compare.curEnd}`); } catch {}
   renderOverviewFunnel();
+}
+
+// Sum a {day:{revenue,orders}} (or {day:number}) map over an inclusive date range
+function sumDaily(obj, start, end, field = 'revenue') {
+  if (!obj || !start || !end) return 0;
+  let t = 0;
+  for (const day of daysInRange(start, end)) { const e = obj[day]; if (e != null) t += (typeof e === 'number' ? e : (e[field] || 0)); }
+  return t;
+}
+// Total Revenue card = SamCart + Kajabi revenue for the selected compare period
+function renderOverviewRevenue() {
+  const c = state.compare; if (!c) return;
+  const sc = state.scData && state.scData.dailyRevenue, kj = state.kajabiData && state.kajabiData.dailyRevenue;
+  const curRev  = sumDaily(sc, c.curStart, c.curEnd)   + sumDaily(kj, c.curStart, c.curEnd);
+  const prevRev = sumDaily(sc, c.prevStart, c.prevEnd) + sumDaily(kj, c.prevStart, c.prevEnd);
+  const el = $('ov-totalRevenue'); if (el) el.textContent = fmtMoney(curRev);
+  setDeltaPill('ov-d-revenue', curRev, prevRev);
 }
 
 // ── Overview widgets ──────────────────────────────────────────────
@@ -775,14 +787,9 @@ async function loadSamCart(force = false) {
   state.scData = data;
 
   // Overview KPI cards
-  $('ov-totalCustomers').textContent = fmtNum(data.totalCustomers);
-  $('ov-totalRevenue').textContent   = fmtMoney(data.totalRevenue);
-  const cs = $('ov-customersSub'); if (cs) cs.textContent = `Avg LTV ${fmtMoneyFull(data.avgLtv)}`;
-  const rp = $('ov-d-revenue');
-  if (rp) {
-    if (data.momRevenue == null) { rp.className = 'delta-pill flat'; rp.textContent = '—'; }
-    else { rp.className = 'delta-pill ' + (data.momRevenue >= 0 ? 'up' : 'down'); rp.textContent = `${data.momRevenue >= 0 ? '▲' : '▼'} ${Math.abs(data.momRevenue)}% MoM`; }
-  }
+  $('ov-totalCustomers').textContent = fmtNum(data.totalCustomers);   // all-time (lifetime)
+  const cs = $('ov-customersSub'); if (cs) cs.textContent = `Avg LTV ${fmtMoneyFull(data.avgLtv)} · all-time`;
+  renderOverviewRevenue();   // Total Revenue is period-based (SamCart + Kajabi)
 
   // Overview widgets
   renderGrossVolume();
@@ -2137,9 +2144,9 @@ async function loadKajabi() {
   try { const d = await api('/api/kajabi/data'); state.kajabiData = d; renderKajabi(d); }
   catch (e) { $('kajabi-status').textContent = 'Error loading'; }
 }
-// Lightweight fetch (no chart render) so the Monthly Goal can include Kajabi at boot
+// Lightweight fetch (no chart render) so the Monthly Goal + Overview revenue can include Kajabi at boot
 async function loadKajabiData() {
-  try { state.kajabiData = await api('/api/kajabi/data'); renderGoal(); } catch {}
+  try { state.kajabiData = await api('/api/kajabi/data'); renderGoal(); renderOverviewRevenue(); } catch {}
 }
 function renderKajabi(d) {
   const unconf = $('kajabi-unconfigured'), content = $('kajabi-content');

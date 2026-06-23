@@ -937,6 +937,26 @@ table.show-upsell .upsell-col { display: table-cell; }
 .funnel-table .fn-sel:focus, .funnel-table .fn-input:focus,
 .funnel-table .fn-prod:focus, .funnel-table .fn-page:focus { border-color: var(--accent); }
 .funnel-table .fn-input { font-weight: 700; }
+/* Help "?" tooltips on cards */
+.help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; margin-left: 5px; border-radius: 50%;
+  background: var(--surface-alt); color: var(--sub); border: 1px solid var(--border);
+  font-size: 10px; font-weight: 700; cursor: help; position: relative; vertical-align: middle;
+  text-transform: none; letter-spacing: 0;
+}
+.help:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.help:hover::after {
+  content: attr(data-tip); position: absolute; bottom: 150%; left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 240px; white-space: normal; text-align: left;
+  background: var(--text); color: var(--surface); font-size: 11px; font-weight: 500; line-height: 1.45;
+  padding: 8px 10px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.28); z-index: 60;
+}
+.help:hover::before {
+  content: ''; position: absolute; bottom: 150%; left: 50%; transform: translate(-50%, 60%) rotate(45deg);
+  width: 8px; height: 8px; background: var(--text); z-index: 60;
+}
+
 /* Settings — integration group divider */
 .settings-divider { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sub); border-top: 1px solid var(--border); padding-top: 14px; margin-top: 6px; }
 
