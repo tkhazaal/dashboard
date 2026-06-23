@@ -2039,12 +2039,16 @@ function renderKajabi(d) {
   unconf.style.display = 'none'; content.style.display = '';
   $('kajabi-status').textContent = (d.syncedAt ? 'Synced ' + timeAgo(d.syncedAt) : '') + (d.stale ? ' · stale' : '');
 
-  const subs = d.subscriptions || {};
+  const subs = d.subscriptions || {}, eng = d.engagement || {};
   $('kajabi-kpis').innerHTML = [
     ['Kajabi Revenue', fmtMoney(d.totalRevenue), `${fmtNum(d.orderCount)} orders`],
+    ['Refunded', fmtMoney(d.totalRefunded || 0), `${fmtNum(d.refundCount || 0)} refunds`],
+    ['Net Revenue', fmtMoney(d.netRevenue != null ? d.netRevenue : d.totalRevenue), 'after refunds'],
     ['Avg Order Value', fmtMoney(d.avgOrderValue), 'net paid per order'],
     ['Contacts', fmtNum(d.contactCount || 0), 'total audience'],
-    ['Active Subscriptions', fmtNum(subs.active || 0), `${fmtNum(subs.oneTime || 0)} one-time purchases`],
+    ['Purchases', fmtNum(d.purchaseCount || 0), `${fmtNum(subs.active || 0)} active subscriptions`],
+    ['Login Rate', (eng.loginRate || 0) + '%', `${fmtNum(eng.loggedIn || 0)} of ${fmtNum(eng.customers || 0)} ever logged in`],
+    ['Active (30d)', (eng.activeRate || 0) + '%', `${fmtNum(eng.active30 || 0)} members active`],
   ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${s}</div></div>`).join('');
 
   const m = d.monthly || [];

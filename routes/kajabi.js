@@ -105,6 +105,15 @@ async function fetchCount(path, creds) {
 const attrs = r => (r && r.attributes) || {};
 const cents = v => (parseFloat(v) || 0) / 100;
 
+// Site id (required by the transactions filter)
+let _siteId = null;
+async function getSiteId(creds) {
+  if (_siteId) return _siteId;
+  const json = await kjFetch(`${BASE_URL}/sites?page%5Bsize%5D=1`, creds);
+  _siteId = json.data && json.data[0] && json.data[0].id;
+  return _siteId;
+}
+
 async function computeKajabiMetrics(creds, onProgress) {
   // Orders → revenue & order counts (paid total). Sideload customers for names.
   const inc = {};
@@ -164,6 +173,35 @@ async function computeKajabiMetrics(creds, onProgress) {
     }
   } catch { /* subscriptions are best-effort */ }
 
+  // Refunds & charges (transactions — needs site_id filter). action: charge | refund
+  let totalRefunded = 0, refundCount = 0;
+  try {
+    const siteId = await getSiteId(creds);
+    if (siteId) {
+      const txns = await fetchAll(`transactions?filter%5Bsite_id%5D=${siteId}`, creds, { maxPages: 300, onProgress: n => onProgress && onProgress('transactions', n) });
+      for (const t of txns) {
+        const a = attrs(t);
+        if (/refund/i.test(String(a.action || ''))) { totalRefunded += Math.abs(cents(a.amount_in_cents)); refundCount++; }
+      }
+    }
+  } catch { /* refunds best-effort */ }
+
+  // Engagement / login (customers carry sign_in_count + last_request_at)
+  let custTotal = 0, loggedIn = 0, active30 = 0, signInSum = 0;
+  try {
+    const cust = await fetchAll('customers', creds, { maxPages: 300, onProgress: n => onProgress && onProgress('customers', n) });
+    const cutoff = Date.now() - 30 * 86400000;
+    for (const c of cust) {
+      const a = attrs(c);
+      custTotal++;
+      const si = parseInt(a.sign_in_count, 10) || 0;
+      signInSum += si;
+      if (si > 0) loggedIn++;
+      if (a.last_request_at && new Date(a.last_request_at).getTime() >= cutoff) active30++;
+    }
+  } catch { /* engagement best-effort */ }
+  const pct = (n, d) => d ? Math.round((n / d) * 1000) / 10 : 0;
+
   const monthlyArr = Object.keys(monthly).sort().map(m => ({ month: m, revenue: Math.round(monthly[m].revenue * 100) / 100, orders: monthly[m].orders }));
 
   return {
@@ -173,8 +211,13 @@ async function computeKajabiMetrics(creds, onProgress) {
     grossRevenue: Math.round(grossRevenue * 100) / 100,
     orderCount,
     avgOrderValue: orderCount ? Math.round((totalRevenue / orderCount) * 100) / 100 : 0,
+    totalRefunded: Math.round(totalRefunded * 100) / 100,
+    refundCount,
+    netRevenue: Math.round((totalRevenue - totalRefunded) * 100) / 100,
     contactCount,
+    purchaseCount: purchasesScanned,
     subscriptions: { active: subsActive, total: subsTotal, oneTime, scanned: purchasesScanned, truncated: purchasesTruncated },
+    engagement: { customers: custTotal, loggedIn, loginRate: pct(loggedIn, custTotal), active30, activeRate: pct(active30, custTotal), avgSignIns: custTotal ? Math.round((signInSum / custTotal) * 10) / 10 : 0 },
     monthly: monthlyArr,
     topOffers,
     recent,
