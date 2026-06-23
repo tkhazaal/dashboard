@@ -937,6 +937,23 @@ table.show-upsell .upsell-col { display: table-cell; }
 .funnel-table .fn-sel:focus, .funnel-table .fn-input:focus,
 .funnel-table .fn-prod:focus, .funnel-table .fn-page:focus { border-color: var(--accent); }
 .funnel-table .fn-input { font-weight: 700; }
+/* ── Ads & ROAS table ─────────────────────── */
+.ad-table th:nth-child(1), .ad-table td:nth-child(1) { width: 16%; }
+.ad-table th:nth-child(2), .ad-table td:nth-child(2) { width: 12%; }
+.ad-table th:nth-child(3), .ad-table td:nth-child(3) { width: 15%; }
+.ad-table th:nth-child(4), .ad-table td:nth-child(4) { width: 22%; }
+.ad-table th:nth-child(5), .ad-table td:nth-child(5) { width: 12%; text-align: right; }
+.ad-table th:nth-child(6), .ad-table td:nth-child(6) { width: 11%; text-align: right; }
+.ad-table th:nth-child(7), .ad-table td:nth-child(7) { width: 9%;  text-align: right; }
+.ad-table th:nth-child(8), .ad-table td:nth-child(8) { width: 3%; }
+.ad-budget { display: flex; align-items: center; gap: 2px; margin-top: 4px; }
+.ad-budget .ad-cur { font-size: 11px; color: var(--sub); }
+.ad-table .ad-amt { font-weight: 700; }
+.ad-table .ad-date { margin-bottom: 3px; font-size: 10.5px; padding: 3px 5px; }
+.roas-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-weight: 800; font-size: 12px; background: var(--surface-alt); color: var(--sub); }
+.roas-badge.ok  { background: rgba(34,197,94,0.15);  color: var(--green); }
+.roas-badge.bad { background: rgba(239,68,68,0.14);  color: var(--danger); }
+
 /* Stacked sub-stat under each input (e.g. "430 · 86%") */
 .fn-sub { font-size: 10px; color: var(--sub); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .th-hint { display: block; font-size: 9px; font-weight: 500; color: var(--sub); text-transform: none; letter-spacing: 0; margin-top: 1px; }

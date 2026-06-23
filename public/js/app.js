@@ -187,6 +187,9 @@ const state = {
   funnelStart:   '',
   funnelEnd:     '',
   funnelPages:   null,
+  adCampaigns:   null,
+  adStart:       '',
+  adEnd:         '',
   trendDays:   30,
   cuSearch:    '',
   cuBuyerType: 'all',
@@ -221,6 +224,7 @@ function activateTab(tab) {
   // Charts must be built while their canvas is visible (Chart.js needs real dimensions)
   if (tab === 'reports') loadReports();
   if (tab === 'funnels') loadFunnels();
+  if (tab === 'ads') loadAds();
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', e => { e.preventDefault(); activateTab(item.dataset.tab); });
@@ -916,6 +920,7 @@ async function loadSettings() {
   if (s.samcart_api_key_masked) $('apiKeyMasked').textContent = 'Current key: ' + s.samcart_api_key_masked;
   state.monthlyGoal = parseFloat(s.monthly_goal) || 0;
   if (s.funnels_config) { try { state.funnelsConfig = JSON.parse(s.funnels_config); } catch {} }
+  if (s.ad_campaigns)   { try { state.adCampaigns   = JSON.parse(s.ad_campaigns);   } catch {} }
   updateTrackingCode(s.tracker_url || 'http://localhost:3000');
   renderGoal();
 }
@@ -1557,17 +1562,19 @@ function daysInRange(s, e) {
   while (cur <= end && guard++ < 1500) { out.push(ymd(cur)); cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1); }
   return out;
 }
-// Sales for a product within the active funnel date range (else all-time)
-function prodSalesInRange(name) {
+// Sales for a product between two dates (inclusive); all-time when no range
+function prodSalesBetween(name, start, end) {
   const sd = state.scData && state.scData.salesByDay;
-  if (!state.funnelStart || !state.funnelEnd || !sd) return prodSales(name);
+  if (!start || !end || !sd) return prodSales(name);
   let o = 0, r = 0;
-  for (const day of daysInRange(state.funnelStart, state.funnelEnd)) {
+  for (const day of daysInRange(start, end)) {
     const e = sd[day] && sd[day][name];
     if (e) { o += e.orders; r += e.revenue; }
   }
   return { orders: o, revenue: Math.round(r * 100) / 100 };
 }
+// Sales for a product within the active funnel date range (else all-time)
+function prodSalesInRange(name) { return prodSalesBetween(name, state.funnelStart, state.funnelEnd); }
 const crPct = (n, d) => d > 0 ? Math.round((n / d) * 1000) / 10 + '%' : '—';
 
 function productOptions(selected) {
@@ -1859,6 +1866,162 @@ $('funnel-add-group').addEventListener('click', () => {
   STANDARD_PLATFORMS.forEach(p => state.funnelsConfig.push({ group: g, platform: p, pageSlug: '', main: '', upsell1: '', upsell2: '' }));
   renderFunnels(); saveFunnels();
 });
+
+// ══ Ads & ROAS ════════════════════════════════════════════════════
+// A campaign: { name, platform, budgetType:'daily'|'total', budget, start, end, product }
+function ensureAdCampaigns() {
+  if (!Array.isArray(state.adCampaigns)) state.adCampaigns = [];
+}
+// Calculated spend for a campaign over [start,end] (inclusive). Daily = budget×days
+// active in range; Total = budget prorated across the campaign's own run.
+function adSpend(c, start, end) {
+  const today = ymd(new Date());
+  const cStart = c.start || start || '2000-01-01';
+  const cEnd   = c.end   || today;                 // ongoing → up to today
+  const rStart = start || cStart, rEnd = end || cEnd;
+  const aStart = cStart > rStart ? cStart : rStart;   // overlap start (later)
+  const aEnd   = cEnd   < rEnd   ? cEnd   : rEnd;      // overlap end (earlier)
+  const days   = daysInRange(aStart, aEnd).length;    // 0 if no overlap
+  if (days <= 0) return 0;
+  const budget = parseFloat(c.budget) || 0;
+  if (c.budgetType === 'total') {
+    const campDays = daysInRange(cStart, cEnd).length || 1;
+    return Math.round(budget * (days / campDays) * 100) / 100;
+  }
+  return Math.round(budget * days * 100) / 100;       // daily × days
+}
+const roasFmt = (rev, spend) => spend > 0 ? (Math.round((rev / spend) * 100) / 100) + '×' : '—';
+
+function renderAds() {
+  ensureAdCampaigns();
+  // product picker datalist
+  const prods = (state.scData && state.scData.productList) || [];
+  const pd = $('ad-products'); if (pd) pd.innerHTML = prods.map(n => `<option value="${escHtml(n)}"></option>`).join('');
+
+  const s = state.adStart, e = state.adEnd;
+  const tot = { spend: 0, rev: 0, orders: 0 };
+  const rowsHtml = state.adCampaigns.map((c, i) => {
+    const spend = adSpend(c, s, e);
+    const sales = prodSalesBetween(c.product, s, e);
+    tot.spend += spend; tot.rev += sales.revenue; tot.orders += sales.orders;
+    const cpa = sales.orders > 0 ? fmtMoney(spend / sales.orders) : '—';
+    return `
+      <tr data-arow="${i}" class="fn-member">
+        <td><input class="fn-input" data-af="name" value="${escHtml(c.name || '')}" placeholder="Campaign name"></td>
+        <td>
+          <select class="fn-sel" data-af="budgetType">
+            <option value="daily"${c.budgetType !== 'total' ? ' selected' : ''}>Daily</option>
+            <option value="total"${c.budgetType === 'total' ? ' selected' : ''}>Total</option>
+          </select>
+          <div class="ad-budget"><span class="ad-cur">$</span><input class="fn-input ad-amt" type="number" min="0" step="1" data-af="budget" value="${escHtml(c.budget != null ? c.budget : '')}" placeholder="0"></div>
+        </td>
+        <td><input class="fn-input ad-date" type="date" data-af="start" value="${escHtml(c.start || '')}"><input class="fn-input ad-date" type="date" data-af="end" value="${escHtml(c.end || '')}" title="leave blank if ongoing"></td>
+        <td>
+          <input class="fn-prod" data-af="product" list="ad-products" placeholder="Search product…" value="${escHtml(c.product || '')}">
+          <div class="fn-sub"><span class="orders-count">${fmtNum(sales.orders)}</span> orders</div>
+        </td>
+        <td><span class="value-count">${fmtMoney(spend)}</span><div class="fn-sub">${cpa}</div></td>
+        <td><span class="value-count">${fmtMoney(sales.revenue)}</span></td>
+        <td><span class="roas-badge ${spend > 0 && sales.revenue / spend >= 1 ? 'ok' : (spend > 0 ? 'bad' : '')}">${roasFmt(sales.revenue, spend)}</span></td>
+        <td><button class="fn-del" data-arow="${i}" title="Remove campaign">✕</button></td>
+      </tr>`;
+  }).join('');
+
+  $('adBody').innerHTML = rowsHtml || `<tr class="empty-row"><td colspan="8">No campaigns yet — click “+ Campaign”.</td></tr>`;
+  $('adFoot').innerHTML = state.adCampaigns.length ? `
+    <tr class="funnel-total">
+      <td>TOTAL</td><td></td><td></td>
+      <td><span class="orders-count">${fmtNum(tot.orders)}</span> orders</td>
+      <td><span class="value-count">${fmtMoney(tot.spend)}</span></td>
+      <td><span class="value-count">${fmtMoney(tot.rev)}</span></td>
+      <td><span class="roas-badge ${tot.spend > 0 && tot.rev / tot.spend >= 1 ? 'ok' : (tot.spend > 0 ? 'bad' : '')}">${roasFmt(tot.rev, tot.spend)}</span></td>
+      <td></td>
+    </tr>` : '';
+
+  // KPI cards
+  const net = tot.rev - tot.spend;
+  const pctRev = tot.rev > 0 ? Math.round((tot.spend / tot.rev) * 1000) / 10 + '%' : '—';
+  $('ad-kpis').innerHTML = [
+    ['Ad Spend', fmtMoney(tot.spend), 'selected range'],
+    ['Revenue', fmtMoney(tot.rev), 'from linked products'],
+    ['ROAS', roasFmt(tot.rev, tot.spend), 'revenue ÷ spend'],
+    ['Net after spend', fmtMoney(net), `ad spend = ${pctRev} of revenue`],
+  ].map(([l, v, sub]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${sub}</div></div>`).join('');
+}
+
+let _adSaveTimer = null;
+function saveAds() {
+  clearTimeout(_adSaveTimer);
+  const pill = $('ad-saved'); pill.textContent = 'Saving…'; pill.className = 'pill';
+  _adSaveTimer = setTimeout(async () => {
+    try {
+      const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ad_campaigns: JSON.stringify(state.adCampaigns) }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !((body.updated || []).includes('ad_campaigns'))) throw new Error('not persisted');
+      pill.textContent = 'Saved ✓';
+      setTimeout(() => { if (pill.textContent === 'Saved ✓') pill.textContent = ''; }, 2500);
+    } catch {
+      pill.textContent = '⚠ Not saved'; pill.className = 'pill pill-danger';
+      pill.title = 'The server did not confirm the save — the dashboard may be running an outdated build.';
+    }
+  }, 600);
+}
+
+// Date range control (mirrors the Funnels picker)
+function applyAdRange() { renderAds(); }
+$('ad-range-preset').addEventListener('change', e => {
+  const r = funnelPresetRange(e.target.value);
+  if (r === undefined) { $('ad-start').focus(); return; }
+  const [a, b] = r;
+  state.adStart = a ? ymd(a) : ''; state.adEnd = b ? ymd(b) : '';
+  $('ad-start').value = state.adStart; $('ad-end').value = state.adEnd;
+  applyAdRange();
+});
+function applyAdCustom() {
+  $('ad-range-preset').value = 'custom';
+  const a = $('ad-start').value, b = $('ad-end').value;
+  if (a && b) { state.adStart = a <= b ? a : b; state.adEnd = a <= b ? b : a; } else { state.adStart = ''; state.adEnd = ''; }
+  applyAdRange();
+}
+$('ad-start').addEventListener('change', applyAdCustom);
+$('ad-end').addEventListener('change', applyAdCustom);
+
+// Row edits
+$('adBody').addEventListener('change', ev => {
+  const cell = ev.target.closest('[data-af]'), tr = ev.target.closest('[data-arow]');
+  if (!cell || !tr) return;
+  state.adCampaigns[+tr.dataset.arow][cell.dataset.af] = ev.target.value;
+  renderAds(); saveAds();
+});
+$('adBody').addEventListener('input', ev => {
+  // live-save free-text/number without re-render (keep focus)
+  const cell = ev.target.closest('[data-af]'), tr = ev.target.closest('[data-arow]');
+  if (!cell || !tr) return;
+  if (cell.dataset.af === 'name' || cell.dataset.af === 'budget') { state.adCampaigns[+tr.dataset.arow][cell.dataset.af] = ev.target.value; saveAds(); }
+});
+$('adBody').addEventListener('click', ev => {
+  const del = ev.target.closest('.fn-del');
+  if (!del) return;
+  const c = state.adCampaigns[+del.dataset.arow] || {};
+  if (!confirm(`Remove the "${c.name || 'this'}" campaign?`)) return;
+  state.adCampaigns.splice(+del.dataset.arow, 1); renderAds(); saveAds();
+});
+$('ad-add').addEventListener('click', () => {
+  ensureAdCampaigns();
+  state.adCampaigns.push({ name: 'New campaign', platform: 'Meta', budgetType: 'daily', budget: '', start: state.adStart || '', end: '', product: '' });
+  renderAds(); saveAds();
+});
+
+async function loadAds() {
+  if (!state.adStart && !state.adEnd) {            // default to This month
+    const [a, b] = funnelPresetRange('thismonth');
+    state.adStart = ymd(a); state.adEnd = ymd(b);
+    $('ad-start').value = state.adStart; $('ad-end').value = state.adEnd;
+  }
+  if (!state.scData) await loadSamCart().catch(() => {});
+  renderAds();
+}
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {

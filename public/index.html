@@ -46,6 +46,10 @@
         <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
         Funnels
       </a>
+      <a href="#" class="nav-item" data-tab="ads">
+        <svg viewBox="0 0 24 24"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/></svg>
+        Ads &amp; ROAS
+      </a>
       <a href="#" class="nav-item" data-tab="pages">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Page Analytics
@@ -361,6 +365,61 @@
       <p class="chart-insight" style="padding:0 2px;">Sales counts come from SamCart (a product's total purchases). Because your products are named per channel (e.g. “RM Upsell — CC — FB”), selecting the exact product gives that channel's numbers. Conversion rates: Checkout→Main, Main→Upsell 1, Upsell 1→Upsell 2.</p>
       <datalist id="fn-products"></datalist>
       <datalist id="fn-pages"></datalist>
+    </section>
+
+    <!-- ── ADS & ROAS ──────────────────────── -->
+    <section class="tab" id="tab-ads">
+      <div class="page-header">
+        <div><h1>Ads &amp; ROAS</h1><p class="subtitle">Set each campaign's budget — spend, revenue &amp; ROAS calculate for the selected dates</p></div>
+        <div class="header-pills fn-actions">
+          <div class="fn-daterange">
+            <span class="fn-range-label">📅 Range</span>
+            <select id="ad-range-preset" class="cmp-preset" title="Date range for spend &amp; revenue">
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="thisweek">This week</option>
+              <option value="lastweek">Last week</option>
+              <option value="thismonth" selected>This month</option>
+              <option value="lastmonth">Last month</option>
+              <option value="thisyear">This year</option>
+              <option value="all">All time</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <span class="fn-range-custom" id="ad-range-custom">
+              <input type="date" id="ad-start" class="date-input" aria-label="Start date">
+              <span class="daterange-to">→</span>
+              <input type="date" id="ad-end" class="date-input" aria-label="End date">
+            </span>
+          </div>
+          <span class="pill" id="ad-saved"></span>
+          <button class="btn-primary sm" id="ad-add">+ Campaign</button>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="ad-kpis"></div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table id="adTable" class="funnel-table ad-table">
+            <thead>
+              <tr>
+                <th>Campaign</th>
+                <th>Budget</th>
+                <th>Active dates</th>
+                <th>Product (revenue) <span class="th-hint">orders</span></th>
+                <th>Spend <span class="th-hint">cost / order</span></th>
+                <th>Revenue</th>
+                <th>ROAS</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="adBody"></tbody>
+            <tfoot id="adFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+      <p class="chart-insight" style="padding:0 2px;">Spend is calculated from each campaign's budget: <strong>Daily</strong> = budget × days active in range; <strong>Total</strong> = budget prorated across the campaign's run. Revenue/orders come from the linked SamCart product. ROAS = Revenue ÷ Spend.</p>
+      <datalist id="ad-products"></datalist>
     </section>
 
     <!-- ── PAGE ANALYTICS ──────────────────── -->
