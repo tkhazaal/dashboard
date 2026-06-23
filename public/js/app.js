@@ -451,7 +451,10 @@ function sumDaily(obj, start, end, field = 'revenue') {
 function renderOverviewRevenue() {
   const c = state.compare; if (!c) return;
   const sc = state.scData && state.scData.dailyRevenue, kj = state.kajabiData && state.kajabiData.dailyRevenue;
-  const curRev  = sumDaily(sc, c.curStart, c.curEnd)   + sumDaily(kj, c.curStart, c.curEnd);
+  let curSc = sumDaily(sc, c.curStart, c.curEnd);
+  // Fallback while day-level data isn't cached yet: use SamCart month-to-date for 'mtd'
+  if (!curSc && state.cmpPreset === 'mtd' && state.scData?.monthToDate?.revenue) curSc = state.scData.monthToDate.revenue;
+  const curRev  = curSc + sumDaily(kj, c.curStart, c.curEnd);
   const prevRev = sumDaily(sc, c.prevStart, c.prevEnd) + sumDaily(kj, c.prevStart, c.prevEnd);
   const el = $('ov-totalRevenue'); if (el) el.textContent = fmtMoney(curRev);
   setDeltaPill('ov-d-revenue', curRev, prevRev);
