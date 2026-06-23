@@ -77,7 +77,7 @@ async function kjFetch(url, creds, attempts = 5) {
 }
 
 // Follow JSON:API links.next until exhausted (bounded by maxPages).
-async function fetchAll(path, creds, { maxPages = 100, onProgress } = {}) {
+async function fetchAll(path, creds, { maxPages = 100, onProgress, includedMap } = {}) {
   const all = [];
   let url = `${BASE_URL}/${path}${path.includes('?') ? '&' : '?'}page%5Bsize%5D=${PAGE_SIZE}`;
   let pages = 0;
@@ -85,6 +85,7 @@ async function fetchAll(path, creds, { maxPages = 100, onProgress } = {}) {
     const json = await kjFetch(url, creds);
     const data = json.data || [];
     all.push(...data);
+    if (includedMap && Array.isArray(json.included)) for (const r of json.included) includedMap[`${r.type}:${r.id}`] = r;
     pages++;
     if (onProgress) onProgress(all.length);
     url = json.links && json.links.next ? json.links.next : null;
@@ -105,8 +106,9 @@ const attrs = r => (r && r.attributes) || {};
 const cents = v => (parseFloat(v) || 0) / 100;
 
 async function computeKajabiMetrics(creds, onProgress) {
-  // Orders → revenue & order counts (paid total)
-  const orders = await fetchAll('orders', creds, { maxPages: 300, onProgress: n => onProgress && onProgress('orders', n) });
+  // Orders → revenue & order counts (paid total). Sideload customers for names.
+  const inc = {};
+  const orders = await fetchAll('orders?include=customer', creds, { maxPages: 300, includedMap: inc, onProgress: n => onProgress && onProgress('orders', n) });
   let totalRevenue = 0, grossRevenue = 0;
   const monthly = {};          // 'YYYY-MM' -> { revenue, orders }
   const recent = [];
@@ -119,10 +121,18 @@ async function computeKajabiMetrics(creds, onProgress) {
     if (m) { (monthly[m] || (monthly[m] = { revenue: 0, orders: 0 })); monthly[m].revenue += rev; monthly[m].orders++; }
   }
   const orderCount = orders.length;
-  // recent 10 (orders come oldest-first; take the last 10 reversed)
+  // recent 10 (orders come oldest-first; take the last 10 reversed) with customer name
   for (const o of orders.slice(-10).reverse()) {
     const a = attrs(o);
-    recent.push({ order: a.order_number, total: cents(a.total_price_in_cents), date: a.created_at });
+    const cref = o.relationships && o.relationships.customer && o.relationships.customer.data;
+    const cust = cref && inc[`${cref.type}:${cref.id}`];
+    const ca = attrs(cust);
+    recent.push({
+      order: a.order_number,
+      customer: ca.name || ca.email || (cref ? `Customer #${cref.id}` : '—'),
+      total: cents(a.total_price_in_cents),
+      date: a.created_at,
+    });
   }
 
   // Order items → sales by offer

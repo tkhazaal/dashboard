@@ -2059,7 +2059,7 @@ function renderKajabi(d) {
     .map(o => `<tr><td>${escHtml(o.title)}</td><td>${fmtNum(o.orders)}</td><td>${fmtMoney(o.revenue)}</td></tr>`).join('')
     || `<tr class="empty-row"><td colspan="3">No offers</td></tr>`;
   $('kajabiRecent').innerHTML = (d.recent || [])
-    .map(r => `<tr><td>#${escHtml(String(r.order))}</td><td>${escHtml(String(r.date || '').slice(0, 10))}</td><td>${fmtMoney(r.total)}</td></tr>`).join('')
+    .map(r => `<tr><td>${escHtml(r.customer || ('#' + r.order))}</td><td>${escHtml(String(r.date || '').slice(0, 10))}</td><td>${fmtMoney(r.total)}</td></tr>`).join('')
     || `<tr class="empty-row"><td colspan="3">No recent orders</td></tr>`;
 }
 $('kajabi-sync').addEventListener('click', async () => {
