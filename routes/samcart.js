@@ -10,6 +10,9 @@ const CACHE_TTL = parseInt(process.env.SAMCART_CACHE_MINUTES || '60', 10) * 60 *
 // Smaller pages = smaller responses = far less chance of a "Premature close"
 // on slower connections (env-tunable; SamCart caps per_page at 100).
 const PAGE_SIZE = Math.min(100, Math.max(5, parseInt(process.env.SAMCART_PAGE_SIZE || '25', 10)));
+// Gentle pause between paginated requests so a long crawl doesn't trip SamCart's
+// rate limit (429). Env-tunable; set 0 to disable.
+const THROTTLE_MS = Math.max(0, parseInt(process.env.SAMCART_THROTTLE_MS || '200', 10));
 
 // Force a fresh TCP connection per request. Reusing keep-alive sockets is the
 // usual cause of "Premature close" during long crawls.
@@ -44,11 +47,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // network resets, 5xx). Reads the body fully as text before parsing so a
 // truncated response is caught and retried. Client errors (4xx) fail fast.
 async function scFetch(url, apiKey, attempts = 6) {
-  let lastErr;
-  for (let i = 0; i < attempts; i++) {
+  let lastErr, tries = 0, rateWaits = 0;
+  while (tries < attempts) {
     try {
       const resp = await fetch(url, { headers: SC_HEADERS(apiKey), timeout: 45000, agent: scAgent });
       if (!resp.ok) {
+        if (resp.status === 429) {
+          // Rate limited — wait it out (honor Retry-After, else exponential backoff).
+          // A rate-limit pause does NOT consume the transient-retry budget.
+          const ra   = parseInt(resp.headers.get('retry-after') || '', 10);
+          const wait = (Number.isFinite(ra) && ra > 0) ? ra * 1000 : Math.min(2000 * 2 ** rateWaits, 30000);
+          if (++rateWaits > 10) throw new Error('SamCart API 429: rate limit not clearing after repeated waits');
+          await sleep(wait);
+          continue;
+        }
         const txt = await resp.text().catch(() => '');
         if (resp.status >= 400 && resp.status < 500) {
           throw Object.assign(new Error(`SamCart API ${resp.status}: ${txt.slice(0, 200)}`), { fatal: true });
@@ -60,7 +72,8 @@ async function scFetch(url, apiKey, attempts = 6) {
     } catch (err) {
       if (err.fatal) throw err;          // don't retry auth/bad-request errors
       lastErr = err;
-      if (i < attempts - 1) await sleep(800 * (i + 1));   // 0.8s, 1.6s, 2.4s, ...
+      tries++;
+      if (tries < attempts) await sleep(800 * tries);   // 0.8s, 1.6s, 2.4s, ...
     }
   }
   throw lastErr;
@@ -84,6 +97,7 @@ async function fetchAllOrders(apiKey, { maxPages = 1000, onProgress } = {}) {
     pages++;
     if (onProgress) onProgress(all.length, total);
     url = json.pagination && json.pagination.next ? json.pagination.next : null;
+    if (url && THROTTLE_MS) await sleep(THROTTLE_MS);
   }
   return all;
 }
@@ -99,6 +113,7 @@ async function fetchProducts(apiKey, { maxPages = 30 } = {}) {
     all.push(...data);
     pages++;
     url = json.pagination && json.pagination.next ? json.pagination.next : null;
+    if (url && THROTTLE_MS) await sleep(THROTTLE_MS);
   }
   return all;
 }
@@ -114,6 +129,7 @@ async function fetchAllRefunds(apiKey, { maxPages = 1000 } = {}) {
     all.push(...data);
     pages++;
     url = json.pagination && json.pagination.next ? json.pagination.next : null;
+    if (url && THROTTLE_MS) await sleep(THROTTLE_MS);
   }
   return all;
 }
@@ -287,17 +303,21 @@ async function computeMetrics(orders, apiKey) {
     .filter(p => p.first !== p.second)
     .sort((a, b) => b.count - a.count).slice(0, 10);
 
-  // Top customers — enrich the top 20 with real names/emails from /customers/{id}
+  // Top customers — enrich the top 20 with real names/emails from /customers/{id}.
+  // Sequential (with throttle) rather than 20 concurrent requests, to avoid a burst
+  // that trips the rate limit.
   const topRaw = [...customers].sort((a, b) => b.ltv - a.ltv).slice(0, 20);
-  const topCustomers = await Promise.all(topRaw.map(async c => {
+  const topCustomers = [];
+  for (const c of topRaw) {
     const info = await fetchCustomer(c.cid, apiKey);
     const name = info ? `${info.first_name||''} ${info.last_name||''}`.trim() : '';
-    return {
+    topCustomers.push({
       name:  name || `Customer #${c.cid}`,
       email: info?.email || '',
       orders: c.orders, products: c.products, ltv: c.ltv,
-    };
-  }));
+    });
+    if (THROTTLE_MS) await sleep(THROTTLE_MS);
+  }
 
   // ── Monthly revenue trend (last 12 months) ──────────────────────
   const monthMap = new Map();
