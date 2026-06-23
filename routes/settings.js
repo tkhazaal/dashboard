@@ -11,13 +11,14 @@ router.get('/', async (req, res) => {
     const mask = k => k.slice(0, 6) + '•'.repeat(Math.max(0, k.length - 10)) + k.slice(-4);
     if (s.samcart_api_key)      { s.samcart_api_key_masked = mask(s.samcart_api_key); delete s.samcart_api_key; }
     if (s.kajabi_client_secret) { s.kajabi_client_secret_masked = mask(s.kajabi_client_secret); delete s.kajabi_client_secret; }
+    if (s.ac_api_token)         { s.ac_api_token_masked = mask(s.ac_api_token); delete s.ac_api_token; }
     res.json(s);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', async (req, res) => {
   try {
-    const allowed = ['site_name', 'tracker_url', 'samcart_api_key', 'monthly_goal', 'funnels_config', 'ad_campaigns', 'kajabi_client_id', 'kajabi_client_secret'];
+    const allowed = ['site_name', 'tracker_url', 'samcart_api_key', 'monthly_goal', 'funnels_config', 'ad_campaigns', 'kajabi_client_id', 'kajabi_client_secret', 'ac_api_url', 'ac_api_token'];
     const updates = [];
 
     for (const key of allowed) {

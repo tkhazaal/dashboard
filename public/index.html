@@ -54,6 +54,10 @@
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 8v8M9 12l5-4M9 12l5 4"/></svg>
         Kajabi
       </a>
+      <a href="#" class="nav-item" data-tab="email">
+        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>
+        Email
+      </a>
       <a href="#" class="nav-item" data-tab="pages">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Page Analytics
@@ -514,6 +518,57 @@
             <table class="data-table">
               <thead><tr><th>Customer</th><th>Date</th><th>Total</th></tr></thead>
               <tbody id="kajabiRecent"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── EMAIL (ActiveCampaign) ──────────── -->
+    <section class="tab" id="tab-email">
+      <div class="page-header">
+        <div><h1>Email <span class="subtitle" style="font-weight:600;">· ActiveCampaign</span></h1><p class="subtitle">Campaign performance, deliverability, automations &amp; list health</p></div>
+        <div class="header-pills">
+          <span class="pill" id="email-status"></span>
+          <button class="btn-primary sm" id="email-sync">↻ Sync Email</button>
+        </div>
+      </div>
+
+      <div id="email-unconfigured" class="card" style="display:none;">
+        <p class="tracking-desc">ActiveCampaign isn't connected. Add your <strong>API URL</strong> and <strong>API Key</strong> (AC → Settings → Developer) to the dashboard settings, then click <em>Sync Email</em>.</p>
+      </div>
+
+      <div id="email-content">
+        <div class="stat-grid" id="email-kpis"></div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><h2>Emails sent &amp; open rate</h2></div>
+            <div class="chart-wrap"><canvas id="emailTrendChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2>List health</h2></div>
+            <div class="chart-wrap"><canvas id="emailListChart"></canvas></div>
+            <p class="chart-insight" id="email-list-note"></p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Campaign performance <span class="th-hint">most recent sends</span></h2></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Campaign</th><th>Date</th><th>Sent</th><th>Open %</th><th>Click %</th><th>CTOR %</th><th>Unsub %</th><th>Bounce %</th></tr></thead>
+              <tbody id="emailCampaigns"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Automations <span class="th-hint">by contacts entered</span></h2></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Automation</th><th>Status</th><th>Entered</th><th>In&nbsp;flight</th><th>Completed %</th></tr></thead>
+              <tbody id="emailAutomations"></tbody>
             </table>
           </div>
         </div>

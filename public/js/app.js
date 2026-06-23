@@ -230,6 +230,7 @@ function activateTab(tab) {
   if (tab === 'funnels') loadFunnels();
   if (tab === 'ads') loadAds();
   if (tab === 'kajabi') loadKajabi();
+  if (tab === 'email') loadEmail();
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', e => { e.preventDefault(); activateTab(item.dataset.tab); });
@@ -2158,6 +2159,69 @@ $('kajabi-sync').addEventListener('click', async () => {
       else if (s.phase) $('kajabi-status').textContent = `Syncing ${s.phase}… ${fmtNum(s.count || 0)}`;
     }, 2500);
   } catch { btn.disabled = false; $('kajabi-status').textContent = 'Sync failed'; }
+});
+
+// ══ Email (ActiveCampaign) ════════════════════════════════════════
+async function loadEmail() {
+  try { renderEmail(await api('/api/ac/data')); }
+  catch { $('email-status').textContent = 'Error loading'; }
+}
+function renderEmail(d) {
+  const unconf = $('email-unconfigured'), content = $('email-content');
+  if (!d || d.configured === false) {
+    unconf.style.display = ''; content.style.display = 'none';
+    $('email-status').textContent = 'Not connected'; return;
+  }
+  unconf.style.display = 'none'; content.style.display = '';
+  $('email-status').textContent = (d.syncedAt ? 'Synced ' + timeAgo(d.syncedAt) : '') + (d.stale ? ' · stale' : '');
+
+  const dl = d.deliverability || {}, c = d.contacts || {}, a = d.automations || {};
+  $('email-kpis').innerHTML = [
+    ['Avg Open Rate', dl.avgOpenRate + '%', `${fmtNum(dl.campaigns || 0)} campaigns`],
+    ['Avg Click Rate', dl.avgClickRate + '%', `click-to-open ${dl.avgCtor || 0}%`],
+    ['Delivery Rate', dl.deliveryRate + '%', `${fmtNum(dl.totalBounces || 0)} bounces`],
+    ['Unsub / Send', dl.unsubRate + '%', `${fmtNum(dl.totalUnsubs || 0)} unsubscribes`],
+    ['Active Subscribers', fmtNum(c.active || 0), `${c.activeRate || 0}% of ${fmtNum(c.total || 0)}`],
+    ['Unsubscribed', fmtNum(c.unsubscribed || 0), `${c.unsubRate || 0}% of list (lifetime)`],
+    ['Active Automations', fmtNum(a.active || 0), `${fmtNum(a.total || 0)} total`],
+    ['Emails Sent', fmtNum(dl.sent || 0), 'analyzed campaigns'],
+  ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${s}</div></div>`).join('');
+
+  const m = d.monthly || [];
+  mkChart('emailTrendChart', {
+    data: { labels: m.map(x => x.month), datasets: [
+      { type: 'bar', label: 'Sent', data: m.map(x => x.sent), backgroundColor: 'rgba(37,99,235,0.45)', borderRadius: 4, yAxisID: 'y' },
+      { type: 'line', label: 'Open %', data: m.map(x => x.openRate), borderColor: '#10b981', backgroundColor: '#10b981', tension: 0.3, pointRadius: 2, yAxisID: 'y1' },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { font: { size: 10 }, color: TICK, boxWidth: 10 } } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 9 }, color: TICK } },
+        y: { position: 'left', grid: { color: GRID }, ticks: { font: { size: 9 }, color: TICK, callback: v => v >= 1000 ? (v / 1000) + 'k' : v }, beginAtZero: true },
+        y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 9 }, color: TICK, callback: v => v + '%' }, min: 0, max: 100 } } },
+  });
+  mkChart('emailListChart', {
+    type: 'doughnut',
+    data: { labels: ['Active', 'Unsubscribed', 'Bounced'], datasets: [{ data: [c.active || 0, c.unsubscribed || 0, c.bounced || 0], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 }, color: TICK, boxWidth: 10, padding: 6 } } }, cutout: '60%' },
+  });
+  $('email-list-note').textContent = `${fmtNum(c.total || 0)} contacts — ${c.activeRate || 0}% active, ${fmtNum(c.unsubscribed || 0)} unsubscribed, ${fmtNum(c.bounced || 0)} bounced.`;
+
+  $('emailCampaigns').innerHTML = (d.campaigns || []).map(x =>
+    `<tr><td>${escHtml(x.name)}</td><td>${escHtml(String(x.date || '').slice(0, 10))}</td><td>${fmtNum(x.sent)}</td><td>${x.openRate}%</td><td>${x.clickRate}%</td><td>${x.ctor}%</td><td>${x.unsubRate}%</td><td>${x.bounceRate}%</td></tr>`).join('')
+    || `<tr class="empty-row"><td colspan="8">No campaigns</td></tr>`;
+  $('emailAutomations').innerHTML = (a.list || []).map(x =>
+    `<tr><td>${escHtml(x.name)}</td><td>${x.active ? '<span class="roas-badge ok">active</span>' : '<span class="muted">off</span>'}</td><td>${fmtNum(x.entered)}</td><td>${fmtNum(x.inFlight)}</td><td>${x.completion}%</td></tr>`).join('')
+    || `<tr class="empty-row"><td colspan="5">No automations</td></tr>`;
+}
+$('email-sync').addEventListener('click', async () => {
+  const btn = $('email-sync'); btn.disabled = true; $('email-status').textContent = 'Syncing…';
+  try {
+    await fetch('/api/ac/sync', { method: 'POST' });
+    const poll = setInterval(async () => {
+      const s = await api('/api/ac/sync/status').catch(() => ({}));
+      if (s.running === false) { clearInterval(poll); btn.disabled = false; loadEmail(); }
+      else if (s.phase) $('email-status').textContent = `Syncing ${s.phase}…`;
+    }, 2500);
+  } catch { btn.disabled = false; $('email-status').textContent = 'Sync failed'; }
 });
 
 // ── Boot ──────────────────────────────────────────────────────────
