@@ -50,6 +50,10 @@
         <svg viewBox="0 0 24 24"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 11-5.8-1.6"/></svg>
         Ads &amp; ROAS
       </a>
+      <a href="#" class="nav-item" data-tab="kajabi">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 8v8M9 12l5-4M9 12l5 4"/></svg>
+        Kajabi
+      </a>
       <a href="#" class="nav-item" data-tab="pages">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Page Analytics
@@ -420,6 +424,51 @@
       </div>
       <p class="chart-insight" style="padding:0 2px;">Spend is calculated from each campaign's budget: <strong>Daily</strong> = budget × days active in range; <strong>Total</strong> = budget prorated across the campaign's run. Revenue/orders come from the linked SamCart product. ROAS = Revenue ÷ Spend.</p>
       <datalist id="ad-products"></datalist>
+    </section>
+
+    <!-- ── KAJABI ──────────────────────────── -->
+    <section class="tab" id="tab-kajabi">
+      <div class="page-header">
+        <div><h1>Kajabi</h1><p class="subtitle">Sales &amp; audience pulled from Kajabi — reporting only (no page tracking)</p></div>
+        <div class="header-pills">
+          <span class="pill" id="kajabi-status"></span>
+          <button class="btn-primary sm" id="kajabi-sync">↻ Sync Kajabi</button>
+        </div>
+      </div>
+
+      <div id="kajabi-unconfigured" class="card" style="display:none;">
+        <p class="tracking-desc">Kajabi isn't connected yet. Add your <strong>Client ID</strong> and <strong>Client Secret</strong> (Settings → Public API in Kajabi) to the dashboard settings, then click <em>Sync Kajabi</em>.</p>
+      </div>
+
+      <div id="kajabi-content">
+        <div class="stat-grid" id="kajabi-kpis"></div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><h2>Monthly revenue</h2></div>
+            <div class="chart-wrap"><canvas id="kajabiMonthlyChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h2>Top offers</h2></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Offer</th><th>Orders</th><th>Revenue</th></tr></thead>
+                <tbody id="kajabiOffers"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Recent orders</h2></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Order #</th><th>Date</th><th>Total</th></tr></thead>
+              <tbody id="kajabiRecent"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ── PAGE ANALYTICS ──────────────────── -->

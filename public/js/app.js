@@ -225,6 +225,7 @@ function activateTab(tab) {
   if (tab === 'reports') loadReports();
   if (tab === 'funnels') loadFunnels();
   if (tab === 'ads') loadAds();
+  if (tab === 'kajabi') loadKajabi();
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', e => { e.preventDefault(); activateTab(item.dataset.tab); });
@@ -2022,6 +2023,56 @@ async function loadAds() {
   if (!state.scData) await loadSamCart().catch(() => {});
   renderAds();
 }
+
+// ══ Kajabi (reporting) ════════════════════════════════════════════
+async function loadKajabi() {
+  try { renderKajabi(await api('/api/kajabi/data')); }
+  catch (e) { $('kajabi-status').textContent = 'Error loading'; }
+}
+function renderKajabi(d) {
+  const unconf = $('kajabi-unconfigured'), content = $('kajabi-content');
+  if (!d || d.configured === false) {
+    unconf.style.display = ''; content.style.display = 'none';
+    $('kajabi-status').textContent = 'Not connected';
+    return;
+  }
+  unconf.style.display = 'none'; content.style.display = '';
+  $('kajabi-status').textContent = (d.syncedAt ? 'Synced ' + timeAgo(d.syncedAt) : '') + (d.stale ? ' · stale' : '');
+
+  const subs = d.subscriptions || {};
+  $('kajabi-kpis').innerHTML = [
+    ['Kajabi Revenue', fmtMoney(d.totalRevenue), `${fmtNum(d.orderCount)} orders`],
+    ['Avg Order Value', fmtMoney(d.avgOrderValue), 'net paid per order'],
+    ['Contacts', fmtNum(d.contactCount || 0), 'total audience'],
+    ['Active Subscriptions', fmtNum(subs.active || 0), `${fmtNum(subs.oneTime || 0)} one-time purchases`],
+  ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${s}</div></div>`).join('');
+
+  const m = d.monthly || [];
+  mkChart('kajabiMonthlyChart', {
+    type: 'bar',
+    data: { labels: m.map(x => x.month), datasets: [{ label: 'Revenue', data: m.map(x => x.revenue), backgroundColor: '#2563eb', borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: baseScales({ y: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick } } }) },
+  });
+
+  $('kajabiOffers').innerHTML = (d.topOffers || []).slice(0, 12)
+    .map(o => `<tr><td>${escHtml(o.title)}</td><td>${fmtNum(o.orders)}</td><td>${fmtMoney(o.revenue)}</td></tr>`).join('')
+    || `<tr class="empty-row"><td colspan="3">No offers</td></tr>`;
+  $('kajabiRecent').innerHTML = (d.recent || [])
+    .map(r => `<tr><td>#${escHtml(String(r.order))}</td><td>${escHtml(String(r.date || '').slice(0, 10))}</td><td>${fmtMoney(r.total)}</td></tr>`).join('')
+    || `<tr class="empty-row"><td colspan="3">No recent orders</td></tr>`;
+}
+$('kajabi-sync').addEventListener('click', async () => {
+  const btn = $('kajabi-sync'); btn.disabled = true; $('kajabi-status').textContent = 'Syncing…';
+  try {
+    await fetch('/api/kajabi/sync', { method: 'POST' });
+    const poll = setInterval(async () => {
+      const s = await api('/api/kajabi/sync/status').catch(() => ({}));
+      if (s.running === false) { clearInterval(poll); btn.disabled = false; loadKajabi(); }
+      else if (s.phase) $('kajabi-status').textContent = `Syncing ${s.phase}… ${fmtNum(s.count || 0)}`;
+    }, 2500);
+  } catch { btn.disabled = false; $('kajabi-status').textContent = 'Sync failed'; }
+});
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {

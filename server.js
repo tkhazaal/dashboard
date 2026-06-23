@@ -54,6 +54,7 @@ const samcartRouter = require('./routes/samcart');
 app.use('/track',          require('./routes/track'));
 app.use('/api/analytics',  require('./routes/analytics'));
 app.use('/api/samcart',    samcartRouter);
+app.use('/api/kajabi',     require('./routes/kajabi'));
 app.use('/api/settings',   require('./routes/settings'));
 
 // Dashboard UI

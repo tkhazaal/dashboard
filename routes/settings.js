@@ -8,18 +8,16 @@ router.get('/', async (req, res) => {
     if (error) throw error;
 
     const s = Object.fromEntries(data.map(r => [r.key, r.value]));
-    if (s.samcart_api_key) {
-      const k = s.samcart_api_key;
-      s.samcart_api_key_masked = k.slice(0, 6) + '•'.repeat(Math.max(0, k.length - 10)) + k.slice(-4);
-      delete s.samcart_api_key;
-    }
+    const mask = k => k.slice(0, 6) + '•'.repeat(Math.max(0, k.length - 10)) + k.slice(-4);
+    if (s.samcart_api_key)      { s.samcart_api_key_masked = mask(s.samcart_api_key); delete s.samcart_api_key; }
+    if (s.kajabi_client_secret) { s.kajabi_client_secret_masked = mask(s.kajabi_client_secret); delete s.kajabi_client_secret; }
     res.json(s);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', async (req, res) => {
   try {
-    const allowed = ['site_name', 'tracker_url', 'samcart_api_key', 'monthly_goal', 'funnels_config', 'ad_campaigns'];
+    const allowed = ['site_name', 'tracker_url', 'samcart_api_key', 'monthly_goal', 'funnels_config', 'ad_campaigns', 'kajabi_client_id', 'kajabi_client_secret'];
     const updates = [];
 
     for (const key of allowed) {
