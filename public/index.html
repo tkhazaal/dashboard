@@ -554,17 +554,35 @@
         </div>
 
         <div class="card">
-          <div class="card-header"><h2>Campaign performance <span class="th-hint">most recent sends</span></h2></div>
+          <div class="card-header">
+            <h2>Campaign performance</h2>
+            <div class="email-filters">
+              <select id="email-camp-filter" class="cmp-preset"><option value="all">All statuses</option></select>
+              <input id="email-camp-search" class="date-input" type="search" placeholder="Search campaigns…">
+              <span class="pill" id="email-camp-count"></span>
+            </div>
+          </div>
           <div class="table-wrap">
             <table class="data-table">
-              <thead><tr><th>Campaign</th><th>Date</th><th>Sent</th><th>Open %</th><th>Click %</th><th>CTOR %</th><th>Unsub %</th><th>Bounce %</th></tr></thead>
+              <thead><tr><th>Campaign</th><th>Status</th><th>Date</th><th>Sent</th><th>Open %</th><th>Click %</th><th>CTOR %</th><th>Unsub %</th><th>Bounce %</th></tr></thead>
               <tbody id="emailCampaigns"></tbody>
             </table>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-header"><h2>Automations <span class="th-hint">by contacts entered</span></h2></div>
+          <div class="card-header">
+            <h2>Automations</h2>
+            <div class="email-filters">
+              <select id="email-auto-filter" class="cmp-preset">
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive / disabled</option>
+              </select>
+              <input id="email-auto-search" class="date-input" type="search" placeholder="Search automations…">
+              <span class="pill" id="email-auto-count"></span>
+            </div>
+          </div>
           <div class="table-wrap">
             <table class="data-table">
               <thead><tr><th>Automation</th><th>Status</th><th>Entered</th><th>In&nbsp;flight</th><th>Completed %</th></tr></thead>

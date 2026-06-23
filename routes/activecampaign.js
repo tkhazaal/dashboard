@@ -75,24 +75,31 @@ async function computeACMetrics(creds, onProgress) {
   const unsub    = await acCount(base, token, 'contacts?status=2');
   const bounced  = await acCount(base, token, 'contacts?status=3');
 
-  // Campaign performance — sent campaigns (status 5), most recent first
+  // Campaign performance — ALL statuses (so the UI can filter sent/scheduled/draft/disabled)
   if (onProgress) onProgress('campaigns', 0);
-  const camps = await acAll(base, token, 'campaigns?filters%5Bstatus%5D=5&orders%5Bsdate%5D=DESC', 'campaigns', { maxPages: 3, limit: 100, });
+  const CAMP_STATUS = { '0': 'Draft', '1': 'Scheduled', '2': 'Sending', '3': 'Paused', '4': 'Stopped', '5': 'Sent', '6': 'Disabled' };
+  const camps = await acAll(base, token, 'campaigns?orders%5Bmdate%5D=DESC', 'campaigns', { maxPages: 6, limit: 100 });
   let S = 0, UO = 0, SC = 0, HB = 0, SB = 0, UN = 0;
   const campaignList = [];
   const monthly = {};   // 'YYYY-MM' -> { sends, sent, uo, sc }
   for (const c of camps) {
-    const sent = num(c.send_amt); if (!sent) continue;
+    const st = String(c.status);
+    const sent = num(c.send_amt);
+    const isSent = st === '5' && sent > 0;
     const uo = num(c.uniqueopens), sc = num(c.subscriberclicks), un = num(c.unsubscribes), hb = num(c.hardbounces), sb = num(c.softbounces);
-    S += sent; UO += uo; SC += sc; HB += hb; SB += sb; UN += un;
+    if (isSent) {
+      S += sent; UO += uo; SC += sc; HB += hb; SB += sb; UN += un;
+      const m = String(c.sdate || '').slice(0, 7);
+      if (m) { (monthly[m] || (monthly[m] = { sends: 0, sent: 0, uo: 0, sc: 0 })); monthly[m].sends++; monthly[m].sent += sent; monthly[m].uo += uo; monthly[m].sc += sc; }
+    }
     campaignList.push({
-      name: c.name, date: c.sdate, sent,
-      openRate: rate(uo, sent), clickRate: rate(sc, sent), ctor: rate(sc, uo),
-      unsubRate: rate(un, sent), bounceRate: rate(hb + sb, sent), unsubs: un,
+      name: c.name, date: c.sdate || c.mdate || c.cdate, status: CAMP_STATUS[st] || 'Other', sent: isSent,
+      recipients: sent,
+      openRate: isSent ? rate(uo, sent) : null, clickRate: isSent ? rate(sc, sent) : null, ctor: isSent ? rate(sc, uo) : null,
+      unsubRate: isSent ? rate(un, sent) : null, bounceRate: isSent ? rate(hb + sb, sent) : null,
     });
-    const m = String(c.sdate || '').slice(0, 7);
-    if (m) { (monthly[m] || (monthly[m] = { sends: 0, sent: 0, uo: 0, sc: 0 })); monthly[m].sends++; monthly[m].sent += sent; monthly[m].uo += uo; monthly[m].sc += sc; }
   }
+  campaignList.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   const deliverability = {
     sent: S, campaigns: campaignList.length,
     avgOpenRate: rate(UO, S), avgClickRate: rate(SC, S), avgCtor: rate(SC, UO),
@@ -115,13 +122,16 @@ async function computeACMetrics(creds, onProgress) {
     return { name: a.name, active: String(a.status) === '1', entered: en, exited: ex, inFlight: Math.max(0, en - ex), completion: rate(ex, en) };
   }).sort((a, b) => b.entered - a.entered);
 
+  const campaignStatusCounts = campaignList.reduce((m, c) => { m[c.status] = (m[c.status] || 0) + 1; return m; }, {});
+
   return {
     configured: true, syncedAt: new Date().toISOString(),
     contacts: { total: totalContacts, active, unsubscribed: unsub, bounced, activeRate: rate(active, totalContacts), unsubRate: rate(unsub, totalContacts) },
     deliverability,
-    campaigns: campaignList.slice(0, 50),
+    campaigns: campaignList,
+    campaignStatusCounts,
     monthly: monthlyArr,
-    automations: { total: autos.length, active: autoActive, entered, exited, list: automationList.slice(0, 30) },
+    automations: { total: autos.length, active: autoActive, entered, exited, list: automationList },
   };
 }
 

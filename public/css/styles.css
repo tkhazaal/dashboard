@@ -937,6 +937,14 @@ table.show-upsell .upsell-col { display: table-cell; }
 .funnel-table .fn-sel:focus, .funnel-table .fn-input:focus,
 .funnel-table .fn-prod:focus, .funnel-table .fn-page:focus { border-color: var(--accent); }
 .funnel-table .fn-input { font-weight: 700; }
+/* ── Email (ActiveCampaign) filters + status badges ──── */
+.email-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.email-filters .date-input { min-width: 170px; }
+.email-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--surface-alt); color: var(--sub); }
+.email-badge.st-sent { background: rgba(34,197,94,0.15); color: var(--green); }
+.email-badge.st-disabled, .email-badge.st-stopped { background: rgba(239,68,68,0.13); color: var(--danger); }
+.email-badge.st-scheduled, .email-badge.st-sending { background: rgba(37,99,235,0.12); color: var(--accent); }
+
 /* ── Ads & ROAS table ─────────────────────── */
 .ad-table th:nth-child(1), .ad-table td:nth-child(1) { width: 16%; }
 .ad-table th:nth-child(2), .ad-table td:nth-child(2) { width: 12%; }

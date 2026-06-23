@@ -213,6 +213,7 @@ const state = {
   repStart:         '',
   repEnd:           '',
   repKajabi:        null,
+  acData:           null,
 };
 
 // ── Tab navigation ────────────────────────────────────────────────
@@ -2205,13 +2206,47 @@ function renderEmail(d) {
   });
   $('email-list-note').textContent = `${fmtNum(c.total || 0)} contacts — ${c.activeRate || 0}% active, ${fmtNum(c.unsubscribed || 0)} unsubscribed, ${fmtNum(c.bounced || 0)} bounced.`;
 
-  $('emailCampaigns').innerHTML = (d.campaigns || []).map(x =>
-    `<tr><td>${escHtml(x.name)}</td><td>${escHtml(String(x.date || '').slice(0, 10))}</td><td>${fmtNum(x.sent)}</td><td>${x.openRate}%</td><td>${x.clickRate}%</td><td>${x.ctor}%</td><td>${x.unsubRate}%</td><td>${x.bounceRate}%</td></tr>`).join('')
-    || `<tr class="empty-row"><td colspan="8">No campaigns</td></tr>`;
-  $('emailAutomations').innerHTML = (a.list || []).map(x =>
-    `<tr><td>${escHtml(x.name)}</td><td>${x.active ? '<span class="roas-badge ok">active</span>' : '<span class="muted">off</span>'}</td><td>${fmtNum(x.entered)}</td><td>${fmtNum(x.inFlight)}</td><td>${x.completion}%</td></tr>`).join('')
-    || `<tr class="empty-row"><td colspan="5">No automations</td></tr>`;
+  state.acData = d;
+  // Populate the campaign status filter from the actual statuses present
+  const counts = d.campaignStatusCounts || {};
+  const order = ['Sent', 'Scheduled', 'Sending', 'Draft', 'Paused', 'Stopped', 'Disabled', 'Other'];
+  const cur = $('email-camp-filter').value || 'all';
+  $('email-camp-filter').innerHTML = `<option value="all">All statuses (${(d.campaigns || []).length})</option>`
+    + order.filter(s => counts[s]).map(s => `<option value="${s}">${s} (${counts[s]})</option>`).join('');
+  $('email-camp-filter').value = [...$('email-camp-filter').options].some(o => o.value === cur) ? cur : 'all';
+  renderEmailCampaigns();
+  renderEmailAutomations();
 }
+function renderEmailCampaigns() {
+  const d = state.acData; if (!d) return;
+  const f = $('email-camp-filter').value, q = ($('email-camp-search').value || '').toLowerCase();
+  let rows = d.campaigns || [];
+  if (f !== 'all') rows = rows.filter(c => c.status === f);
+  if (q) rows = rows.filter(c => (c.name || '').toLowerCase().includes(q));
+  $('email-camp-count').textContent = `${fmtNum(rows.length)} of ${fmtNum((d.campaigns || []).length)}`;
+  const pct = v => v == null ? '<span class="muted">—</span>' : v + '%';
+  $('emailCampaigns').innerHTML = rows.slice(0, 250).map(c => `<tr>
+      <td>${escHtml(c.name)}</td>
+      <td><span class="email-badge st-${(c.status || '').toLowerCase()}">${escHtml(c.status)}</span></td>
+      <td>${escHtml(String(c.date || '').slice(0, 10))}</td>
+      <td>${c.sent ? fmtNum(c.recipients) : '<span class="muted">—</span>'}</td>
+      <td>${pct(c.openRate)}</td><td>${pct(c.clickRate)}</td><td>${pct(c.ctor)}</td><td>${pct(c.unsubRate)}</td><td>${pct(c.bounceRate)}</td>
+    </tr>`).join('') || `<tr class="empty-row"><td colspan="9">No campaigns match</td></tr>`;
+}
+function renderEmailAutomations() {
+  const d = state.acData; if (!d) return;
+  const f = $('email-auto-filter').value, q = ($('email-auto-search').value || '').toLowerCase();
+  let rows = (d.automations && d.automations.list) || [];
+  if (f === 'active') rows = rows.filter(a => a.active);
+  else if (f === 'inactive') rows = rows.filter(a => !a.active);
+  if (q) rows = rows.filter(a => (a.name || '').toLowerCase().includes(q));
+  $('email-auto-count').textContent = `${fmtNum(rows.length)} of ${fmtNum(((d.automations && d.automations.list) || []).length)}`;
+  $('emailAutomations').innerHTML = rows.map(x =>
+    `<tr><td>${escHtml(x.name)}</td><td>${x.active ? '<span class="roas-badge ok">active</span>' : '<span class="muted">off</span>'}</td><td>${fmtNum(x.entered)}</td><td>${fmtNum(x.inFlight)}</td><td>${x.completion}%</td></tr>`).join('')
+    || `<tr class="empty-row"><td colspan="5">No automations match</td></tr>`;
+}
+['email-camp-filter', 'email-camp-search'].forEach(id => $(id).addEventListener('input', renderEmailCampaigns));
+['email-auto-filter', 'email-auto-search'].forEach(id => $(id).addEventListener('input', renderEmailAutomations));
 $('email-sync').addEventListener('click', async () => {
   const btn = $('email-sync'); btn.disabled = true; $('email-status').textContent = 'Syncing…';
   try {
