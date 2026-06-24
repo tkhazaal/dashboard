@@ -62,6 +62,10 @@
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Page Analytics
       </a>
+      <a href="#" class="nav-item" data-tab="utm">
+        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1.5-1.5"/></svg>
+        UTM &amp; Links
+      </a>
       <a href="#" class="nav-item" data-tab="customers">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
         Customers
@@ -689,6 +693,80 @@
               </tr>
             </thead>
             <tbody id="pagesTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── UTM & LINKS ─────────────────────── -->
+    <section class="tab" id="tab-utm">
+      <div class="page-header">
+        <div><h1>UTM &amp; Links</h1><p class="subtitle">Build tagged links and track which UTM sources, mediums &amp; campaigns drive traffic</p></div>
+      </div>
+
+      <!-- UTM Builder -->
+      <div class="card">
+        <div class="card-header"><h2>UTM Link Builder</h2><button class="copy-btn" id="utm-copy">Copy URL</button></div>
+        <div class="utm-builder">
+          <label class="utm-field utm-full"><span>Destination URL <small>(the page you're linking to)</small></span>
+            <input type="text" id="utm-base" placeholder="https://go.taniakhazaal.com/cutoff-culture"></label>
+          <label class="utm-field"><span>Campaign Source <small>(utm_source — e.g. facebook, ig, newsletter)</small></span>
+            <input type="text" id="utm-source" placeholder="facebook"></label>
+          <label class="utm-field"><span>Campaign Medium <small>(utm_medium — e.g. cpc, email, social)</small></span>
+            <input type="text" id="utm-medium" placeholder="cpc"></label>
+          <label class="utm-field"><span>Campaign Name <small>(utm_campaign — e.g. fathers-day)</small></span>
+            <input type="text" id="utm-campaign" placeholder="fathers-day-launch"></label>
+          <label class="utm-field"><span>Term <small>(utm_term — optional, paid keywords)</small></span>
+            <input type="text" id="utm-term" placeholder="optional"></label>
+          <label class="utm-field"><span>Content <small>(utm_content — optional, ad/variant)</small></span>
+            <input type="text" id="utm-content" placeholder="optional"></label>
+          <label class="utm-field utm-full"><span>Your tagged URL</span>
+            <textarea id="utm-result" rows="2" readonly placeholder="Fill in the fields above…"></textarea></label>
+          <div class="utm-builder-actions">
+            <button class="clear-btn" id="utm-clear">Clear</button>
+            <span class="save-msg" id="utm-copied"></span>
+          </div>
+        </div>
+        <p class="chart-insight" style="padding:8px 2px 0;">Tip: keep values lowercase and consistent (e.g. always <code>facebook</code>, not <code>FB</code>/<code>Facebook</code>) so the tracking below groups them cleanly. Tagged links land on your tracked pages and show up in the report.</p>
+      </div>
+
+      <!-- UTM Tracking -->
+      <div class="page-header" style="margin-top:6px;">
+        <div><h2 style="margin:0;">UTM Traffic</h2></div>
+        <div class="header-pills">
+          <select id="utm-range" class="cmp-preset" title="Date range">
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="thisweek">This week</option>
+            <option value="thismonth">This month</option>
+            <option value="lastmonth">Last month</option>
+            <option value="thisyear">This year</option>
+          </select>
+          <span class="pill" id="utm-status"></span>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="utm-kpis"></div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><h2>Top sources</h2></div>
+          <div class="chart-wrap"><canvas id="utmSourceChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Source breakdown</h2></div>
+          <div class="table-wrap">
+            <table class="data-table"><thead><tr><th>Source</th><th>Views</th><th>Unique</th></tr></thead><tbody id="utmSources"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Source · Medium · Campaign</h2><span class="pill" id="utm-count"></span></div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>Views</th><th>Unique</th><th>Last seen</th></tr></thead>
+            <tbody id="utmRows"></tbody>
           </table>
         </div>
       </div>

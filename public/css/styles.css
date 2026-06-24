@@ -937,6 +937,20 @@ table.show-upsell .upsell-col { display: table-cell; }
 .funnel-table .fn-sel:focus, .funnel-table .fn-input:focus,
 .funnel-table .fn-prod:focus, .funnel-table .fn-page:focus { border-color: var(--accent); }
 .funnel-table .fn-input { font-weight: 700; }
+/* UTM Link Builder */
+.utm-builder { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.utm-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--sub); }
+.utm-field.utm-full { grid-column: 1 / -1; }
+.utm-field small { font-weight: 500; opacity: 0.85; }
+.utm-field input, .utm-field textarea {
+  font: inherit; font-weight: 500; color: var(--text); background: var(--bg);
+  border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 10px; outline: none; resize: vertical;
+}
+.utm-field input:focus, .utm-field textarea:focus { border-color: var(--accent); }
+#utm-result { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: var(--accent); }
+.utm-builder-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+@media (max-width: 760px) { .utm-builder { grid-template-columns: 1fr; } }
+
 /* Help "?" tooltips on cards */
 .help {
   display: inline-flex; align-items: center; justify-content: center;

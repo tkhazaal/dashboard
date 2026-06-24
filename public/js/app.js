@@ -257,6 +257,7 @@ function activateTab(tab) {
   if (tab === 'ads') loadAds();
   if (tab === 'kajabi') loadKajabi();
   if (tab === 'email') loadEmail();
+  if (tab === 'utm') loadUtm();
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', e => { e.preventDefault(); activateTab(item.dataset.tab); });
@@ -2387,6 +2388,60 @@ $('email-sync').addEventListener('click', async () => {
     }, 2500);
   } catch { btn.disabled = false; $('email-status').textContent = 'Sync failed'; }
 });
+
+// ══ UTM & Links ═══════════════════════════════════════════════════
+function buildUtm() {
+  const base = $('utm-base').value.trim();
+  const parts = [];
+  for (const k of ['source', 'medium', 'campaign', 'term', 'content']) {
+    const v = $('utm-' + k).value.trim();
+    if (v) parts.push('utm_' + k + '=' + encodeURIComponent(v));
+  }
+  let url = base;
+  if (base && parts.length) url += (base.includes('?') ? '&' : '?') + parts.join('&');
+  $('utm-result').value = base ? url : '';
+}
+['utm-base', 'utm-source', 'utm-medium', 'utm-campaign', 'utm-term', 'utm-content'].forEach(id => $(id).addEventListener('input', buildUtm));
+$('utm-copy').addEventListener('click', () => {
+  const v = $('utm-result').value; if (!v) return;
+  navigator.clipboard.writeText(v).then(() => { $('utm-copied').textContent = '✓ Copied!'; setTimeout(() => $('utm-copied').textContent = '', 2000); });
+});
+$('utm-clear').addEventListener('click', () => {
+  ['utm-base', 'utm-source', 'utm-medium', 'utm-campaign', 'utm-term', 'utm-content', 'utm-result'].forEach(id => $(id).value = '');
+});
+
+function utmRangeParams() {
+  const r = funnelPresetRange($('utm-range').value);
+  if (!r || (!r[0] && !r[1])) return '';
+  return `start=${ymd(r[0])}&end=${ymd(r[1])}`;
+}
+async function loadUtm() {
+  buildUtm();
+  $('utm-status').textContent = 'Loading…';
+  try { renderUtm(await api('/api/analytics/utm' + (utmRangeParams() ? '?' + utmRangeParams() : ''))); $('utm-status').textContent = ''; }
+  catch { $('utm-status').textContent = 'Error loading'; }
+}
+function renderUtm(d) {
+  $('utm-kpis').innerHTML = [
+    ['UTM Visits', fmtNum(d.total || 0), 'tagged page visits'],
+    ['Unique Visitors', fmtNum(d.unique || 0), 'distinct visitors'],
+    ['Sources', fmtNum(d.distinctSources || 0), 'utm_source values'],
+    ['Campaigns', fmtNum(d.distinctCampaigns || 0), 'utm_campaign values'],
+  ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${s}</div></div>`).join('');
+  const src = (d.sources || []).slice(0, 10);
+  mkChart('utmSourceChart', {
+    type: 'bar',
+    data: { labels: src.map(s => s.source), datasets: [{ data: src.map(s => s.views), backgroundColor: '#2563eb', borderRadius: 5 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtNum(c.raw) + ' views' } } },
+      scales: { x: { grid: { color: GRID }, ticks: { font: { size: 9 }, color: TICK } }, y: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } } } },
+  });
+  $('utmSources').innerHTML = (d.sources || []).map(s => `<tr><td>${escHtml(s.source)}</td><td>${fmtNum(s.views)}</td><td>${fmtNum(s.unique)}</td></tr>`).join('') || `<tr class="empty-row"><td colspan="3">No UTM traffic</td></tr>`;
+  $('utm-count').textContent = `${fmtNum((d.rows || []).length)} combos`;
+  $('utmRows').innerHTML = (d.rows || []).slice(0, 250).map(r =>
+    `<tr><td>${escHtml(r.source)}</td><td>${escHtml(r.medium)}</td><td>${escHtml(r.campaign)}</td><td>${fmtNum(r.views)}</td><td>${fmtNum(r.unique)}</td><td>${escHtml(String(r.lastSeen || '').slice(0, 10))}</td></tr>`).join('')
+    || `<tr class="empty-row"><td colspan="6">No UTM traffic in this range</td></tr>`;
+}
+$('utm-range').addEventListener('change', loadUtm);
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {
