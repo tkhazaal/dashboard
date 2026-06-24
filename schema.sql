@@ -58,6 +58,9 @@ DECLARE
   dc TEXT := '';
   result JSON;
 BEGIN
+  -- Report on Eastern Time: cast/compare day boundaries in America/New_York
+  -- (CURRENT_DATE, NOW() and ::date all honour this session setting).
+  SET LOCAL TimeZone = 'America/New_York';
   IF start_date <> '' AND end_date <> '' THEN
     dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
   ELSIF days_back = 1 THEN
@@ -102,6 +105,9 @@ DECLARE
   dc TEXT := '';
   sc TEXT := '';
 BEGIN
+  -- Report on Eastern Time: cast/compare day boundaries in America/New_York
+  -- (CURRENT_DATE, NOW() and ::date all honour this session setting).
+  SET LOCAL TimeZone = 'America/New_York';
   IF start_date <> '' AND end_date <> '' THEN
     dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
   ELSIF days_back = 1 THEN
@@ -142,6 +148,9 @@ AS $$
 DECLARE
   wc TEXT := '';
 BEGIN
+  -- Report on Eastern Time: cast/compare day boundaries in America/New_York
+  -- (CURRENT_DATE, NOW() and ::date all honour this session setting).
+  SET LOCAL TimeZone = 'America/New_York';
   IF start_date <> '' AND end_date <> '' THEN
     wc := format('WHERE created_at::date BETWEEN %L AND %L', start_date, end_date);
   ELSIF days_back > 0 THEN
@@ -178,6 +187,9 @@ DECLARE
   dc TEXT := '';
   pc TEXT := '';
 BEGIN
+  -- Report on Eastern Time: cast/compare day boundaries in America/New_York
+  -- (CURRENT_DATE, NOW() and ::date all honour this session setting).
+  SET LOCAL TimeZone = 'America/New_York';
   IF start_date <> '' AND end_date <> '' THEN
     dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
   ELSIF days_back = 1 THEN
@@ -209,6 +221,9 @@ AS $$
 DECLARE
   dc TEXT := '';
 BEGIN
+  -- Report on Eastern Time: cast/compare day boundaries in America/New_York
+  -- (CURRENT_DATE, NOW() and ::date all honour this session setting).
+  SET LOCAL TimeZone = 'America/New_York';
   IF start_date <> '' AND end_date <> '' THEN
     dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
   ELSIF days_back = 1 THEN
@@ -243,6 +258,9 @@ DECLARE
   dc TEXT := '';
   result JSON;
 BEGIN
+  -- Report on Eastern Time: cast/compare day boundaries in America/New_York
+  -- (CURRENT_DATE, NOW() and ::date all honour this session setting).
+  SET LOCAL TimeZone = 'America/New_York';
   IF start_date <> '' AND end_date <> '' THEN
     dc := format('AND created_at::date BETWEEN %L AND %L', start_date, end_date);
   ELSIF days_back = 1 THEN

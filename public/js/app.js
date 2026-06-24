@@ -2,6 +2,10 @@
 
 // ── Helpers ──────────────────────────────────────────────────────
 const $  = id => document.getElementById(id);
+// "Now" anchored to Eastern Time, so every "today" / "this month" / preset range
+// is computed on EST regardless of the viewer's browser timezone — matching the
+// EST-based backend data. The returned Date's local fields reflect ET wall-clock.
+const nowET = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
 const fmtNum      = n => n == null ? '—' : Number(n).toLocaleString();
 const fmtMoney    = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const fmtMoneyFull= n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -84,7 +88,7 @@ function ordersForSlug(slug) {
 // The Page-Analytics date window as [start,end], matching paRangeParams. null = all-time.
 function paEffectiveRange() {
   if (state.paStart && state.paEnd) return [state.paStart, state.paEnd];
-  if (state.paDays > 0) { const now = new Date(); const s = new Date(now); s.setDate(s.getDate() - (state.paDays - 1)); return [ymd(s), ymd(now)]; }
+  if (state.paDays > 0) { const now = nowET(); const s = new Date(now); s.setDate(s.getDate() - (state.paDays - 1)); return [ymd(s), ymd(now)]; }
   return null;   // all time
 }
 // Page Analytics orders — date-filtered to the active window, else all-time.
@@ -490,7 +494,7 @@ function renderSalesAnalytics(d) {
 const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const fmtRange = (a, b) => { const o = { month: 'short', day: 'numeric' }; return `${a.toLocaleDateString('en-US', o)} – ${b.toLocaleDateString('en-US', o)}`; };
 function comparePeriods(preset) {
-  const now = new Date(); const d = x => { const t = new Date(now); t.setDate(t.getDate() + x); return t; };
+  const now = nowET(); const d = x => { const t = new Date(now); t.setDate(t.getDate() + x); return t; };
   let curStart, curEnd = now, prevStart, prevEnd;
   if (preset === '7d')       { curStart = d(-6);  prevEnd = d(-7);  prevStart = d(-13); }
   else if (preset === '30d') { curStart = d(-29); prevEnd = d(-30); prevStart = d(-59); }
@@ -644,7 +648,7 @@ async function loadPaStats() {
 
 // ── Conversion funnel (current month, aligned with SamCart month-to-date) ──
 async function loadFunnel() {
-  const now = new Date();
+  const now = nowET();
   const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0');
   const start = `${y}-${m}-01`;
   const end   = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1043,7 +1047,7 @@ async function loadSettings() {
 function kajabiMtdRevenue() {
   const d = state.kajabiData;
   if (!d || !Array.isArray(d.monthly)) return 0;
-  const mo = ymd(new Date()).slice(0, 7);
+  const mo = ymd(nowET()).slice(0, 7);
   const row = d.monthly.find(m => m.month === mo);
   return row ? row.revenue : 0;
 }
@@ -1055,7 +1059,7 @@ function renderGoal() {
   const current = scMtd + kjMtd;   // total business revenue this month (SamCart + Kajabi)
 
   // Current month label
-  const now = new Date();
+  const now = nowET();
   $('goal-month').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   $('goal-current').textContent = fmtMoney(current);
@@ -1979,7 +1983,7 @@ async function applyFunnelRange() {
 }
 // Resolve a preset to [startDate, endDate] (Date objects, or [null,null] for all-time)
 function funnelPresetRange(v) {
-  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  const now = nowET(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
   const mk = (yy, mm, dd) => new Date(yy, mm, dd);
   const weekOffset = (now.getDay() + 6) % 7;   // days since Monday (week starts Monday)
   switch (v) {
@@ -2083,7 +2087,7 @@ function ensureAdCampaigns() {
 // Calculated spend for a campaign over [start,end] (inclusive). Daily = budget×days
 // active in range; Total = budget prorated across the campaign's own run.
 function adSpend(c, start, end) {
-  const today = ymd(new Date());
+  const today = ymd(nowET());
   const cStart = c.start || start || '2000-01-01';
   const cEnd   = c.end   || today;                 // ongoing → up to today
   const rStart = start || cStart, rEnd = end || cEnd;

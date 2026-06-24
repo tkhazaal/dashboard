@@ -8,6 +8,19 @@ const { utmChannel } = require('../channel');   // shared UTM → channel resolv
 const BASE_URL  = 'https://api.samcart.com/v1';
 const CACHE_TTL = parseInt(process.env.SAMCART_CACHE_MINUTES || '60', 10) * 60 * 1000;
 
+// All day/month bucketing reports on Eastern Time so it lines up with the
+// EST-based page-view analytics. Convert an ISO timestamp (or Date) to the
+// 'YYYY-MM-DD' / 'YYYY-MM' calendar value in America/New_York.
+const ET_TZ = 'America/New_York';
+function etDay(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  // 'en-CA' formats as YYYY-MM-DD
+  return new Intl.DateTimeFormat('en-CA', { timeZone: ET_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+const etMonth = iso => { const s = etDay(iso); return s ? s.slice(0, 7) : ''; };
+
 // Smaller pages = smaller responses = far less chance of a "Premature close"
 // on slower connections (env-tunable; SamCart caps per_page at 100).
 const PAGE_SIZE = Math.min(100, Math.max(5, parseInt(process.env.SAMCART_PAGE_SIZE || '25', 10)));
@@ -187,9 +200,9 @@ async function computeMetrics(orders, apiKey) {
       const amt = (parseFloat(r.refund_amount) || 0) / 100;   // cents -> dollars
       if (!amt) continue;
       totalRefunded += amt; refundCount++;
-      const m = String(r.created_at || '').slice(0, 7);        // YYYY-MM
+      const m = etMonth(r.created_at);                         // YYYY-MM (EST)
       if (m) refundsByMonth[m] = (refundsByMonth[m] || 0) + amt;
-      const dy = String(r.created_at || '').slice(0, 10);      // YYYY-MM-DD
+      const dy = etDay(r.created_at);                          // YYYY-MM-DD (EST)
       if (dy) refundsByDay[dy] = (refundsByDay[dy] || 0) + amt;
     }
   } catch { /* refunds are best-effort */ }
@@ -215,7 +228,7 @@ async function computeMetrics(orders, apiKey) {
     const product = orderProduct(o);
 
     // Daily revenue + distinct order count (drives date-filtered Reporting)
-    const dRev = String(date || '').slice(0, 10);
+    const dRev = etDay(date);
     if (dRev) { (dailyRevenue[dRev] || (dailyRevenue[dRev] = { revenue: 0, orders: 0 })); dailyRevenue[dRev].revenue += amount; dailyRevenue[dRev].orders++; }
 
     // Attribute the order to a UTM channel + full UTM combo (when the checkout carried UTM)
@@ -250,7 +263,7 @@ async function computeMetrics(orders, apiKey) {
     }
 
     // Per-product purchase counts (every cart line = one purchase of that product)
-    const oday = String(date || '').slice(0, 10);   // YYYY-MM-DD for date filtering
+    const oday = etDay(date);   // YYYY-MM-DD (EST) for date filtering
     for (const it of (o.cart_items || [])) {
       const pname = itemName(it);
       if (!pname || pname === 'Unknown Product') continue;
@@ -359,7 +372,7 @@ async function computeMetrics(orders, apiKey) {
   for (const c of customers) {
     for (const o of c.orderList) {
       if (!o.date) continue;
-      const m = String(o.date).slice(0, 7); // YYYY-MM
+      const m = etMonth(o.date); // YYYY-MM (EST)
       if (!monthMap.has(m)) monthMap.set(m, { revenue: 0, orders: 0 });
       const e = monthMap.get(m);
       e.revenue += o.amount; e.orders++;
@@ -375,7 +388,7 @@ async function computeMetrics(orders, apiKey) {
 
   // Month-over-month — compare the two most-recent COMPLETED months.
   // The current calendar month is partial, so including it understates growth.
-  const curMonthKey = new Date().toISOString().slice(0, 7);
+  const curMonthKey = etMonth(new Date());
   const completedMonths = monthly.filter(m => m.month !== curMonthKey);
   const monthToDate = monthly.find(m => m.month === curMonthKey) || null;
   let momRevenue = null, momOrders = null, momLabel = null;

@@ -12,6 +12,18 @@ function safeDate(val) {
   return /^\d{4}-\d{2}-\d{2}$/.test(val || '') ? val : '';
 }
 
+// The UTC instant that corresponds to the start (or end) of a calendar day in
+// Eastern Time, so created_at filtering buckets on EST like the SQL functions do.
+// (DST-aware and independent of the server's own timezone.)
+const ET_TZ = 'America/New_York';
+function etBoundUTC(dateStr, endOfDay) {
+  const [Y, M, D] = dateStr.split('-').map(Number);
+  const guess  = Date.UTC(Y, M - 1, D, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0);
+  const asET   = new Date(new Date(guess).toLocaleString('en-US', { timeZone: ET_TZ }));
+  const asUTC  = new Date(new Date(guess).toLocaleString('en-US', { timeZone: 'UTC' }));
+  return new Date(guess + (asUTC - asET)).toISOString();
+}
+
 // Only include date params when BOTH are valid — otherwise omit them entirely so
 // preset-day calls still match the old function signature (no hard deploy ordering).
 function range(req) {
@@ -94,7 +106,7 @@ router.get('/utm', async (req, res) => {
     const r = range(req);
     let q = supabase.from('page_views').select('page_url, page_path, visitor_id, created_at')
       .ilike('page_url', '%utm_%').order('created_at', { ascending: false }).range(0, 7999);
-    if (r.start_date && r.end_date) q = q.gte('created_at', r.start_date).lte('created_at', r.end_date + 'T23:59:59');
+    if (r.start_date && r.end_date) q = q.gte('created_at', etBoundUTC(r.start_date, false)).lte('created_at', etBoundUTC(r.end_date, true));
     else { const days = safeDays(req.query.days); if (days > 0) q = q.gte('created_at', new Date(Date.now() - days * 86400000).toISOString()); }
     const { data, error } = await q;
     if (error) throw error;
