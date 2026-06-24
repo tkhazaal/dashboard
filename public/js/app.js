@@ -2463,6 +2463,18 @@ function utmChannelOrders(channel) {
   for (const day of days) { const e = byDay[day] && byDay[day][channel]; if (e) { o += e.orders; r += e.revenue; } }
   return { orders: o, revenue: r };
 }
+// Orders attributed to a full UTM combo (source|medium|campaign|content), within range
+function utmRowOrders(row) {
+  const byDay = state.scData && state.scData.ordersByUtmByDay;
+  if (!byDay) return { orders: 0, revenue: 0 };
+  const n = v => String(v || '').toLowerCase().trim() || '(none)';
+  const key = `${n(row.source)}|${n(row.medium)}|${n(row.campaign)}|${n(row.content)}`;
+  const rng = utmOrderRange();
+  let o = 0, r = 0;
+  const days = rng ? daysInRange(rng[0], rng[1]) : Object.keys(byDay);
+  for (const day of days) { const e = byDay[day] && byDay[day][key]; if (e) { o += e.orders; r += e.revenue; } }
+  return { orders: o, revenue: r };
+}
 async function loadUtm() {
   buildUtm();
   $('utm-status').textContent = 'Loading…';
@@ -2510,9 +2522,11 @@ function renderUtmRows() {
   if (cpf !== 'all') rows = rows.filter(r => r.campaign === cpf);
   if (q) rows = rows.filter(r => (r.campaign + ' ' + r.content + ' ' + r.source + ' ' + r.channel).toLowerCase().includes(q));
   $('utm-count').textContent = `${fmtNum(rows.length)} of ${fmtNum((d.rows || []).length)}`;
-  $('utmRows').innerHTML = rows.slice(0, 300).map(r =>
-    `<tr><td><strong>${escHtml(r.channel)}</strong></td><td>${escHtml(r.source)}</td><td>${escHtml(r.medium)}</td><td>${escHtml(r.campaign)}</td><td>${escHtml(r.content)}</td><td>${fmtNum(r.views)}</td><td>${fmtNum(r.unique)}</td><td>${escHtml(String(r.lastSeen || '').slice(0, 10))}</td></tr>`).join('')
-    || `<tr class="empty-row"><td colspan="8">No UTM traffic matches</td></tr>`;
+  $('utmRows').innerHTML = rows.slice(0, 300).map(r => {
+    const ord = utmRowOrders(r);
+    return `<tr><td><strong>${escHtml(r.channel)}</strong></td><td>${escHtml(r.source)}</td><td>${escHtml(r.medium)}</td><td>${escHtml(r.campaign)}</td><td>${escHtml(r.content)}</td><td>${fmtNum(r.views)}</td><td>${fmtNum(r.unique)}</td><td>${r.checkoutViews ? fmtNum(r.checkoutViews) : '<span class="muted">—</span>'}</td><td>${ord.orders ? '<span class="orders-count">' + fmtNum(ord.orders) + '</span>' : '<span class="muted">—</span>'}</td><td>${escHtml(String(r.lastSeen || '').slice(0, 10))}</td></tr>`;
+  }).join('')
+    || `<tr class="empty-row"><td colspan="10">No UTM traffic matches</td></tr>`;
 }
 $('utm-range').addEventListener('change', loadUtm);
 ['utm-channel-filter', 'utm-campaign-filter', 'utm-search'].forEach(id => $(id).addEventListener('input', renderUtmRows));

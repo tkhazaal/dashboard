@@ -111,8 +111,8 @@ router.get('/utm', async (req, res) => {
       const checkout = isCheckoutUrl(row.page_url);
       total++; uniqAll.add(row.visitor_id);
       const key = s + '|' + m + '|' + c + '|' + ct;
-      if (!combo[key]) combo[key] = { source: s, medium: m, campaign: c, content: ct, channel, views: 0, uniq: new Set(), lastSeen: row.created_at };
-      combo[key].views++; combo[key].uniq.add(row.visitor_id);
+      if (!combo[key]) combo[key] = { source: s, medium: m, campaign: c, content: ct, channel, views: 0, uniq: new Set(), coViews: 0, lastSeen: row.created_at };
+      if (checkout) combo[key].coViews++; else { combo[key].views++; combo[key].uniq.add(row.visitor_id); }
       if (row.created_at > combo[key].lastSeen) combo[key].lastSeen = row.created_at;
       if (!bySource[s]) bySource[s] = { source: s, views: 0, uniq: new Set() };
       bySource[s].views++; bySource[s].uniq.add(row.visitor_id);
@@ -122,7 +122,7 @@ router.get('/utm', async (req, res) => {
       if (c !== '(none)') bc.camps.add(c);
       if (row.created_at > bc.lastSeen) bc.lastSeen = row.created_at;
     }
-    const rows = Object.values(combo).map(c => ({ source: c.source, medium: c.medium, campaign: c.campaign, content: c.content, channel: c.channel, views: c.views, unique: c.uniq.size, lastSeen: c.lastSeen })).sort((a, b) => b.views - a.views);
+    const rows = Object.values(combo).map(c => ({ source: c.source, medium: c.medium, campaign: c.campaign, content: c.content, channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
     const sources = Object.values(bySource).map(s => ({ source: s.source, views: s.views, unique: s.uniq.size })).sort((a, b) => b.views - a.views);
     const channels = Object.values(byChannel).map(c => ({ channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, checkoutUnique: c.coUniq.size, campaigns: c.camps.size, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
     res.json({

@@ -201,6 +201,7 @@ async function computeMetrics(orders, apiKey) {
   const ordersBySlug = {};      // slug -> { orders, revenue }  (all-time)
   const ordersBySlugByDay = {}; // 'YYYY-MM-DD' -> { slug -> { orders, revenue } } (date-filtered Page Analytics)
   const ordersByChannelByDay = {}; // 'YYYY-MM-DD' -> { channel -> { orders, revenue } } from order.utm_parameters
+  const ordersByUtmByDay = {};     // 'YYYY-MM-DD' -> { 'source|medium|campaign|content' -> { orders, revenue } }
   const upsellTotals = {};   // upsellName -> { orders, revenue }
   const upsellBySlug = {};   // mainSlug -> { upsellName -> { orders, revenue } }
 
@@ -217,15 +218,20 @@ async function computeMetrics(orders, apiKey) {
     const dRev = String(date || '').slice(0, 10);
     if (dRev) { (dailyRevenue[dRev] || (dailyRevenue[dRev] = { revenue: 0, orders: 0 })); dailyRevenue[dRev].revenue += amount; dailyRevenue[dRev].orders++; }
 
-    // Attribute the order to a UTM channel (when the checkout carried UTM)
+    // Attribute the order to a UTM channel + full UTM combo (when the checkout carried UTM)
     const up = o.utm_parameters || {};
-    if (dRev && (up.source || up.medium || up.content)) {
+    if (dRev && (up.source || up.medium || up.content || up.campaign)) {
       const ch = utmChannel(up.content, up.source, up.medium);
       if (ch && ch !== '(untagged)') {
         if (!ordersByChannelByDay[dRev]) ordersByChannelByDay[dRev] = {};
         if (!ordersByChannelByDay[dRev][ch]) ordersByChannelByDay[dRev][ch] = { orders: 0, revenue: 0 };
         ordersByChannelByDay[dRev][ch].orders++; ordersByChannelByDay[dRev][ch].revenue += amount;
       }
+      const norm = v => String(v || '').toLowerCase().trim() || '(none)';
+      const ukey = `${norm(up.source)}|${norm(up.medium)}|${norm(up.campaign)}|${norm(up.content)}`;
+      if (!ordersByUtmByDay[dRev]) ordersByUtmByDay[dRev] = {};
+      if (!ordersByUtmByDay[dRev][ukey]) ordersByUtmByDay[dRev][ukey] = { orders: 0, revenue: 0 };
+      ordersByUtmByDay[dRev][ukey].orders++; ordersByUtmByDay[dRev][ukey].revenue += amount;
     }
 
     // Attribute this order to the main product's slug
@@ -433,7 +439,7 @@ async function computeMetrics(orders, apiKey) {
     refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
-    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, upsellProducts, upsellBySlug,
+    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, upsellProducts, upsellBySlug,
     productSales, productList: sortedProductList, productSlug, salesByDay,
     dailyRevenue, refundsByDay,
   };
