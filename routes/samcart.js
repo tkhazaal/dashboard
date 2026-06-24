@@ -3,6 +3,7 @@ const router   = express.Router();
 const fetch    = require('node-fetch');
 const https    = require('https');
 const supabase = require('../database');
+const { utmChannel } = require('../channel');   // shared UTM → channel resolver
 
 const BASE_URL  = 'https://api.samcart.com/v1';
 const CACHE_TTL = parseInt(process.env.SAMCART_CACHE_MINUTES || '60', 10) * 60 * 1000;
@@ -199,6 +200,7 @@ async function computeMetrics(orders, apiKey) {
   const custMap = new Map();
   const ordersBySlug = {};      // slug -> { orders, revenue }  (all-time)
   const ordersBySlugByDay = {}; // 'YYYY-MM-DD' -> { slug -> { orders, revenue } } (date-filtered Page Analytics)
+  const ordersByChannelByDay = {}; // 'YYYY-MM-DD' -> { channel -> { orders, revenue } } from order.utm_parameters
   const upsellTotals = {};   // upsellName -> { orders, revenue }
   const upsellBySlug = {};   // mainSlug -> { upsellName -> { orders, revenue } }
 
@@ -214,6 +216,17 @@ async function computeMetrics(orders, apiKey) {
     // Daily revenue + distinct order count (drives date-filtered Reporting)
     const dRev = String(date || '').slice(0, 10);
     if (dRev) { (dailyRevenue[dRev] || (dailyRevenue[dRev] = { revenue: 0, orders: 0 })); dailyRevenue[dRev].revenue += amount; dailyRevenue[dRev].orders++; }
+
+    // Attribute the order to a UTM channel (when the checkout carried UTM)
+    const up = o.utm_parameters || {};
+    if (dRev && (up.source || up.medium || up.content)) {
+      const ch = utmChannel(up.content, up.source, up.medium);
+      if (ch && ch !== '(untagged)') {
+        if (!ordersByChannelByDay[dRev]) ordersByChannelByDay[dRev] = {};
+        if (!ordersByChannelByDay[dRev][ch]) ordersByChannelByDay[dRev][ch] = { orders: 0, revenue: 0 };
+        ordersByChannelByDay[dRev][ch].orders++; ordersByChannelByDay[dRev][ch].revenue += amount;
+      }
+    }
 
     // Attribute this order to the main product's slug
     const main = orderMainItem(o);
@@ -420,7 +433,7 @@ async function computeMetrics(orders, apiKey) {
     refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
-    ordersBySlug, ordersBySlugByDay, upsellProducts, upsellBySlug,
+    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, upsellProducts, upsellBySlug,
     productSales, productList: sortedProductList, productSlug, salesByDay,
     dailyRevenue, refundsByDay,
   };

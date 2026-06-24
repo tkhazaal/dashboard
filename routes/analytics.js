@@ -20,35 +20,8 @@ function range(req) {
   return (start_date && end_date) ? { start_date, end_date } : {};
 }
 
-// Derive a channel type from UTM params (primarily utm_content). New campaigns auto-group:
-//  1) known channel-type content (fb_post…) → clean label
-//  2) a clean new slug (e.g. yt_shorts)      → title-cased (auto-detected new channel)
-//  3) creative content (subject lines, ad IDs) → fall back to source+medium bucket
-const UTM_CHANNELS = {        // utm_content → channel label (the agreed quiz scheme)
-  fb_post: 'FB Post', fb_posts: 'FB Post', fb_stories: 'FB Stories', fb_story: 'FB Stories',
-  ig_post: 'IG Post', ig_posts: 'IG Post', ig_stories: 'IG Stories', ig_story: 'IG Stories',
-  fb_group: 'FB Group', email: 'Email', tiktok: 'TikTok', tt: 'TikTok',
-  fb_ads: 'FB Ads', fb_ad: 'FB Ads', fbads: 'FB Ads',
-};
-const SRC_MED_CHANNELS = {    // source|medium → channel (fallback for legacy/creative content)
-  'facebook|paid_social': 'FB Ads', 'fb|paid': 'FB Ads', 'facebook|paid': 'FB Ads', 'fb|paid_social': 'FB Ads',
-  'facebook|community': 'FB Group',
-  'facebook|social': 'Facebook (Social)', 'fb|social': 'Facebook (Social)',
-  'instagram|social': 'Instagram (Social)', 'ig|social': 'Instagram (Social)',
-  'instagram|paid_social': 'IG Ads', 'ig|paid': 'IG Ads', 'instagram|paid': 'IG Ads', 'ig|paid_social': 'IG Ads',
-  'tiktok|social': 'TikTok', 'tiktok|paid_social': 'TikTok', 'tiktok|paid': 'TikTok',
-};
-const titleize = s => String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
-function utmChannel(content, source, medium) {
-  const c = String(content || '').toLowerCase().trim();
-  if (UTM_CHANNELS[c]) return UTM_CHANNELS[c];                       // known channel type
-  if (/^[a-z][a-z0-9_]{0,23}$/.test(c)) return titleize(c);         // clean new slug → new channel
-  const s = String(source || '').toLowerCase().trim(), m = String(medium || '').toLowerCase().trim();
-  if (SRC_MED_CHANNELS[s + '|' + m]) return SRC_MED_CHANNELS[s + '|' + m];
-  if (m === 'email' || s === 'email') return 'Email';
-  if (s) return titleize(s) + (m ? ' · ' + titleize(m) : '');
-  return '(untagged)';
-}
+const { utmChannel } = require('../channel');   // shared UTM → channel resolver
+const isCheckoutUrl = u => /samcart/i.test(u) || /\/products?(\/|\?|$)/i.test(u);
 
 router.get('/overview', async (req, res) => {
   try {
@@ -135,6 +108,7 @@ router.get('/utm', async (req, res) => {
       if (!src && !med && !camp && !cont) continue;                     // require at least one utm
       const s = src || '(none)', m = med || '(none)', c = camp || '(none)', ct = cont || '(none)';
       const channel = utmChannel(cont, src, med);
+      const checkout = isCheckoutUrl(row.page_url);
       total++; uniqAll.add(row.visitor_id);
       const key = s + '|' + m + '|' + c + '|' + ct;
       if (!combo[key]) combo[key] = { source: s, medium: m, campaign: c, content: ct, channel, views: 0, uniq: new Set(), lastSeen: row.created_at };
@@ -142,13 +116,15 @@ router.get('/utm', async (req, res) => {
       if (row.created_at > combo[key].lastSeen) combo[key].lastSeen = row.created_at;
       if (!bySource[s]) bySource[s] = { source: s, views: 0, uniq: new Set() };
       bySource[s].views++; bySource[s].uniq.add(row.visitor_id);
-      if (!byChannel[channel]) byChannel[channel] = { channel, views: 0, uniq: new Set(), camps: new Set(), lastSeen: row.created_at };
-      byChannel[channel].views++; byChannel[channel].uniq.add(row.visitor_id); if (c !== '(none)') byChannel[channel].camps.add(c);
-      if (row.created_at > byChannel[channel].lastSeen) byChannel[channel].lastSeen = row.created_at;
+      if (!byChannel[channel]) byChannel[channel] = { channel, views: 0, uniq: new Set(), coViews: 0, coUniq: new Set(), camps: new Set(), lastSeen: row.created_at };
+      const bc = byChannel[channel];
+      if (checkout) { bc.coViews++; bc.coUniq.add(row.visitor_id); } else { bc.views++; bc.uniq.add(row.visitor_id); }
+      if (c !== '(none)') bc.camps.add(c);
+      if (row.created_at > bc.lastSeen) bc.lastSeen = row.created_at;
     }
     const rows = Object.values(combo).map(c => ({ source: c.source, medium: c.medium, campaign: c.campaign, content: c.content, channel: c.channel, views: c.views, unique: c.uniq.size, lastSeen: c.lastSeen })).sort((a, b) => b.views - a.views);
     const sources = Object.values(bySource).map(s => ({ source: s.source, views: s.views, unique: s.uniq.size })).sort((a, b) => b.views - a.views);
-    const channels = Object.values(byChannel).map(c => ({ channel: c.channel, views: c.views, unique: c.uniq.size, campaigns: c.camps.size, lastSeen: c.lastSeen })).sort((a, b) => b.views - a.views);
+    const channels = Object.values(byChannel).map(c => ({ channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, checkoutUnique: c.coUniq.size, campaigns: c.camps.size, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
     res.json({
       total, unique: uniqAll.size,
       distinctSources: sources.length, distinctChannels: channels.length,

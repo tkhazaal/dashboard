@@ -2449,9 +2449,24 @@ function utmRangeParams() {
   if (!r || (!r[0] && !r[1])) return '';
   return `start=${ymd(r[0])}&end=${ymd(r[1])}`;
 }
+function utmOrderRange() {
+  const r = funnelPresetRange($('utm-range').value);
+  return (r && r[0] && r[1]) ? [ymd(r[0]), ymd(r[1])] : null;
+}
+// Orders attributed to a channel (from SamCart utm_parameters), within the UTM date range
+function utmChannelOrders(channel) {
+  const byDay = state.scData && state.scData.ordersByChannelByDay;
+  if (!byDay) return { orders: 0, revenue: 0 };
+  const rng = utmOrderRange();
+  let o = 0, r = 0;
+  const days = rng ? daysInRange(rng[0], rng[1]) : Object.keys(byDay);
+  for (const day of days) { const e = byDay[day] && byDay[day][channel]; if (e) { o += e.orders; r += e.revenue; } }
+  return { orders: o, revenue: r };
+}
 async function loadUtm() {
   buildUtm();
   $('utm-status').textContent = 'Loading…';
+  if (!state.scData) await loadSamCart().catch(() => {});   // need SamCart for channel orders
   try { renderUtm(await api('/api/analytics/utm' + (utmRangeParams() ? '?' + utmRangeParams() : ''))); $('utm-status').textContent = ''; }
   catch { $('utm-status').textContent = 'Error loading'; }
 }
@@ -2471,7 +2486,10 @@ function renderUtm(d) {
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtNum(c.raw) + ' views' } } },
       scales: { x: { grid: { color: GRID }, ticks: { font: { size: 9 }, color: TICK } }, y: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } } } },
   });
-  $('utmChannels').innerHTML = (d.channels || []).map(c => `<tr><td><strong>${escHtml(c.channel)}</strong></td><td>${fmtNum(c.views)}</td><td>${fmtNum(c.unique)}</td><td>${fmtNum(c.campaigns)}</td></tr>`).join('') || `<tr class="empty-row"><td colspan="4">No UTM traffic</td></tr>`;
+  $('utmChannels').innerHTML = (d.channels || []).map(c => {
+    const ord = utmChannelOrders(c.channel);
+    return `<tr><td><strong>${escHtml(c.channel)}</strong></td><td>${fmtNum(c.views)}</td><td>${fmtNum(c.unique)}</td><td>${c.checkoutViews ? fmtNum(c.checkoutViews) : '<span class="muted">—</span>'}</td><td>${ord.orders ? '<span class="orders-count">' + fmtNum(ord.orders) + '</span>' : '<span class="muted">—</span>'}</td></tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="5">No UTM traffic</td></tr>`;
 
   // Populate filter dropdowns
   const chans = [...new Set((d.rows || []).map(r => r.channel))].sort();
