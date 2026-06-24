@@ -951,6 +951,16 @@ table.show-upsell .upsell-col { display: table-cell; }
 .utm-builder-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
 @media (max-width: 760px) { .utm-builder { grid-template-columns: 1fr; } }
 
+/* Per-tab Refresh button */
+.refresh-tab {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: 600 12px var(--font-body); padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  white-space: nowrap; transition: border-color .12s, color .12s;
+}
+.refresh-tab:hover { border-color: var(--accent); color: var(--accent); }
+.refresh-tab:disabled { opacity: 0.6; cursor: default; }
+
 /* Help "?" tooltips on cards */
 .help {
   display: inline-flex; align-items: center; justify-content: center;

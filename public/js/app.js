@@ -269,6 +269,39 @@ window.addEventListener('DOMContentLoaded', () => {
   if (tab && document.querySelector(`.nav-item[data-tab="${tab}"]`)) activateTab(tab);
 });
 
+// ── Per-tab Refresh ───────────────────────────────────────────────
+// Each reporting tab gets its own Refresh button that reloads only that tab's data
+// (and re-renders the widgets it shows). Sidebar "Refresh All Data" still does everything.
+const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 'email', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
+async function refreshTab(tab, btn) {
+  if (btn) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Refreshing…'; }
+  try {
+    if (tab === 'overview')      await Promise.allSettled([applyCompare(state.cmpPreset || 'mtd'), loadSamCart(), loadKajabiData()]);
+    else if (tab === 'reports')  { await loadSamCart(); await loadReports(); }
+    else if (tab === 'funnels')  { await Promise.allSettled([loadSamCart(), loadPagesTable()]); renderFunnels(); }
+    else if (tab === 'ads')      { await loadSamCart(); renderAds(); }
+    else if (tab === 'kajabi')   await loadKajabi();
+    else if (tab === 'email')    await loadEmail();
+    else if (tab === 'pages')    await Promise.allSettled([loadPagesTable(), loadSamCart()]);
+    else if (tab === 'utm')      await loadUtm();
+    else if (tab === 'customers' || tab === 'behaviour' || tab === 'paths') await loadSamCart();
+  } catch {}
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset.label || '↻ Refresh'; } }
+}
+// Inject a Refresh button into each refreshable tab's header
+document.querySelectorAll('.tab').forEach(sec => {
+  const tab = sec.id.replace('tab-', '');
+  if (!REFRESHABLE.has(tab)) return;
+  const header = sec.querySelector('.page-header'); if (!header) return;
+  let pills = header.querySelector('.header-pills');
+  if (!pills) { pills = document.createElement('div'); pills.className = 'header-pills'; header.appendChild(pills); }
+  if (pills.querySelector('.refresh-tab')) return;
+  const btn = document.createElement('button');
+  btn.className = 'refresh-tab'; btn.type = 'button'; btn.dataset.refresh = tab; btn.innerHTML = '↻ Refresh';
+  pills.appendChild(btn);
+});
+document.addEventListener('click', e => { const b = e.target.closest('.refresh-tab'); if (b) refreshTab(b.dataset.refresh, b); });
+
 // ── Date button groups ────────────────────────────────────────────
 function initDateBtns(groupId, onSelect) {
   const group = $(groupId);
