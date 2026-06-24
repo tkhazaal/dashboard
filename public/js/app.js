@@ -239,6 +239,7 @@ const state = {
   repKajabi:        null,
   acData:           null,
   kajabiData:       null,
+  utmData:          null,
 };
 
 // ── Tab navigation ────────────────────────────────────────────────
@@ -2422,26 +2423,48 @@ async function loadUtm() {
   catch { $('utm-status').textContent = 'Error loading'; }
 }
 function renderUtm(d) {
+  state.utmData = d;
   $('utm-kpis').innerHTML = [
     ['UTM Visits', fmtNum(d.total || 0), 'tagged page visits'],
     ['Unique Visitors', fmtNum(d.unique || 0), 'distinct visitors'],
-    ['Sources', fmtNum(d.distinctSources || 0), 'utm_source values'],
+    ['Channel Types', fmtNum(d.distinctChannels || 0), 'grouped by utm_content'],
     ['Campaigns', fmtNum(d.distinctCampaigns || 0), 'utm_campaign values'],
   ].map(([l, v, s]) => `<div class="stat-card"><div class="stat-label">${l}</div><div class="stat-value">${v}</div><div class="stat-sub">${s}</div></div>`).join('');
-  const src = (d.sources || []).slice(0, 10);
-  mkChart('utmSourceChart', {
+
+  const ch = (d.channels || []).slice(0, 14);
+  mkChart('utmChannelChart', {
     type: 'bar',
-    data: { labels: src.map(s => s.source), datasets: [{ data: src.map(s => s.views), backgroundColor: '#2563eb', borderRadius: 5 }] },
+    data: { labels: ch.map(c => c.channel), datasets: [{ data: ch.map(c => c.views), backgroundColor: '#2563eb', borderRadius: 5 }] },
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtNum(c.raw) + ' views' } } },
       scales: { x: { grid: { color: GRID }, ticks: { font: { size: 9 }, color: TICK } }, y: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } } } },
   });
-  $('utmSources').innerHTML = (d.sources || []).map(s => `<tr><td>${escHtml(s.source)}</td><td>${fmtNum(s.views)}</td><td>${fmtNum(s.unique)}</td></tr>`).join('') || `<tr class="empty-row"><td colspan="3">No UTM traffic</td></tr>`;
-  $('utm-count').textContent = `${fmtNum((d.rows || []).length)} combos`;
-  $('utmRows').innerHTML = (d.rows || []).slice(0, 250).map(r =>
-    `<tr><td>${escHtml(r.source)}</td><td>${escHtml(r.medium)}</td><td>${escHtml(r.campaign)}</td><td>${fmtNum(r.views)}</td><td>${fmtNum(r.unique)}</td><td>${escHtml(String(r.lastSeen || '').slice(0, 10))}</td></tr>`).join('')
-    || `<tr class="empty-row"><td colspan="6">No UTM traffic in this range</td></tr>`;
+  $('utmChannels').innerHTML = (d.channels || []).map(c => `<tr><td><strong>${escHtml(c.channel)}</strong></td><td>${fmtNum(c.views)}</td><td>${fmtNum(c.unique)}</td><td>${fmtNum(c.campaigns)}</td></tr>`).join('') || `<tr class="empty-row"><td colspan="4">No UTM traffic</td></tr>`;
+
+  // Populate filter dropdowns
+  const chans = [...new Set((d.rows || []).map(r => r.channel))].sort();
+  const camps = [...new Set((d.rows || []).map(r => r.campaign).filter(c => c !== '(none)'))].sort();
+  const cf = $('utm-channel-filter'), curCf = cf.value || 'all';
+  cf.innerHTML = '<option value="all">All channels</option>' + chans.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  cf.value = chans.includes(curCf) ? curCf : 'all';
+  const pf = $('utm-campaign-filter'), curPf = pf.value || 'all';
+  pf.innerHTML = '<option value="all">All campaigns</option>' + camps.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  pf.value = camps.includes(curPf) ? curPf : 'all';
+  renderUtmRows();
+}
+function renderUtmRows() {
+  const d = state.utmData; if (!d) return;
+  const chf = $('utm-channel-filter').value, cpf = $('utm-campaign-filter').value, q = ($('utm-search').value || '').toLowerCase();
+  let rows = d.rows || [];
+  if (chf !== 'all') rows = rows.filter(r => r.channel === chf);
+  if (cpf !== 'all') rows = rows.filter(r => r.campaign === cpf);
+  if (q) rows = rows.filter(r => (r.campaign + ' ' + r.content + ' ' + r.source + ' ' + r.channel).toLowerCase().includes(q));
+  $('utm-count').textContent = `${fmtNum(rows.length)} of ${fmtNum((d.rows || []).length)}`;
+  $('utmRows').innerHTML = rows.slice(0, 300).map(r =>
+    `<tr><td><strong>${escHtml(r.channel)}</strong></td><td>${escHtml(r.source)}</td><td>${escHtml(r.medium)}</td><td>${escHtml(r.campaign)}</td><td>${escHtml(r.content)}</td><td>${fmtNum(r.views)}</td><td>${fmtNum(r.unique)}</td><td>${escHtml(String(r.lastSeen || '').slice(0, 10))}</td></tr>`).join('')
+    || `<tr class="empty-row"><td colspan="8">No UTM traffic matches</td></tr>`;
 }
 $('utm-range').addEventListener('change', loadUtm);
+['utm-channel-filter', 'utm-campaign-filter', 'utm-search'].forEach(id => $(id).addEventListener('input', renderUtmRows));
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {

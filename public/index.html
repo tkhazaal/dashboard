@@ -750,22 +750,30 @@
 
       <div class="two-col">
         <div class="card">
-          <div class="card-header"><h2>Top sources</h2></div>
-          <div class="chart-wrap"><canvas id="utmSourceChart"></canvas></div>
+          <div class="card-header"><h2>Traffic by channel type</h2></div>
+          <div class="chart-wrap"><canvas id="utmChannelChart"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-header"><h2>Source breakdown</h2></div>
+          <div class="card-header"><h2>Channel breakdown</h2></div>
           <div class="table-wrap">
-            <table class="data-table"><thead><tr><th>Source</th><th>Views</th><th>Unique</th></tr></thead><tbody id="utmSources"></tbody></table>
+            <table class="data-table"><thead><tr><th>Channel</th><th>Views</th><th>Unique</th><th>Campaigns</th></tr></thead><tbody id="utmChannels"></tbody></table>
           </div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header"><h2>Source · Medium · Campaign</h2><span class="pill" id="utm-count"></span></div>
+        <div class="card-header">
+          <h2>Campaign detail</h2>
+          <div class="email-filters">
+            <select id="utm-channel-filter" class="cmp-preset"><option value="all">All channels</option></select>
+            <select id="utm-campaign-filter" class="cmp-preset"><option value="all">All campaigns</option></select>
+            <input id="utm-search" class="date-input" type="search" placeholder="Search…">
+            <span class="pill" id="utm-count"></span>
+          </div>
+        </div>
         <div class="table-wrap">
           <table class="data-table">
-            <thead><tr><th>Source</th><th>Medium</th><th>Campaign</th><th>Views</th><th>Unique</th><th>Last seen</th></tr></thead>
+            <thead><tr><th>Channel</th><th>Source</th><th>Medium</th><th>Campaign</th><th>Content</th><th>Views</th><th>Unique</th><th>Last seen</th></tr></thead>
             <tbody id="utmRows"></tbody>
           </table>
         </div>
