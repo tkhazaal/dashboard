@@ -951,6 +951,26 @@ table.show-upsell .upsell-col { display: table-cell; }
 .utm-builder-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
 @media (max-width: 760px) { .utm-builder { grid-template-columns: 1fr; } }
 
+/* Version badge in the sidebar footer */
+.version-btn {
+  margin-top: 8px; width: 100%; border: none; background: transparent; cursor: pointer;
+  color: rgba(255,255,255,0.45); font: 600 11px var(--font-body); letter-spacing: 0.03em;
+  padding: 4px; border-radius: 6px;
+}
+.version-btn:hover { color: #fff; background: rgba(255,255,255,0.07); }
+
+/* What's New / release notes */
+.release { margin-bottom: 16px; }
+.release-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.release-ver { font-family: var(--font-display); font-weight: 800; font-size: 18px; color: var(--text); }
+.release-badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
+.release-title { font-weight: 600; color: var(--sub); font-size: 14px; }
+.release-date { margin-left: auto; font-size: 12px; color: var(--sub); }
+.release-latest { border: 1.5px solid var(--accent); }
+.release-changes { margin: 0; padding-left: 20px; }
+.release-changes li { font-size: 13.5px; line-height: 1.65; color: var(--text); margin-bottom: 7px; }
+.release-changes li strong { color: var(--text); }
+
 /* Per-tab Refresh button */
 .refresh-tab {
   display: inline-flex; align-items: center; gap: 5px;

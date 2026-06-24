@@ -302,6 +302,36 @@ document.querySelectorAll('.tab').forEach(sec => {
 });
 document.addEventListener('click', e => { const b = e.target.closest('.refresh-tab'); if (b) refreshTab(b.dataset.refresh, b); });
 
+// ── Version + What's New ──────────────────────────────────────────
+function openWhatsNew() {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const sec = $('tab-whatsnew'); if (sec) sec.classList.add('active');
+  if (history.replaceState) history.replaceState(null, '', '#whatsnew');
+  renderWhatsNew();
+}
+function renderWhatsNew() {
+  const log = (typeof CHANGELOG !== 'undefined' && CHANGELOG) || [];
+  $('whatsnew-version').textContent = 'Current: v' + (typeof APP_VERSION !== 'undefined' ? APP_VERSION : '1.0.0');
+  $('whatsnewList').innerHTML = log.map((r, i) => `
+    <div class="card release${i === 0 ? ' release-latest' : ''}">
+      <div class="release-head">
+        <span class="release-ver">v${escHtml(r.version)}</span>
+        ${i === 0 ? '<span class="release-badge">Latest</span>' : ''}
+        <span class="release-title">${escHtml(r.title)}</span>
+        <span class="release-date">${escHtml(r.date)}</span>
+      </div>
+      <ul class="release-changes">
+        ${(r.changes || []).map(c => `<li><strong>${escHtml(c.title)}</strong> — ${escHtml(c.detail)}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+}
+if ($('versionBtn')) {
+  $('versionBtn').textContent = 'v' + (typeof APP_VERSION !== 'undefined' ? APP_VERSION : '1.0.0');
+  $('versionBtn').addEventListener('click', openWhatsNew);
+}
+if ((location.hash || '') === '#whatsnew') openWhatsNew();
+
 // ── Date button groups ────────────────────────────────────────────
 function initDateBtns(groupId, onSelect) {
   const group = $(groupId);

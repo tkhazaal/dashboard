@@ -98,6 +98,7 @@
         Sync SamCart
       </button>
       <div class="sync-status" id="syncStatus"></div>
+      <button class="version-btn" id="versionBtn" title="What's new in this version">v—</button>
     </div>
   </aside>
 
@@ -1120,9 +1121,19 @@
       </div>
     </section>
 
+    <!-- ── WHAT'S NEW ──────────────────────── -->
+    <section class="tab" id="tab-whatsnew">
+      <div class="page-header">
+        <div><h1>What's New</h1><p class="subtitle">Release notes — what changed in each update</p></div>
+        <div class="header-pills"><span class="pill" id="whatsnew-version"></span></div>
+      </div>
+      <div id="whatsnewList"></div>
+    </section>
+
   </main>
 </div>
 
+<script src="/js/changelog.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>
