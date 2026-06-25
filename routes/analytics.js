@@ -34,6 +34,13 @@ function range(req) {
 
 const { utmChannel } = require('../channel');   // shared UTM → channel resolver
 const isCheckoutUrl = u => /samcart/i.test(u) || /\/products?(\/|\?|$)/i.test(u);
+// A purchase-confirmation / thank-you page (our pixel placed there marks a completed sale).
+// Excludes funnel-builder "preview" pages, which aren't real purchases.
+const isConfirmationUrl = u => {
+  const s = String(u);
+  if (/preview/i.test(s)) return false;
+  return /thank|confirm|order[-_]?received|order[-_]?success|purchase[-_]?complete|\/complete\/|receipt/i.test(s);
+};
 
 router.get('/overview', async (req, res) => {
   try {
@@ -113,6 +120,7 @@ router.get('/utm', async (req, res) => {
 
     const getp = (url, k) => { const m = String(url).match(new RegExp('[?&]' + k + '=([^&#]*)', 'i')); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')).trim() : ''; };
     const combo = {}, bySource = {}, byChannel = {}; let total = 0; const uniqAll = new Set();
+    const visitorChannel = {}, visitorCombo = {};   // each visitor's most-recent UTM channel/combo (for order attribution)
     for (const row of data || []) {
       if (/^\/complete(\/|$)/i.test(row.page_path || '')) continue;     // skip confirmation pages
       const src = getp(row.page_url, 'utm_source'), med = getp(row.page_url, 'utm_medium'),
@@ -123,6 +131,7 @@ router.get('/utm', async (req, res) => {
       const checkout = isCheckoutUrl(row.page_url);
       total++; uniqAll.add(row.visitor_id);
       const key = s + '|' + m + '|' + c + '|' + ct;
+      if (!visitorChannel[row.visitor_id]) { visitorChannel[row.visitor_id] = channel; visitorCombo[row.visitor_id] = key; }
       if (!combo[key]) combo[key] = { source: s, medium: m, campaign: c, content: ct, channel, views: 0, uniq: new Set(), coViews: 0, lastSeen: row.created_at };
       if (checkout) combo[key].coViews++; else { combo[key].views++; combo[key].uniq.add(row.visitor_id); }
       if (row.created_at > combo[key].lastSeen) combo[key].lastSeen = row.created_at;
@@ -134,11 +143,39 @@ router.get('/utm', async (req, res) => {
       if (c !== '(none)') bc.camps.add(c);
       if (row.created_at > bc.lastSeen) bc.lastSeen = row.created_at;
     }
-    const rows = Object.values(combo).map(c => ({ source: c.source, medium: c.medium, campaign: c.campaign, content: c.content, channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
+    // ── Orders = purchase-confirmation / thank-you page views (our pixel on the
+    // post-checkout page). Each is attributed to a channel via the page's own UTM,
+    // else the visitor's most-recent UTM visit. One order per visitor (dedupe refreshes).
+    const ordersByCh = {}, ordersByCombo = {}; let totalOrders = 0;
+    try {
+      let cq = supabase.from('page_views').select('page_url, page_path, visitor_id, created_at')
+        .or('page_url.ilike.*thank*,page_url.ilike.*confirm*,page_url.ilike.*/complete/*,page_url.ilike.*receipt*,page_url.ilike.*order-received*,page_url.ilike.*order-success*,page_url.ilike.*order_received*')
+        .order('created_at', { ascending: false }).range(0, 7999);
+      if (r.start_date && r.end_date) cq = cq.gte('created_at', etBoundUTC(r.start_date, false)).lte('created_at', etBoundUTC(r.end_date, true));
+      else { const days = safeDays(req.query.days); if (days > 0) cq = cq.gte('created_at', new Date(Date.now() - days * 86400000).toISOString()); }
+      const { data: confs } = await cq;
+      const seen = new Set();
+      for (const cv of (confs || [])) {
+        if (!isConfirmationUrl(cv.page_url)) continue;
+        if (seen.has(cv.visitor_id)) continue;            // one order per visitor
+        const oc = getp(cv.page_url, 'utm_content'), os = getp(cv.page_url, 'utm_source'),
+              om = getp(cv.page_url, 'utm_medium'), ocamp = getp(cv.page_url, 'utm_campaign');
+        let ch, ck;
+        if (oc || os || ocamp) { ch = utmChannel(oc, os, om); ck = `${os || '(none)'}|${om || '(none)'}|${ocamp || '(none)'}|${oc || '(none)'}`; }
+        else if (visitorChannel[cv.visitor_id]) { ch = visitorChannel[cv.visitor_id]; ck = visitorCombo[cv.visitor_id]; }
+        else continue;                                    // can't attribute → skip
+        seen.add(cv.visitor_id);
+        ordersByCh[ch] = (ordersByCh[ch] || 0) + 1;
+        if (ck) ordersByCombo[ck] = (ordersByCombo[ck] || 0) + 1;
+        totalOrders++;
+      }
+    } catch (e) { /* order attribution is best-effort */ }
+
+    const rows = Object.values(combo).map(c => ({ source: c.source, medium: c.medium, campaign: c.campaign, content: c.content, channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, orders: ordersByCombo[`${c.source}|${c.medium}|${c.campaign}|${c.content}`] || 0, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
     const sources = Object.values(bySource).map(s => ({ source: s.source, views: s.views, unique: s.uniq.size })).sort((a, b) => b.views - a.views);
-    const channels = Object.values(byChannel).map(c => ({ channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, checkoutUnique: c.coUniq.size, campaigns: c.camps.size, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
+    const channels = Object.values(byChannel).map(c => ({ channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, checkoutUnique: c.coUniq.size, campaigns: c.camps.size, orders: ordersByCh[c.channel] || 0, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
     res.json({
-      total, unique: uniqAll.size,
+      total, unique: uniqAll.size, totalOrders,
       distinctSources: sources.length, distinctChannels: channels.length,
       distinctCampaigns: new Set(rows.map(r => r.campaign).filter(c => c !== '(none)')).size,
       channels, sources, rows,

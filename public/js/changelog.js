@@ -2,6 +2,14 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.7.0', date: '2026-06-26', title: 'UTM orders via thank-you-page tracking',
+    changes: [
+      { title: 'Orders attributed by channel', detail: 'The UTM page now counts orders per channel using your own page tracking — a buyer\'s checkout visit (which carries the channel) plus their purchase-confirmation page view = one attributed sale. This works even though SamCart doesn\'t save the UTM on the order.' },
+      { title: 'Add the snippet to your thank-you page', detail: 'Paste the tracking snippet on your post-purchase / order-confirmation page (just like the quiz). From then on, every campaign sale shows up in the UTM table by channel.' },
+      { title: 'Eastern Time everywhere', detail: 'All days, months and date filters — page views, SamCart, Kajabi — now report on Eastern Time (EST/EDT) instead of UTC.' },
+    ],
+  },
+  {
     version: '1.6.0', date: '2026-06-24', title: 'UTM tracking & channel attribution',
     changes: [
       { title: 'UTM & Links tab', detail: 'A new page to build tagged campaign links and track traffic by channel type (FB Post, IG Stories, Email, TikTok…), auto-detected from each link\'s utm_content. New channel types appear automatically — no setup.' },
