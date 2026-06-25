@@ -1771,7 +1771,7 @@ function prodSales(name) {
 function daysInRange(s, e) {
   const out = []; let cur = new Date(s + 'T00:00:00'); const end = new Date(e + 'T00:00:00');
   let guard = 0;
-  while (cur <= end && guard++ < 1500) { out.push(ymd(cur)); cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1); }
+  while (cur <= end && guard++ < 4000) { out.push(ymd(cur)); cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1); }
   return out;
 }
 // Sales for a product between two dates (inclusive); all-time when no range
@@ -2500,8 +2500,8 @@ document.querySelectorAll('.utm-preset-btn').forEach(btn => btn.addEventListener
   if (r && r[0] && r[1]) setUtmRange(ymd(r[0]), ymd(r[1]), btn.textContent, btn);
 }));
 if ($('utm-apply')) $('utm-apply').addEventListener('click', () => {
-  const s = $('utm-start').value, e = $('utm-end').value;
-  if (s && e) setUtmRange(s, e, `${s} → ${e}`, null);
+  let s = $('utm-start').value, e = $('utm-end').value;
+  if (s && e) { if (s > e) { const t = s; s = e; e = t; } setUtmRange(s, e, `${s} → ${e}`, null); }
 });
 if ($('cxp-campaign')) $('cxp-campaign').addEventListener('change', renderCxp);
 // Orders attributed to a channel (from SamCart utm_parameters), within the UTM date range
@@ -2596,12 +2596,11 @@ function renderCxp() {
   const camp = $('cxp-campaign') ? $('cxp-campaign').value : '';
   if (!d || !camp) { if ($('cxpRows')) $('cxpRows').innerHTML = '<tr class="empty-row"><td colspan="6">Select a campaign</td></tr>'; return; }
 
-  // channel-level views/unique/checkout from the combo rows (for this campaign)
+  // channel-level views/unique/checkout — true dedup from the server (campaignChannels)
   const chAgg = {};
-  for (const r of (d.rows || [])) {
-    if (r.campaign !== camp) continue;
-    const a = chAgg[r.channel] || (chAgg[r.channel] = { views: 0, unique: 0, checkout: 0 });
-    a.views += r.views || 0; a.unique += r.unique || 0; a.checkout += r.checkoutViews || 0;
+  for (const cc of (d.campaignChannels || [])) {
+    if (cc.campaign !== camp) continue;
+    chAgg[cc.channel] = { views: cc.views, unique: cc.unique, checkout: cc.checkout };
   }
   // product-level checkout views from channelProducts
   const prodView = {};

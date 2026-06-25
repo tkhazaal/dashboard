@@ -254,7 +254,7 @@ async function computeMetrics(orders, apiKey) {
 
       // Campaign × Channel × Product (drives the "Channel × Product" breakdown).
       // Key parts joined by  (never appears in a campaign/channel/product name).
-      const cpKey = `${up.campaign || '(none)'}${ch || '(untagged)'}${cleanProduct(product)}`;
+      const cpKey = `${(up.campaign || '(none)').trim()}${ch || '(untagged)'}${cleanProduct(product)}`;
       if (!ordersByChannelProductByDay[dRev]) ordersByChannelProductByDay[dRev] = {};
       if (!ordersByChannelProductByDay[dRev][cpKey]) ordersByChannelProductByDay[dRev][cpKey] = { orders: 0, revenue: 0 };
       ordersByChannelProductByDay[dRev][cpKey].orders++; ordersByChannelProductByDay[dRev][cpKey].revenue += amount;

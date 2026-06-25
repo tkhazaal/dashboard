@@ -113,7 +113,7 @@ router.get('/utm', async (req, res) => {
   try {
     const r = range(req);
     let q = supabase.from('page_views').select('page_url, page_path, visitor_id, created_at')
-      .ilike('page_url', '%utm_%').order('created_at', { ascending: false }).range(0, 7999);
+      .ilike('page_url', '%utm_%').order('created_at', { ascending: false }).range(0, 49999);
     if (r.start_date && r.end_date) q = q.gte('created_at', etBoundUTC(r.start_date, false)).lte('created_at', etBoundUTC(r.end_date, true));
     else { const days = safeDays(req.query.days); if (days > 0) q = q.gte('created_at', new Date(Date.now() - days * 86400000).toISOString()); }
     const { data, error } = await q;
@@ -122,6 +122,7 @@ router.get('/utm', async (req, res) => {
     const getp = (url, k) => { const m = String(url).match(new RegExp('[?&]' + k + '=([^&#]*)', 'i')); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')).trim() : ''; };
     const combo = {}, bySource = {}, byChannel = {}; let total = 0; const uniqAll = new Set();
     const visitorChannel = {}, visitorCombo = {};   // each visitor's most-recent UTM channel/combo (for order attribution)
+    const campChan = {};   // 'campaign + SEP + channel' -> true views/unique/checkout (breakdown header)
     const chProd = {};   // 'campaignchannelproduct' -> checkout views/unique (for the Channel × Product breakdown)
     for (const row of data || []) {
       if (/^\/complete(\/|$)/i.test(row.page_path || '')) continue;     // skip confirmation pages
@@ -145,6 +146,13 @@ router.get('/utm', async (req, res) => {
       if (c !== '(none)') bc.camps.add(c);
       if (row.created_at > bc.lastSeen) bc.lastSeen = row.created_at;
 
+      // Per campaign × channel — true unique reach (dedups visitors across content combos)
+      const cck = `${c}${channel}`;
+      if (!campChan[cck]) campChan[cck] = { campaign: c, channel, views: 0, uniq: new Set(), checkout: 0 };
+      const ccc = campChan[cck];
+      ccc.uniq.add(row.visitor_id);
+      if (checkout) ccc.checkout++; else ccc.views++;
+
       // Checkout views by campaign × channel × product (product from the checkout slug)
       if (checkout) {
         const prod = productFromUrl(row.page_url) || 'Other';
@@ -160,7 +168,7 @@ router.get('/utm', async (req, res) => {
     try {
       let cq = supabase.from('page_views').select('page_url, page_path, visitor_id, created_at')
         .or('page_url.ilike.*thank*,page_url.ilike.*confirm*,page_url.ilike.*/complete/*,page_url.ilike.*receipt*,page_url.ilike.*order-received*,page_url.ilike.*order-success*,page_url.ilike.*order_received*')
-        .order('created_at', { ascending: false }).range(0, 7999);
+        .order('created_at', { ascending: false }).range(0, 49999);
       if (r.start_date && r.end_date) cq = cq.gte('created_at', etBoundUTC(r.start_date, false)).lte('created_at', etBoundUTC(r.end_date, true));
       else { const days = safeDays(req.query.days); if (days > 0) cq = cq.gte('created_at', new Date(Date.now() - days * 86400000).toISOString()); }
       const { data: confs } = await cq;
@@ -188,11 +196,14 @@ router.get('/utm', async (req, res) => {
       campaign: c.campaign, channel: c.channel, product: c.product,
       checkoutViews: c.checkoutViews, checkoutUnique: c.uniq.size,
     })).sort((a, b) => b.checkoutViews - a.checkoutViews);
+    const campaignChannels = Object.values(campChan).map(c => ({
+      campaign: c.campaign, channel: c.channel, views: c.views, unique: c.uniq.size, checkout: c.checkout,
+    }));
     res.json({
       total, unique: uniqAll.size, totalOrders,
       distinctSources: sources.length, distinctChannels: channels.length,
       distinctCampaigns: new Set(rows.map(r => r.campaign).filter(c => c !== '(none)')).size,
-      channels, sources, rows, channelProducts,
+      channels, sources, rows, channelProducts, campaignChannels,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
