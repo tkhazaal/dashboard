@@ -984,6 +984,7 @@ table.show-upsell .upsell-col { display: table-cell; }
 tr.cxp-channel td { background: var(--bg); font-size: 13px; border-top: 2px solid var(--border); }
 tr.cxp-product td { font-size: 12.5px; }
 .cxp-prod-name { padding-left: 22px !important; color: var(--sub); font-weight: 600; }
+.cxp-est { font-size: 11px; font-weight: 600; margin-left: 4px; }
 
 /* Version badge in the sidebar footer */
 .version-btn {

@@ -2608,39 +2608,57 @@ function renderCxp() {
     if (cp.campaign !== camp) continue;
     (prodView[cp.channel] = prodView[cp.channel] || {})[cp.product] = { cv: cp.checkoutViews, cu: cp.checkoutUnique };
   }
-  // orders + revenue per channel×product from SamCart, summed over the date range
-  const prodOrd = {};
-  const byDay = sc && sc.ordersByChannelProductByDay;
-  if (byDay) {
-    const rng = utmOrderRange();
-    const days = rng ? daysInRange(rng[0], rng[1]) : Object.keys(byDay);
-    for (const day of days) {
-      const e = byDay[day]; if (!e) continue;
-      for (const key in e) {
-        const parts = key.split(''); if (parts[0] !== camp) continue;
-        const c = prodOrd[parts[1]] = prodOrd[parts[1]] || {};
-        const p = c[parts[2]] = c[parts[2]] || { orders: 0, revenue: 0 };
-        p.orders += e[key].orders; p.revenue += e[key].revenue;
-      }
-    }
-  }
+  // real orders/revenue per channel×product from SamCart (order UTM), over the date range
+  const prodOrd = sumCxpOrders(sc && sc.ordersByChannelProductByDay, camp);
 
-  const channels = [...new Set([...Object.keys(chAgg), ...Object.keys(prodView), ...Object.keys(prodOrd)])].sort();
+  // estimated orders (time-matched, for UTM-less historical orders) — same shape
+  const prodEst = sumCxpOrders(sc && sc.estOrdersByChannelProductByDay, camp);
+
+  // Orders cell: real count (bold) + estimated count (muted "(N est)")
+  const get = (m, ch, p, f) => (m[ch] && m[ch][p] && m[ch][p][f]) || 0;
+  const ordersCell = (real, est) => {
+    const parts = [];
+    if (real) parts.push('<span class="orders-count">' + fmtNum(real) + '</span>');
+    if (est) parts.push('<span class="muted cxp-est">(' + fmtNum(est) + ' est)</span>');
+    return parts.length ? parts.join(' ') : '<span class="muted">—</span>';
+  };
+
+  const channels = [...new Set([...Object.keys(chAgg), ...Object.keys(prodView), ...Object.keys(prodOrd), ...Object.keys(prodEst)])].sort();
   let html = '';
   for (const ch of channels) {
-    const prods = [...new Set([...Object.keys(prodView[ch] || {}), ...Object.keys(prodOrd[ch] || {})])];
-    const chOrders = prods.reduce((s, p) => s + ((prodOrd[ch] && prodOrd[ch][p] && prodOrd[ch][p].orders) || 0), 0);
-    const chRev = prods.reduce((s, p) => s + ((prodOrd[ch] && prodOrd[ch][p] && prodOrd[ch][p].revenue) || 0), 0);
+    const prods = [...new Set([...Object.keys(prodView[ch] || {}), ...Object.keys(prodOrd[ch] || {}), ...Object.keys(prodEst[ch] || {})])];
+    const chOrders = prods.reduce((s, p) => s + get(prodOrd, ch, p, 'orders'), 0);
+    const chEst = prods.reduce((s, p) => s + get(prodEst, ch, p, 'orders'), 0);
+    const chRev = prods.reduce((s, p) => s + get(prodOrd, ch, p, 'revenue') + get(prodEst, ch, p, 'revenue'), 0);
     const a = chAgg[ch] || { views: 0, unique: 0, checkout: 0 };
-    html += `<tr class="cxp-channel"><td><strong>${escHtml(ch)}</strong></td><td>${fmtNum(a.views)}</td><td>${fmtNum(a.unique)}</td><td>${a.checkout ? fmtNum(a.checkout) : '<span class="muted">—</span>'}</td><td>${chOrders ? '<span class="orders-count">' + fmtNum(chOrders) + '</span>' : '<span class="muted">—</span>'}</td><td>${chRev ? fmtMoney(chRev) : '<span class="muted">—</span>'}</td></tr>`;
-    prods.sort((x, y) => (((prodOrd[ch] && prodOrd[ch][y] && prodOrd[ch][y].orders) || 0) + ((prodView[ch] && prodView[ch][y] && prodView[ch][y].cv) || 0)) - (((prodOrd[ch] && prodOrd[ch][x] && prodOrd[ch][x].orders) || 0) + ((prodView[ch] && prodView[ch][x] && prodView[ch][x].cv) || 0)));
+    html += `<tr class="cxp-channel"><td><strong>${escHtml(ch)}</strong></td><td>${fmtNum(a.views)}</td><td>${fmtNum(a.unique)}</td><td>${a.checkout ? fmtNum(a.checkout) : '<span class="muted">—</span>'}</td><td>${ordersCell(chOrders, chEst)}</td><td>${chRev ? fmtMoney(chRev) : '<span class="muted">—</span>'}</td></tr>`;
+    prods.sort((x, y) => (get(prodOrd, ch, y, 'orders') + get(prodEst, ch, y, 'orders') + get(prodView, ch, y, 'cv')) - (get(prodOrd, ch, x, 'orders') + get(prodEst, ch, x, 'orders') + get(prodView, ch, x, 'cv')));
     for (const p of prods) {
-      const pv = (prodView[ch] && prodView[ch][p]) || { cv: 0, cu: 0 };
-      const od = (prodOrd[ch] && prodOrd[ch][p]) || { orders: 0, revenue: 0 };
-      html += `<tr class="cxp-product"><td class="cxp-prod-name">↳ ${escHtml(p)}</td><td class="muted">—</td><td class="muted">—</td><td>${pv.cv ? fmtNum(pv.cv) : '<span class="muted">—</span>'}</td><td>${od.orders ? '<span class="orders-count">' + fmtNum(od.orders) + '</span>' : '<span class="muted">—</span>'}</td><td>${od.revenue ? fmtMoney(od.revenue) : '<span class="muted">—</span>'}</td></tr>`;
+      const cv = get(prodView, ch, p, 'cv');
+      const rev = get(prodOrd, ch, p, 'revenue') + get(prodEst, ch, p, 'revenue');
+      html += `<tr class="cxp-product"><td class="cxp-prod-name">↳ ${escHtml(p)}</td><td class="muted">—</td><td class="muted">—</td><td>${cv ? fmtNum(cv) : '<span class="muted">—</span>'}</td><td>${ordersCell(get(prodOrd, ch, p, 'orders'), get(prodEst, ch, p, 'orders'))}</td><td>${rev ? fmtMoney(rev) : '<span class="muted">—</span>'}</td></tr>`;
     }
   }
   $('cxpRows').innerHTML = html || `<tr class="empty-row"><td colspan="6">No data for this campaign in the selected dates</td></tr>`;
+}
+// Sum a SamCart by-day channel×product structure (real or estimate) over the UTM date
+// range → { channel -> { product -> { orders, revenue } } } for the given campaign.
+function sumCxpOrders(byDay, camp) {
+  const out = {};
+  if (!byDay) return out;
+  const SEP = String.fromCharCode(1);
+  const rng = utmOrderRange();
+  const days = rng ? daysInRange(rng[0], rng[1]) : Object.keys(byDay);
+  for (const day of days) {
+    const e = byDay[day]; if (!e) continue;
+    for (const key in e) {
+      const parts = key.split(SEP); if (parts[0] !== camp) continue;
+      const c = out[parts[1]] = out[parts[1]] || {};
+      const p = c[parts[2]] = c[parts[2]] || { orders: 0, revenue: 0 };
+      p.orders += e[key].orders; p.revenue += e[key].revenue;
+    }
+  }
+  return out;
 }
 
 // ── Boot ──────────────────────────────────────────────────────────

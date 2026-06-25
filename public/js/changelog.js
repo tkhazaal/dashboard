@@ -6,7 +6,8 @@ const CHANGELOG = [
     changes: [
       { title: 'Channel × Product', detail: 'On the UTM page, pick a campaign and see how each channel performed per product — channel-level views & unique, then per-product checkout views, orders and revenue. Answers "which channel sold which product."' },
       { title: 'Prominent date range', detail: 'A big from/to date picker (plus Today / This week / Last month / This year presets) on the UTM page — all UTM data follows the selected dates.' },
-      { title: 'Orders from SamCart UTM capture', detail: 'After enabling UTM tracking in SamCart settings, each order now carries its channel; the dashboard reads it directly and attributes orders by channel and product on every sync.' },
+      { title: 'Orders from SamCart UTM capture', detail: 'After enabling UTM tracking in SamCart settings, each order now carries its channel; the dashboard reads it directly and attributes orders by channel and product on every sync — real data, no guesswork.' },
+      { title: 'Historical estimate', detail: 'Orders placed before UTM capture was enabled (no channel on the order) are time-matched to the checkout visits for that product/day and shown as a clearly-labelled "(est)" — real UTM always takes precedence.' },
     ],
   },
   {

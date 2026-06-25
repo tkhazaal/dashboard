@@ -172,7 +172,7 @@ function orderProduct(o) {
 // Collapse SamCart's many channel-specific product names / checkout slugs into a
 // clean product family, so orders (internal_product_name) and page-view checkout
 // slugs line up. Shared shape lives in ../product.js.
-const { cleanProduct } = require('../product');
+const { cleanProduct, productFromUrl } = require('../product');
 
 async function computeMetrics(orders, apiKey) {
   // Map product_id -> checkout slug so orders can be attributed to a funnel slug.
@@ -221,6 +221,8 @@ async function computeMetrics(orders, apiKey) {
   const ordersByChannelByDay = {}; // 'YYYY-MM-DD' -> { channel -> { orders, revenue } } from order.utm_parameters
   const ordersByUtmByDay = {};     // 'YYYY-MM-DD' -> { 'source|medium|campaign|content' -> { orders, revenue } }
   const ordersByChannelProductByDay = {}; // 'YYYY-MM-DD' -> { 'campaignchannelproduct' -> { orders, revenue } }
+  const estOrdersByChannelProductByDay = {}; // same shape — ESTIMATE for UTM-less orders, time-matched to checkout visits
+  const nonUtmOrders = [];   // {day, product, amount} for orders without UTM → time-match estimate candidates
   const upsellTotals = {};   // upsellName -> { orders, revenue }
   const upsellBySlug = {};   // mainSlug -> { upsellName -> { orders, revenue } }
 
@@ -258,6 +260,9 @@ async function computeMetrics(orders, apiKey) {
       if (!ordersByChannelProductByDay[dRev]) ordersByChannelProductByDay[dRev] = {};
       if (!ordersByChannelProductByDay[dRev][cpKey]) ordersByChannelProductByDay[dRev][cpKey] = { orders: 0, revenue: 0 };
       ordersByChannelProductByDay[dRev][cpKey].orders++; ordersByChannelProductByDay[dRev][cpKey].revenue += amount;
+    } else if (dRev) {
+      // No UTM on the order (placed before SamCart UTM capture) → time-match estimate later
+      nonUtmOrders.push({ day: dRev, product: cleanProduct(product), amount });
     }
 
     // Attribute this order to the main product's slug
@@ -309,6 +314,40 @@ async function computeMetrics(orders, apiKey) {
     c.orders.push({ amount, product, date });
     (o.cart_items || []).forEach(it => { if (it.product_name) c.products.add(it.product_name); });
     c.ltv += amount;
+  }
+
+  // ── Time-match ESTIMATE: attribute UTM-less orders to the channel/product whose
+  // checkout page got the most visits for that product on the same (Eastern) day.
+  // Best-effort only — real UTM on the order always wins; this fills historical gaps.
+  if (nonUtmOrders.length) {
+    try {
+      const getp = (url, k) => { const m = String(url).match(new RegExp('[?&]' + k + '=([^&#]*)', 'i')); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')).trim() : ''; };
+      const { data: cvs } = await supabase.from('page_views').select('page_url, created_at')
+        .ilike('page_url', '%samcart%').ilike('page_url', '%utm_%').range(0, 49999);
+      const SEP = String.fromCharCode(1);   // same control-char separator the real keys use
+      const idx = {};   // product+SEP+day -> { campaign+SEP+channel : count }
+      for (const v of (cvs || [])) {
+        const prod = productFromUrl(v.page_url); if (!prod) continue;
+        const day = etDay(v.created_at); if (!day) continue;
+        const ch = utmChannel(getp(v.page_url, 'utm_content'), getp(v.page_url, 'utm_source'), getp(v.page_url, 'utm_medium'));
+        const camp = getp(v.page_url, 'utm_campaign') || '(none)';
+        const k = prod + SEP + day;
+        (idx[k] || (idx[k] = {}));
+        const ck = camp + SEP + ch;
+        idx[k][ck] = (idx[k][ck] || 0) + 1;
+      }
+      for (const o of nonUtmOrders) {
+        const cand = idx[o.product + SEP + o.day]; if (!cand) continue;
+        let best = null, bestN = 0;
+        for (const ck in cand) if (cand[ck] > bestN) { bestN = cand[ck]; best = ck; }
+        if (!best) continue;
+        const [camp, ch] = best.split(SEP);
+        const key = camp + SEP + ch + SEP + o.product;
+        if (!estOrdersByChannelProductByDay[o.day]) estOrdersByChannelProductByDay[o.day] = {};
+        if (!estOrdersByChannelProductByDay[o.day][key]) estOrdersByChannelProductByDay[o.day][key] = { orders: 0, revenue: 0 };
+        estOrdersByChannelProductByDay[o.day][key].orders++; estOrdersByChannelProductByDay[o.day][key].revenue += o.amount;
+      }
+    } catch (e) { /* estimate is best-effort */ }
   }
 
   const customers = [...custMap.values()].map(c => ({
@@ -465,7 +504,7 @@ async function computeMetrics(orders, apiKey) {
     refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
-    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, ordersByChannelProductByDay, upsellProducts, upsellBySlug,
+    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, ordersByChannelProductByDay, estOrdersByChannelProductByDay, upsellProducts, upsellBySlug,
     productSales, productList: sortedProductList, productSlug, salesByDay,
     dailyRevenue, refundsByDay,
   };
