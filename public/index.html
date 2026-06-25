@@ -734,17 +734,27 @@
       <!-- UTM Tracking -->
       <div class="page-header" style="margin-top:6px;">
         <div><h2 style="margin:0;">UTM Traffic</h2></div>
-        <div class="header-pills">
-          <select id="utm-range" class="cmp-preset" title="Date range">
-            <option value="all">All time</option>
-            <option value="today">Today</option>
-            <option value="thisweek">This week</option>
-            <option value="thismonth">This month</option>
-            <option value="lastmonth">Last month</option>
-            <option value="thisyear">This year</option>
-          </select>
-          <span class="pill" id="utm-status"></span>
-        </div>
+        <div class="header-pills"><span class="pill" id="utm-status"></span></div>
+      </div>
+
+      <!-- Prominent date range -->
+      <div class="utm-daterange">
+        <span class="utm-dr-ico">📅 Date range</span>
+        <label class="utm-dr-field">From <input type="date" id="utm-start" class="utm-date"></label>
+        <span class="utm-dr-arrow">→</span>
+        <label class="utm-dr-field">To <input type="date" id="utm-end" class="utm-date"></label>
+        <button id="utm-apply" class="utm-apply-btn">Apply</button>
+        <span class="utm-presets">
+          <button class="utm-preset-btn" data-utmp="today">Today</button>
+          <button class="utm-preset-btn" data-utmp="yesterday">Yesterday</button>
+          <button class="utm-preset-btn" data-utmp="thisweek">This week</button>
+          <button class="utm-preset-btn" data-utmp="lastweek">Last week</button>
+          <button class="utm-preset-btn" data-utmp="thismonth">This month</button>
+          <button class="utm-preset-btn" data-utmp="lastmonth">Last month</button>
+          <button class="utm-preset-btn" data-utmp="thisyear">This year</button>
+          <button class="utm-preset-btn active" data-utmp="all">All time</button>
+        </span>
+        <span class="utm-dr-current" id="utm-dr-current">All time</span>
       </div>
 
       <div class="stat-grid" id="utm-kpis"></div>
@@ -776,6 +786,25 @@
           <table class="data-table">
             <thead><tr><th>Channel</th><th>Source</th><th>Medium</th><th>Campaign</th><th>Content</th><th>Views</th><th>Unique</th><th>Checkout&nbsp;Views</th><th>Orders</th><th>Last seen</th></tr></thead>
             <tbody id="utmRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Channel × Product breakdown (per selected campaign) -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Channel × Product</h2>
+          <div class="email-filters">
+            <label class="cxp-camp-label">Campaign
+              <select id="cxp-campaign" class="cmp-preset"></select>
+            </label>
+          </div>
+        </div>
+        <p class="th-hint" style="padding:0 2px 8px;">For the selected campaign: how each channel performed per product — views → unique → checkout views → orders. Channel rows summarise; product rows break it down.</p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Channel / Product</th><th>Views</th><th>Unique</th><th>Checkout&nbsp;Views</th><th>Orders</th><th>Revenue</th></tr></thead>
+            <tbody id="cxpRows"></tbody>
           </table>
         </div>
       </div>

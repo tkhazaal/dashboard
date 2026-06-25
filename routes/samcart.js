@@ -169,6 +169,11 @@ function orderProduct(o) {
   return itemName(orderMainItem(o));
 }
 
+// Collapse SamCart's many channel-specific product names / checkout slugs into a
+// clean product family, so orders (internal_product_name) and page-view checkout
+// slugs line up. Shared shape lives in ../product.js.
+const { cleanProduct } = require('../product');
+
 async function computeMetrics(orders, apiKey) {
   // Map product_id -> checkout slug so orders can be attributed to a funnel slug.
   const slugById = {};
@@ -215,6 +220,7 @@ async function computeMetrics(orders, apiKey) {
   const ordersBySlugByDay = {}; // 'YYYY-MM-DD' -> { slug -> { orders, revenue } } (date-filtered Page Analytics)
   const ordersByChannelByDay = {}; // 'YYYY-MM-DD' -> { channel -> { orders, revenue } } from order.utm_parameters
   const ordersByUtmByDay = {};     // 'YYYY-MM-DD' -> { 'source|medium|campaign|content' -> { orders, revenue } }
+  const ordersByChannelProductByDay = {}; // 'YYYY-MM-DD' -> { 'campaignchannelproduct' -> { orders, revenue } }
   const upsellTotals = {};   // upsellName -> { orders, revenue }
   const upsellBySlug = {};   // mainSlug -> { upsellName -> { orders, revenue } }
 
@@ -245,6 +251,13 @@ async function computeMetrics(orders, apiKey) {
       if (!ordersByUtmByDay[dRev]) ordersByUtmByDay[dRev] = {};
       if (!ordersByUtmByDay[dRev][ukey]) ordersByUtmByDay[dRev][ukey] = { orders: 0, revenue: 0 };
       ordersByUtmByDay[dRev][ukey].orders++; ordersByUtmByDay[dRev][ukey].revenue += amount;
+
+      // Campaign × Channel × Product (drives the "Channel × Product" breakdown).
+      // Key parts joined by  (never appears in a campaign/channel/product name).
+      const cpKey = `${up.campaign || '(none)'}${ch || '(untagged)'}${cleanProduct(product)}`;
+      if (!ordersByChannelProductByDay[dRev]) ordersByChannelProductByDay[dRev] = {};
+      if (!ordersByChannelProductByDay[dRev][cpKey]) ordersByChannelProductByDay[dRev][cpKey] = { orders: 0, revenue: 0 };
+      ordersByChannelProductByDay[dRev][cpKey].orders++; ordersByChannelProductByDay[dRev][cpKey].revenue += amount;
     }
 
     // Attribute this order to the main product's slug
@@ -452,7 +465,7 @@ async function computeMetrics(orders, apiKey) {
     refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
-    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, upsellProducts, upsellBySlug,
+    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, ordersByChannelProductByDay, upsellProducts, upsellBySlug,
     productSales, productList: sortedProductList, productSlug, salesByDay,
     dailyRevenue, refundsByDay,
   };

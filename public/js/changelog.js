@@ -2,6 +2,14 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.8.0', date: '2026-06-26', title: 'Channel × Product breakdown + date picker',
+    changes: [
+      { title: 'Channel × Product', detail: 'On the UTM page, pick a campaign and see how each channel performed per product — channel-level views & unique, then per-product checkout views, orders and revenue. Answers "which channel sold which product."' },
+      { title: 'Prominent date range', detail: 'A big from/to date picker (plus Today / This week / Last month / This year presets) on the UTM page — all UTM data follows the selected dates.' },
+      { title: 'Orders from SamCart UTM capture', detail: 'After enabling UTM tracking in SamCart settings, each order now carries its channel; the dashboard reads it directly and attributes orders by channel and product on every sync.' },
+    ],
+  },
+  {
     version: '1.7.0', date: '2026-06-26', title: 'UTM orders via thank-you-page tracking',
     changes: [
       { title: 'Orders attributed by channel', detail: 'The UTM page now counts orders per channel using your own page tracking — a buyer\'s checkout visit (which carries the channel) plus their purchase-confirmation page view = one attributed sale. This works even though SamCart doesn\'t save the UTM on the order.' },

@@ -33,6 +33,7 @@ function range(req) {
 }
 
 const { utmChannel } = require('../channel');   // shared UTM → channel resolver
+const { cleanProduct, productFromUrl } = require('../product');   // checkout slug → product family
 const isCheckoutUrl = u => /samcart/i.test(u) || /\/products?(\/|\?|$)/i.test(u);
 // A purchase-confirmation / thank-you page (our pixel placed there marks a completed sale).
 // Excludes funnel-builder "preview" pages, which aren't real purchases.
@@ -121,6 +122,7 @@ router.get('/utm', async (req, res) => {
     const getp = (url, k) => { const m = String(url).match(new RegExp('[?&]' + k + '=([^&#]*)', 'i')); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')).trim() : ''; };
     const combo = {}, bySource = {}, byChannel = {}; let total = 0; const uniqAll = new Set();
     const visitorChannel = {}, visitorCombo = {};   // each visitor's most-recent UTM channel/combo (for order attribution)
+    const chProd = {};   // 'campaignchannelproduct' -> checkout views/unique (for the Channel × Product breakdown)
     for (const row of data || []) {
       if (/^\/complete(\/|$)/i.test(row.page_path || '')) continue;     // skip confirmation pages
       const src = getp(row.page_url, 'utm_source'), med = getp(row.page_url, 'utm_medium'),
@@ -142,6 +144,14 @@ router.get('/utm', async (req, res) => {
       if (checkout) { bc.coViews++; bc.coUniq.add(row.visitor_id); } else { bc.views++; bc.uniq.add(row.visitor_id); }
       if (c !== '(none)') bc.camps.add(c);
       if (row.created_at > bc.lastSeen) bc.lastSeen = row.created_at;
+
+      // Checkout views by campaign × channel × product (product from the checkout slug)
+      if (checkout) {
+        const prod = productFromUrl(row.page_url) || 'Other';
+        const cpk = `${c}${channel}${prod}`;
+        if (!chProd[cpk]) chProd[cpk] = { campaign: c, channel, product: prod, checkoutViews: 0, uniq: new Set() };
+        chProd[cpk].checkoutViews++; chProd[cpk].uniq.add(row.visitor_id);
+      }
     }
     // ── Orders = purchase-confirmation / thank-you page views (our pixel on the
     // post-checkout page). Each is attributed to a channel via the page's own UTM,
@@ -174,11 +184,15 @@ router.get('/utm', async (req, res) => {
     const rows = Object.values(combo).map(c => ({ source: c.source, medium: c.medium, campaign: c.campaign, content: c.content, channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, orders: ordersByCombo[`${c.source}|${c.medium}|${c.campaign}|${c.content}`] || 0, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
     const sources = Object.values(bySource).map(s => ({ source: s.source, views: s.views, unique: s.uniq.size })).sort((a, b) => b.views - a.views);
     const channels = Object.values(byChannel).map(c => ({ channel: c.channel, views: c.views, unique: c.uniq.size, checkoutViews: c.coViews, checkoutUnique: c.coUniq.size, campaigns: c.camps.size, orders: ordersByCh[c.channel] || 0, lastSeen: c.lastSeen })).sort((a, b) => (b.views + b.checkoutViews) - (a.views + a.checkoutViews));
+    const channelProducts = Object.values(chProd).map(c => ({
+      campaign: c.campaign, channel: c.channel, product: c.product,
+      checkoutViews: c.checkoutViews, checkoutUnique: c.uniq.size,
+    })).sort((a, b) => b.checkoutViews - a.checkoutViews);
     res.json({
       total, unique: uniqAll.size, totalOrders,
       distinctSources: sources.length, distinctChannels: channels.length,
       distinctCampaigns: new Set(rows.map(r => r.campaign).filter(c => c !== '(none)')).size,
-      channels, sources, rows,
+      channels, sources, rows, channelProducts,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

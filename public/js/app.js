@@ -2479,14 +2479,31 @@ $('utm-clear').addEventListener('click', () => {
 });
 
 function utmRangeParams() {
-  const r = funnelPresetRange($('utm-range').value);
-  if (!r || (!r[0] && !r[1])) return '';
-  return `start=${ymd(r[0])}&end=${ymd(r[1])}`;
+  return (state.utmStart && state.utmEnd) ? `start=${state.utmStart}&end=${state.utmEnd}` : '';
 }
 function utmOrderRange() {
-  const r = funnelPresetRange($('utm-range').value);
-  return (r && r[0] && r[1]) ? [ymd(r[0]), ymd(r[1])] : null;
+  return (state.utmStart && state.utmEnd) ? [state.utmStart, state.utmEnd] : null;
 }
+// Prominent date-range picker (presets + custom from/to)
+function setUtmRange(start, end, label, presetBtn) {
+  state.utmStart = start || null; state.utmEnd = end || null;
+  if ($('utm-start')) $('utm-start').value = start || '';
+  if ($('utm-end')) $('utm-end').value = end || '';
+  if ($('utm-dr-current')) $('utm-dr-current').textContent = label || 'All time';
+  document.querySelectorAll('.utm-preset-btn').forEach(b => b.classList.toggle('active', b === presetBtn));
+  loadUtm();
+}
+document.querySelectorAll('.utm-preset-btn').forEach(btn => btn.addEventListener('click', () => {
+  const p = btn.dataset.utmp;
+  if (p === 'all') return setUtmRange(null, null, 'All time', btn);
+  const r = funnelPresetRange(p);
+  if (r && r[0] && r[1]) setUtmRange(ymd(r[0]), ymd(r[1]), btn.textContent, btn);
+}));
+if ($('utm-apply')) $('utm-apply').addEventListener('click', () => {
+  const s = $('utm-start').value, e = $('utm-end').value;
+  if (s && e) setUtmRange(s, e, `${s} → ${e}`, null);
+});
+if ($('cxp-campaign')) $('cxp-campaign').addEventListener('change', renderCxp);
 // Orders attributed to a channel (from SamCart utm_parameters), within the UTM date range
 function utmChannelOrders(channel) {
   const byDay = state.scData && state.scData.ordersByChannelByDay;
@@ -2545,7 +2562,17 @@ function renderUtm(d) {
   const pf = $('utm-campaign-filter'), curPf = pf.value || 'all';
   pf.innerHTML = '<option value="all">All campaigns</option>' + camps.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
   pf.value = camps.includes(curPf) ? curPf : 'all';
+
+  // Channel × Product campaign selector — default to Reconnection Compass if present
+  const cxp = $('cxp-campaign');
+  if (cxp) {
+    const curCxp = cxp.value;
+    cxp.innerHTML = camps.length ? camps.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('') : '<option value="">(no campaigns)</option>';
+    cxp.value = camps.includes(curCxp) ? curCxp
+      : (camps.find(c => /reconnection_compass/i.test(c)) || camps[0] || '');
+  }
   renderUtmRows();
+  renderCxp();
 }
 function renderUtmRows() {
   const d = state.utmData; if (!d) return;
@@ -2560,8 +2587,62 @@ function renderUtmRows() {
   ).join('')
     || `<tr class="empty-row"><td colspan="10">No UTM traffic matches</td></tr>`;
 }
-$('utm-range').addEventListener('change', loadUtm);
 ['utm-channel-filter', 'utm-campaign-filter', 'utm-search'].forEach(id => $(id).addEventListener('input', renderUtmRows));
+
+// Channel × Product breakdown for the selected campaign (views/unique are channel-level;
+// checkout views/orders/revenue are per product). Orders come from SamCart utm_parameters.
+function renderCxp() {
+  const d = state.utmData, sc = state.scData;
+  const camp = $('cxp-campaign') ? $('cxp-campaign').value : '';
+  if (!d || !camp) { if ($('cxpRows')) $('cxpRows').innerHTML = '<tr class="empty-row"><td colspan="6">Select a campaign</td></tr>'; return; }
+
+  // channel-level views/unique/checkout from the combo rows (for this campaign)
+  const chAgg = {};
+  for (const r of (d.rows || [])) {
+    if (r.campaign !== camp) continue;
+    const a = chAgg[r.channel] || (chAgg[r.channel] = { views: 0, unique: 0, checkout: 0 });
+    a.views += r.views || 0; a.unique += r.unique || 0; a.checkout += r.checkoutViews || 0;
+  }
+  // product-level checkout views from channelProducts
+  const prodView = {};
+  for (const cp of (d.channelProducts || [])) {
+    if (cp.campaign !== camp) continue;
+    (prodView[cp.channel] = prodView[cp.channel] || {})[cp.product] = { cv: cp.checkoutViews, cu: cp.checkoutUnique };
+  }
+  // orders + revenue per channel×product from SamCart, summed over the date range
+  const prodOrd = {};
+  const byDay = sc && sc.ordersByChannelProductByDay;
+  if (byDay) {
+    const rng = utmOrderRange();
+    const days = rng ? daysInRange(rng[0], rng[1]) : Object.keys(byDay);
+    for (const day of days) {
+      const e = byDay[day]; if (!e) continue;
+      for (const key in e) {
+        const parts = key.split(''); if (parts[0] !== camp) continue;
+        const c = prodOrd[parts[1]] = prodOrd[parts[1]] || {};
+        const p = c[parts[2]] = c[parts[2]] || { orders: 0, revenue: 0 };
+        p.orders += e[key].orders; p.revenue += e[key].revenue;
+      }
+    }
+  }
+
+  const channels = [...new Set([...Object.keys(chAgg), ...Object.keys(prodView), ...Object.keys(prodOrd)])].sort();
+  let html = '';
+  for (const ch of channels) {
+    const prods = [...new Set([...Object.keys(prodView[ch] || {}), ...Object.keys(prodOrd[ch] || {})])];
+    const chOrders = prods.reduce((s, p) => s + ((prodOrd[ch] && prodOrd[ch][p] && prodOrd[ch][p].orders) || 0), 0);
+    const chRev = prods.reduce((s, p) => s + ((prodOrd[ch] && prodOrd[ch][p] && prodOrd[ch][p].revenue) || 0), 0);
+    const a = chAgg[ch] || { views: 0, unique: 0, checkout: 0 };
+    html += `<tr class="cxp-channel"><td><strong>${escHtml(ch)}</strong></td><td>${fmtNum(a.views)}</td><td>${fmtNum(a.unique)}</td><td>${a.checkout ? fmtNum(a.checkout) : '<span class="muted">—</span>'}</td><td>${chOrders ? '<span class="orders-count">' + fmtNum(chOrders) + '</span>' : '<span class="muted">—</span>'}</td><td>${chRev ? fmtMoney(chRev) : '<span class="muted">—</span>'}</td></tr>`;
+    prods.sort((x, y) => (((prodOrd[ch] && prodOrd[ch][y] && prodOrd[ch][y].orders) || 0) + ((prodView[ch] && prodView[ch][y] && prodView[ch][y].cv) || 0)) - (((prodOrd[ch] && prodOrd[ch][x] && prodOrd[ch][x].orders) || 0) + ((prodView[ch] && prodView[ch][x] && prodView[ch][x].cv) || 0)));
+    for (const p of prods) {
+      const pv = (prodView[ch] && prodView[ch][p]) || { cv: 0, cu: 0 };
+      const od = (prodOrd[ch] && prodOrd[ch][p]) || { orders: 0, revenue: 0 };
+      html += `<tr class="cxp-product"><td class="cxp-prod-name">↳ ${escHtml(p)}</td><td class="muted">—</td><td class="muted">—</td><td>${pv.cv ? fmtNum(pv.cv) : '<span class="muted">—</span>'}</td><td>${od.orders ? '<span class="orders-count">' + fmtNum(od.orders) + '</span>' : '<span class="muted">—</span>'}</td><td>${od.revenue ? fmtMoney(od.revenue) : '<span class="muted">—</span>'}</td></tr>`;
+    }
+  }
+  $('cxpRows').innerHTML = html || `<tr class="empty-row"><td colspan="6">No data for this campaign in the selected dates</td></tr>`;
+}
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {

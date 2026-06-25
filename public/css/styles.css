@@ -951,6 +951,40 @@ table.show-upsell .upsell-col { display: table-cell; }
 .utm-builder-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
 @media (max-width: 760px) { .utm-builder { grid-template-columns: 1fr; } }
 
+/* Prominent UTM date-range picker */
+.utm-daterange {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  background: var(--card); border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 14px;
+}
+.utm-dr-ico { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: 0.01em; }
+.utm-dr-field { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--sub); }
+.utm-date {
+  font: inherit; font-weight: 600; font-size: 14px; color: var(--text); background: var(--bg);
+  border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 12px; outline: none;
+}
+.utm-date:focus { border-color: var(--accent); }
+.utm-dr-arrow { color: var(--sub); font-weight: 700; }
+.utm-apply-btn {
+  font: inherit; font-weight: 700; font-size: 13px; color: #fff; background: var(--accent);
+  border: none; border-radius: 8px; padding: 8px 16px; cursor: pointer;
+}
+.utm-apply-btn:hover { filter: brightness(1.07); }
+.utm-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 4px; }
+.utm-preset-btn {
+  font: inherit; font-weight: 600; font-size: 12px; color: var(--sub); background: var(--bg);
+  border: 1.5px solid var(--border); border-radius: 999px; padding: 5px 12px; cursor: pointer;
+}
+.utm-preset-btn:hover { border-color: var(--accent); color: var(--text); }
+.utm-preset-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.utm-dr-current { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--text); }
+
+/* Channel × Product breakdown */
+.cxp-camp-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--sub); }
+tr.cxp-channel td { background: var(--bg); font-size: 13px; border-top: 2px solid var(--border); }
+tr.cxp-product td { font-size: 12.5px; }
+.cxp-prod-name { padding-left: 22px !important; color: var(--sub); font-weight: 600; }
+
 /* Version badge in the sidebar footer */
 .version-btn {
   margin-top: 8px; width: 100%; border: none; background: transparent; cursor: pointer;
