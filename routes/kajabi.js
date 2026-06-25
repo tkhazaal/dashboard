@@ -10,6 +10,17 @@ const CACHE_TTL  = parseInt(process.env.KAJABI_CACHE_MINUTES || '180', 10) * 60 
 const PAGE_SIZE  = Math.min(100, Math.max(10, parseInt(process.env.KAJABI_PAGE_SIZE || '100', 10)));
 const THROTTLE_MS = Math.max(0, parseInt(process.env.KAJABI_THROTTLE_MS || '120', 10));
 
+// Kajabi timestamps are UTC (ISO 'Z'); bucket day/month on Eastern Time so revenue
+// lines up with the rest of the dashboard (page views, SamCart). 'en-CA' → YYYY-MM-DD.
+const ET_TZ = 'America/New_York';
+function etDay(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: ET_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+const etMonth = iso => { const s = etDay(iso); return s ? s.slice(0, 7) : ''; };
+
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ── Credentials (settings table, fallback to env) ─────────────────
@@ -127,9 +138,9 @@ async function computeKajabiMetrics(creds, onProgress) {
     const rev = cents(a.total_price_in_cents);
     totalRevenue += rev;
     grossRevenue += cents(a.subtotal_in_cents);
-    const m = String(a.created_at || '').slice(0, 7);
+    const m = etMonth(a.created_at);
     if (m) { (monthly[m] || (monthly[m] = { revenue: 0, orders: 0 })); monthly[m].revenue += rev; monthly[m].orders++; }
-    const dy = String(a.created_at || '').slice(0, 10);
+    const dy = etDay(a.created_at);
     if (dy) { (dailyRevenue[dy] || (dailyRevenue[dy] = { revenue: 0, orders: 0 })); dailyRevenue[dy].revenue += rev; dailyRevenue[dy].orders++; }
   }
   const orderCount = orders.length;
@@ -188,7 +199,7 @@ async function computeKajabiMetrics(creds, onProgress) {
         if (/refund/i.test(String(a.action || ''))) {
           const amt = Math.abs(cents(a.amount_in_cents));
           totalRefunded += amt; refundCount++;
-          const dy = String(a.created_at || '').slice(0, 10);
+          const dy = etDay(a.created_at);
           if (dy) refundsByDay[dy] = (refundsByDay[dy] || 0) + amt;
         }
       }
