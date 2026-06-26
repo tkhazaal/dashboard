@@ -2901,7 +2901,7 @@ function renderFxForms(forms) {
     <tr><td><input class="fx-form-name" data-key="${escHtml(f.form_key)}" value="${escHtml(f.name)}" title="Rename this form"></td>
       <td><a href="#" class="fx-form-link" data-key="${escHtml(f.form_key)}"><span class="orders-count">${fmtNum(f.count)}</span></a></td>
       <td>${f.lastAt ? timeAgo(f.lastAt) : '—'}</td>
-      <td><span class="th-hint">${escHtml(f.form_key)}</span></td></tr>`).join('')
+      <td class="fx-form-actions"><button class="fx-mini" data-fxcsv="${escHtml(f.form_key)}" title="Download this form as CSV">⬇ CSV</button><button class="fx-mini fx-del" data-fxdelform="${escHtml(f.form_key)}" title="Delete all submissions for this form">🗑</button></td></tr>`).join('')
     : '<tr class="empty-row"><td colspan="4">No forms yet</td></tr>';
 }
 async function fxSearch() {
@@ -2927,7 +2927,8 @@ async function openSubmission(id) {
     $('fx-modal-body').innerHTML = `
       <div class="fx-meta">${s.contact_email ? '✉ ' + escHtml(s.contact_email) + ' · ' : ''}${s.created_at ? fmtET(s.created_at) : ''}</div>
       ${qa}
-      <details class="fx-raw"><summary>Raw payload</summary><pre>${escHtml(JSON.stringify(s.payload, null, 2))}</pre></details>`;
+      <details class="fx-raw"><summary>Raw payload</summary><pre>${escHtml(JSON.stringify(s.payload, null, 2))}</pre></details>
+      <div class="fx-modal-actions"><button class="fx-mini fx-del" data-fxdelsub="${s.id}">🗑 Delete this submission</button></div>`;
     $('fx-modal').hidden = false;
   } catch (e) { console.error('openSubmission failed:', e); }
 }
@@ -2943,9 +2944,25 @@ if ($('fx-webhooks')) $('fx-webhooks').addEventListener('click', async e => {
   const del = e.target.closest('.fx-hook-del');
   if (del && confirm('Delete this webhook? (Captured submissions are kept.)')) { try { await fxDel('/api/forms/webhooks/' + del.dataset.id); loadForms(); } catch {} }
 });
+const fxDownload = url => { const a = document.createElement('a'); a.href = url; document.body.appendChild(a); a.click(); a.remove(); };
 if ($('fx-subs')) $('fx-subs').addEventListener('click', e => { const r = e.target.closest('.fx-sub-row'); if (r) openSubmission(r.dataset.id); });
+if ($('fx-export')) $('fx-export').addEventListener('click', () => {
+  const qs = new URLSearchParams();
+  const search = $('fx-search').value.trim(), form = $('fx-form-filter').value;
+  if (search) qs.set('search', search); if (form) qs.set('form', form);
+  fxDownload('/api/forms/export?' + qs.toString());
+});
+if ($('fx-modal-body')) $('fx-modal-body').addEventListener('click', async e => {
+  const d = e.target.closest('[data-fxdelsub]');
+  if (d && confirm('Delete this submission permanently?')) { try { await fxDel('/api/forms/submissions/' + d.dataset.fxdelsub); closeFxModal(); fxSearch(); loadForms(); } catch (err) { alert('Delete failed: ' + err.message); } }
+});
 if ($('fx-forms')) {
-  $('fx-forms').addEventListener('click', e => { const l = e.target.closest('.fx-form-link'); if (l) { e.preventDefault(); $('fx-form-filter').value = l.dataset.key; fxSearch(); document.getElementById('fx-subs').scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
+  $('fx-forms').addEventListener('click', async e => {
+    const csv = e.target.closest('[data-fxcsv]'); if (csv) { fxDownload('/api/forms/export?form=' + encodeURIComponent(csv.dataset.fxcsv)); return; }
+    const del = e.target.closest('[data-fxdelform]');
+    if (del) { if (confirm('Delete ALL submissions for this form? This cannot be undone.')) { try { await fxDel('/api/forms/form/' + encodeURIComponent(del.dataset.fxdelform)); loadForms(); } catch (err) { alert('Delete failed: ' + err.message); } } return; }
+    const l = e.target.closest('.fx-form-link'); if (l) { e.preventDefault(); $('fx-form-filter').value = l.dataset.key; fxSearch(); document.getElementById('fx-subs').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  });
   $('fx-forms').addEventListener('change', async e => { const n = e.target.closest('.fx-form-name'); if (n) { try { await fxPost('/api/forms/rename', { form_key: n.dataset.key, name: n.value }); (state.fxForms || []).forEach(f => { if (f.form_key === n.dataset.key) f.name = n.value; }); fxSearch(); } catch {} } });
 }
 let _fxT; if ($('fx-search')) $('fx-search').addEventListener('input', () => { clearTimeout(_fxT); _fxT = setTimeout(fxSearch, 300); });

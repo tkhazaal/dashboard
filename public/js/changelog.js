@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.13.0', date: '2026-06-26', title: 'Form Submissions — delete + CSV export',
+    changes: [
+      { title: 'Download as CSV', detail: 'Export submissions to CSV — all at once, by the current search/filter, or one form at a time. Each question becomes its own column, so it opens cleanly in Excel/Sheets.' },
+      { title: 'Delete submissions', detail: 'Delete a single submission (from its popup) or wipe all submissions for a whole form. Webhooks also moved to their own sub-tab so the main view stays clean.' },
+    ],
+  },
+  {
     version: '1.12.0', date: '2026-06-26', title: 'Form Submissions + webhooks',
     changes: [
       { title: 'Create your own webhooks', detail: 'A new Form Submissions page where you create a webhook URL in one click and paste it into any software (GHL, Typeform, etc.). Every form/quiz submission sent to it is captured and saved automatically.' },

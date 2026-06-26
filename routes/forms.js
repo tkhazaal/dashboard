@@ -127,6 +127,49 @@ router.get('/submissions/:id', async (req, res) => {
     res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+// Delete one submission, or all submissions for a form.
+router.delete('/submissions/:id', async (req, res) => {
+  try { const { error } = await supabase.from('form_submissions').delete().eq('id', req.params.id); if (error) throw error; res.json({ ok: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+router.delete('/form/:key', async (req, res) => {
+  try {
+    const { error } = await supabase.from('form_submissions').delete().eq('form_key', req.params.key);
+    if (error) throw error;
+    await supabase.from('forms').delete().eq('form_key', req.params.key);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// CSV export — all, by form, or by search. Columns = Form/Name/Email/Received +
+// a column per distinct question across the exported set.
+function toCsv(subs) {
+  const cols = [], seen = new Set();
+  for (const s of subs) for (const f of (s.fields || [])) if (!seen.has(f.q)) { seen.add(f.q); cols.push(f.q); }
+  const esc = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const out = [['Form', 'Name', 'Email', 'Received', ...cols].map(esc).join(',')];
+  for (const s of subs) {
+    const fm = {}; for (const f of (s.fields || [])) fm[f.q] = f.a;
+    out.push([s.form_key || '', s.contact_name || '', s.contact_email || '', s.created_at || '', ...cols.map(q => fm[q] || '')].map(esc).join(','));
+  }
+  return out.join('\r\n');
+}
+router.get('/export', async (req, res) => {
+  try {
+    const form = (req.query.form || '').toString();
+    const search = (req.query.search || '').toString().trim().slice(0, 100);
+    let q = supabase.from('form_submissions').select('form_key, contact_name, contact_email, created_at, fields').order('created_at', { ascending: false }).limit(10000);
+    if (form) q = q.eq('form_key', form);
+    if (search) q = q.or(`contact_name.ilike.*${search}*,contact_email.ilike.*${search}*`);
+    const { data, error } = await q;
+    if (error) throw error;
+    const fname = (form ? form.replace(/[^a-z0-9]+/gi, '-').slice(0, 50) : 'form-submissions') + '.csv';
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send('﻿' + toCsv(data || []));   // BOM for Excel
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Recent submissions with full payload — the "test / inspect a new webhook" view.
 router.get('/recent', async (req, res) => {
   try {
