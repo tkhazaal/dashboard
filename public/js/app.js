@@ -1448,7 +1448,8 @@ async function loadReports() {
   state.reportsReferrers = referrers;
   if (state.scData?.syncedAt) $('rep-syncedAt').textContent = (state.scData.isDemo ? 'Demo data' : 'Synced ' + timeAgo(state.scData.syncedAt));
   applyReportView();
-  renderRevenueKpis();
+  renderGoal();
+  renderRevenueKpis().then(renderGoal);   // re-render once Kajabi MTD is loaded
 }
 
 // Source + date aware reporting. Summary KPIs + trend work for both sources from

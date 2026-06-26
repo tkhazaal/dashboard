@@ -255,6 +255,29 @@
         </div>
       </div>
 
+      <!-- Monthly goal progress -->
+      <div class="card goal-card">
+        <div class="goal-head">
+          <div>
+            <h2>Monthly Revenue Goal</h2>
+            <span class="goal-month" id="goal-month"></span>
+          </div>
+          <div class="goal-edit">
+            <span class="goal-prefix">$</span>
+            <input type="number" id="goal-input" class="goal-input" min="0" step="100" placeholder="Set goal">
+            <button class="btn-primary sm" id="goal-save">Save</button>
+          </div>
+        </div>
+        <div class="goal-figures">
+          <span class="goal-current" id="goal-current">—</span>
+          <span class="goal-of">of</span>
+          <span class="goal-target" id="goal-target">—</span>
+          <span class="goal-pct" id="goal-pct"></span>
+        </div>
+        <div class="goal-bar-wrap"><div class="goal-bar" id="goal-bar" style="width:0%"></div></div>
+        <div class="goal-meta" id="goal-meta"></div>
+      </div>
+
       <!-- Executive snapshot — fixed periods (today / MTD / 30d), business-wide -->
       <div class="kpi-section-head">Executive snapshot <span class="kpi-section-sub">today · month-to-date · 30 days (SamCart + Kajabi)</span></div>
       <div class="stat-grid rev-kpi-grid" id="rev-kpis"></div>
@@ -915,29 +938,6 @@
     <section class="tab" id="tab-behaviour">
       <div class="page-header">
         <div><h1>Sales Analytics</h1><p class="subtitle">Revenue performance, retention &amp; repeat-purchase behaviour</p></div>
-      </div>
-
-      <!-- Monthly goal progress -->
-      <div class="card goal-card">
-        <div class="goal-head">
-          <div>
-            <h2>Monthly Revenue Goal</h2>
-            <span class="goal-month" id="goal-month"></span>
-          </div>
-          <div class="goal-edit">
-            <span class="goal-prefix">$</span>
-            <input type="number" id="goal-input" class="goal-input" min="0" step="100" placeholder="Set goal">
-            <button class="btn-primary sm" id="goal-save">Save</button>
-          </div>
-        </div>
-        <div class="goal-figures">
-          <span class="goal-current" id="goal-current">—</span>
-          <span class="goal-of">of</span>
-          <span class="goal-target" id="goal-target">—</span>
-          <span class="goal-pct" id="goal-pct"></span>
-        </div>
-        <div class="goal-bar-wrap"><div class="goal-bar" id="goal-bar" style="width:0%"></div></div>
-        <div class="goal-meta" id="goal-meta"></div>
       </div>
 
       <!-- Conversion funnel -->
