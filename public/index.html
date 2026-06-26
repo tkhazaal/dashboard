@@ -1180,37 +1180,53 @@
     <section class="tab" id="tab-forms">
       <div class="page-header">
         <div><h1>Form Submissions</h1><p class="subtitle">Capture form &amp; quiz answers from any software via webhooks</p></div>
-        <div class="header-pills"><span class="pill" id="fx-status"></span><button class="btn-primary sm" id="fx-new-webhook">+ Create webhook</button></div>
+        <div class="header-pills"><span class="pill" id="fx-status"></span></div>
       </div>
 
-      <div class="card">
-        <div class="card-header"><h2>Your webhooks</h2><span class="th-hint">paste a URL into your other software (GHL, Typeform, etc.) to send submissions here</span></div>
-        <div id="fx-webhooks"></div>
+      <!-- Sub-navigation -->
+      <div class="fx-subnav">
+        <button class="fx-subtab active" data-fxview="subs">Submissions</button>
+        <button class="fx-subtab" data-fxview="hooks">Webhooks</button>
       </div>
 
-      <div class="card">
-        <div class="card-header">
-          <h2>Submissions</h2>
-          <div class="email-filters">
-            <input id="fx-search" class="search-input" placeholder="Search by name or email…">
-            <select id="fx-form-filter" class="cmp-preset"><option value="">All forms</option></select>
+      <!-- Submissions sub-view -->
+      <div class="fx-view" id="fxview-subs">
+        <div class="card">
+          <div class="card-header">
+            <h2>Submissions</h2>
+            <div class="email-filters">
+              <input id="fx-search" class="search-input" placeholder="Search by name or email…">
+              <select id="fx-form-filter" class="cmp-preset"><option value="">All forms</option></select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Name</th><th>Email</th><th>Form</th><th>Received</th></tr></thead>
+              <tbody id="fx-subs"></tbody>
+            </table>
           </div>
         </div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Form</th><th>Received</th></tr></thead>
-            <tbody id="fx-subs"></tbody>
-          </table>
+
+        <div class="card">
+          <div class="card-header"><h2>Forms</h2><span class="th-hint">rename a form, or click a row to filter its submissions above</span></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Form</th><th>Submissions</th><th>Last received</th><th></th></tr></thead>
+              <tbody id="fx-forms"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header"><h2>Forms</h2><span class="th-hint">rename a form, or click a row to filter its submissions above</span></div>
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead><tr><th>Form</th><th>Submissions</th><th>Last received</th><th></th></tr></thead>
-            <tbody id="fx-forms"></tbody>
-          </table>
+      <!-- Webhooks sub-view -->
+      <div class="fx-view" id="fxview-hooks" hidden>
+        <div class="card">
+          <div class="card-header">
+            <h2>Your webhooks</h2>
+            <button class="btn-primary sm" id="fx-new-webhook">+ Create webhook</button>
+          </div>
+          <p class="th-hint" style="padding:0 2px 10px;">Create a webhook, then paste its URL into your other software (GHL, Typeform, etc.) so its form submissions are captured here.</p>
+          <div id="fx-webhooks"></div>
         </div>
       </div>
     </section>

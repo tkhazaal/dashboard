@@ -980,6 +980,10 @@ table.show-upsell .upsell-col { display: table-cell; }
 .utm-dr-current { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--text); }
 
 /* Form Submissions */
+.fx-subnav { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1.5px solid var(--border); }
+.fx-subtab { font: 600 13.5px var(--font-body); color: var(--sub); background: transparent; border: none; border-bottom: 2px solid transparent; padding: 8px 14px; margin-bottom: -1.5px; cursor: pointer; }
+.fx-subtab:hover { color: var(--text); }
+.fx-subtab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .fx-hook { border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
 .fx-hook-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .fx-hook-top strong { font-size: 14px; }

@@ -2952,6 +2952,13 @@ let _fxT; if ($('fx-search')) $('fx-search').addEventListener('input', () => { c
 if ($('fx-form-filter')) $('fx-form-filter').addEventListener('change', fxSearch);
 if ($('fx-modal-x')) $('fx-modal-x').addEventListener('click', closeFxModal);
 if ($('fx-modal-close')) $('fx-modal-close').addEventListener('click', closeFxModal);
+// Sub-navigation: Submissions ⇄ Webhooks
+document.querySelectorAll('.fx-subtab').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.fx-subtab').forEach(x => x.classList.toggle('active', x === b));
+  const v = b.dataset.fxview;
+  if ($('fxview-subs')) $('fxview-subs').hidden = v !== 'subs';
+  if ($('fxview-hooks')) $('fxview-hooks').hidden = v !== 'hooks';
+}));
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {
