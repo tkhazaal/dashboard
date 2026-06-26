@@ -6,6 +6,8 @@ const $  = id => document.getElementById(id);
 // is computed on EST regardless of the viewer's browser timezone — matching the
 // EST-based backend data. The returned Date's local fields reflect ET wall-clock.
 const nowET = () => new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+// Format a timestamp in Eastern Time for display (e.g. "Jun 26, 2026, 2:30 PM").
+const fmtET = ts => { const d = new Date(ts); return isNaN(d) ? '' : d.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); };
 const fmtNum      = n => n == null ? '—' : Number(n).toLocaleString();
 const fmtMoney    = n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const fmtMoneyFull= n => n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2865,7 +2867,7 @@ async function openSubmission(id) {
       ${qa}
       <details class="fx-raw"><summary>Raw payload</summary><pre>${escHtml(JSON.stringify(s.payload, null, 2))}</pre></details>`;
     $('fx-modal').hidden = false;
-  } catch {}
+  } catch (e) { console.error('openSubmission failed:', e); }
 }
 const closeFxModal = () => { $('fx-modal').hidden = true; };
 if ($('fx-new-webhook')) $('fx-new-webhook').addEventListener('click', async () => {
