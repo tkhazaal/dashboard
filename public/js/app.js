@@ -1373,6 +1373,7 @@ async function renderRevenueKpis() {
   if (!grid.innerHTML) grid.innerHTML = '<div class="stat-card"><div class="stat-sub">Loading…</div></div>';
   if (!state.scData) await loadSamCart().catch(() => {});
   if (!state.kajabiData) { try { state.kajabiData = await api('/api/kajabi/data'); } catch { state.kajabiData = {}; } }
+  if (!state.instagram)  { try { state.instagram  = await api('/api/instagram/data'); } catch { state.instagram = {}; } }
   ensureAdCampaigns();
   const sc = state.scData || {}, kj = state.kajabiData || {};
   const scD = sc.dailyRevenue || {}, kjD = kj.dailyRevenue || {};
@@ -1407,7 +1408,7 @@ async function renderRevenueKpis() {
   const ltv = sc.avgLtv || 0;
   const cac = (newCust90 > 0 && adSpend90 > 0) ? adSpend90 / newCust90 : null;
   const ltvcac = (cac && ltv > 0) ? ltv / cac : null;
-  const ig = state.instagram || null;   // filled in later by the P5 / Instagram API
+  const ig = (state.instagram && state.instagram.followers != null) ? state.instagram : null;
 
   const cards = [
     ['Revenue today', fmtMoney(revToday), 'SamCart + Kajabi · today (ET)'],
@@ -1422,8 +1423,8 @@ async function renderRevenueKpis() {
     ['Revenue source MTD', fmtMoney(revMTD), `SamCart ${fmtMoney(scMTD)} · Kajabi ${fmtMoney(kjMTD)}`],
     ['Acquisition MTD', acq ? Math.round(paid / acq * 100) + '% ads' : '—', acq ? `${Math.round(organic / acq * 100)}% organic · ${fmtNum(acq)} tagged orders` : 'needs UTM-tagged orders', 'Paid = orders from ad channels (FB Ads, etc.); organic = the rest, from UTM-attributed orders this month.'],
     ['New customers (90d)', fmtNum(newCust90), 'first-time buyers · last 90 days', 'Customers whose first-ever purchase was in the last 90 days.'],
-    ['Instagram gain today', ig ? '+' + fmtNum(ig.gainToday || 0) : '—', ig ? 'followers today' : 'connect Instagram (next)', 'Add your P5 / Instagram API next and this fills in automatically.'],
-    ['Instagram followers', ig ? fmtNum(ig.followers || 0) : '—', ig ? 'current total' : 'connect Instagram (next)', 'Add your P5 / Instagram API next and this fills in automatically.'],
+    ['IG followers gained', ig && ig.gainThisMonth != null ? '+' + fmtNum(ig.gainThisMonth) : (ig ? 'baseline set' : '—'), ig ? 'this month' : 'connect Instagram', ig && ig.gainThisMonth == null ? 'First month sets the baseline — next month shows the gain.' : 'New followers vs last month (Apify, refreshed monthly).'],
+    ['Instagram followers', ig ? fmtNum(ig.followers) : '—', ig ? (ig.verified ? '✔ @' : '@') + ig.username : 'connect Instagram', 'Current follower count (Apify Instagram scraper, monthly).'],
   ];
   grid.innerHTML = cards.map(([l, v, s, h]) =>
     `<div class="stat-card"><div class="stat-label">${escHtml(l)}${h ? ` <span class="help" data-tip="${escHtml(h)}">?</span>` : ''}</div><div class="stat-value">${v}</div><div class="stat-sub">${escHtml(s)}</div></div>`

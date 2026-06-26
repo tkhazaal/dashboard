@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.11.0', date: '2026-06-26', title: 'Instagram follower tracking',
+    changes: [
+      { title: 'Instagram cards live', detail: 'The Reporting snapshot now shows current Instagram followers and followers gained this month, via the Apify Instagram scraper. It snapshots once a month so month-over-month follower growth is tracked automatically.' },
+      { title: 'Apify credentials in Settings', detail: 'The Apify token + Instagram username are stored securely in the database (masked, never in code), like the other integrations.' },
+    ],
+  },
+  {
     version: '1.10.0', date: '2026-06-26', title: 'Revenue executive snapshot',
     changes: [
       { title: 'Executive KPI cards', detail: 'The Reporting page now opens with a business-wide snapshot (SamCart + Kajabi): Revenue today / MTD / 30-day, Orders today, AOV, ROAS MTD, Ad spend today, Revenue-by-source MTD, and Acquisition (ads vs organic). Fixed periods, independent of the date filter below.' },
