@@ -2779,7 +2779,7 @@ function renderUtmRows() {
 // + email estimate, while the email UTM tag drops at checkout). Shown as "(est)".
 // REMOVE this once SamCart UTM tracking auto-populates these channels.
 const CXP_MANUAL = [
-  { campaign: 'reconnection_compass_quiz', channel: 'Email',   product: 'Cutoff Culture',        orders: 3, revenue: 201 },
+  { campaign: 'reconnection_compass_quiz', channel: 'Email',   product: 'Cutoff Culture',        orders: 3, revenue: 201, checkout: 267 },
   { campaign: 'reconnection_compass_quiz', channel: 'FB Post', product: 'Cutoff Culture',        orders: 6, revenue: 483 },
   { campaign: 'reconnection_compass_quiz', channel: 'FB Post', product: 'Reconnect Starter Kit', orders: 3, revenue: 81 },
   { campaign: 'reconnection_compass_quiz', channel: 'IG Post', product: 'Cutoff Culture',        orders: 1, revenue: 67 },
@@ -2812,7 +2812,14 @@ function renderCxp() {
     if (m.campaign !== camp) continue;
     const c = prodEst[m.channel] = prodEst[m.channel] || {};
     const p = c[m.product] = c[m.product] || { orders: 0, revenue: 0 };
-    p.orders += m.orders; p.revenue += m.revenue || 0;
+    p.orders += m.orders || 0; p.revenue += m.revenue || 0;
+    if (m.checkout) {                      // manual checkout views (e.g. email, where the tag drops)
+      const pv = prodView[m.channel] = prodView[m.channel] || {};
+      pv[m.product] = pv[m.product] || { cv: 0, cu: 0 };
+      pv[m.product].cv += m.checkout;
+      const ca = chAgg[m.channel] = chAgg[m.channel] || { views: 0, unique: 0, checkout: 0 };
+      ca.checkout += m.checkout;
+    }
   }
 
   // Orders cell: real count (bold) + estimated count (muted "(N est)")
