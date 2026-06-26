@@ -47,7 +47,7 @@ function flattenFields(obj) {
     if (Array.isArray(v)) { v.forEach((x, i) => walk(x, path ? `${path} [${i + 1}]` : `[${i + 1}]`)); return; }
     if (typeof v === 'object') { for (const k in v) walk(v[k], path ? `${path} › ${humanize(k)}` : humanize(k)); return; }
     const a = String(v); if (a !== '') out.push({ q: path, a });
-    if (out.length > 300) throw { __stop: true };
+    if (out.length > 1000) throw { __stop: true };   // generous cap; raw payload keeps everything anyway
   };
   try { walk(obj, ''); } catch (e) { if (!e.__stop) throw e; }
   return out;
