@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.13.1', date: '2026-06-26', title: 'Fix: complete UTM data (channels were being dropped)',
+    changes: [
+      { title: 'All UTM views now counted', detail: 'The UTM report was silently capped at the newest 1,000 tracked views — under-counting busy channels and dropping low-traffic ones entirely (e.g. FB Stories & IG Stories on the Reconnection Compass campaign). It now pages through the full data, so every channel shows up with accurate view & unique counts — including channels that have views but no sales yet.' },
+    ],
+  },
+  {
     version: '1.13.0', date: '2026-06-26', title: 'Form Submissions — delete + CSV export',
     changes: [
       { title: 'Download as CSV', detail: 'Export submissions to CSV — all at once, by the current search/filter, or one form at a time. Each question becomes its own column, so it opens cleanly in Excel/Sheets.' },

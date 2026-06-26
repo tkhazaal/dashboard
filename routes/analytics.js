@@ -7,6 +7,21 @@ function safeDays(val) {
   return isNaN(n) || n < 0 ? 0 : n;
 }
 
+// Supabase/PostgREST caps every response at max-rows (1000 here), so .range(0, 49999)
+// silently returns only the newest 1000 rows — truncating large result sets. Page
+// through .range() until a short page comes back to fetch the full set.
+async function fetchAllPages(buildQuery, pageSize = 1000, maxRows = 200000) {
+  const all = [];
+  for (let from = 0; from < maxRows; from += pageSize) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || !data.length) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+  }
+  return all;
+}
+
 // Validate a YYYY-MM-DD date string; return '' if invalid/absent.
 function safeDate(val) {
   return /^\d{4}-\d{2}-\d{2}$/.test(val || '') ? val : '';
@@ -112,12 +127,14 @@ router.get('/funnel', async (req, res) => {
 router.get('/utm', async (req, res) => {
   try {
     const r = range(req);
-    let q = supabase.from('page_views').select('page_url, page_path, visitor_id, created_at')
-      .ilike('page_url', '%utm_%').order('created_at', { ascending: false }).range(0, 49999);
-    if (r.start_date && r.end_date) q = q.gte('created_at', etBoundUTC(r.start_date, false)).lte('created_at', etBoundUTC(r.end_date, true));
-    else { const days = safeDays(req.query.days); if (days > 0) q = q.gte('created_at', new Date(Date.now() - days * 86400000).toISOString()); }
-    const { data, error } = await q;
-    if (error) throw error;
+    const buildUtmQuery = () => {
+      let q = supabase.from('page_views').select('page_url, page_path, visitor_id, created_at')
+        .ilike('page_url', '%utm_%').order('created_at', { ascending: false });
+      if (r.start_date && r.end_date) q = q.gte('created_at', etBoundUTC(r.start_date, false)).lte('created_at', etBoundUTC(r.end_date, true));
+      else { const days = safeDays(req.query.days); if (days > 0) q = q.gte('created_at', new Date(Date.now() - days * 86400000).toISOString()); }
+      return q;
+    };
+    const data = await fetchAllPages(buildUtmQuery);   // fetch ALL utm views, not just the newest 1000
 
     const getp = (url, k) => { const m = String(url).match(new RegExp('[?&]' + k + '=([^&#]*)', 'i')); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')).trim() : ''; };
     const combo = {}, bySource = {}, byChannel = {}; let total = 0; const uniqAll = new Set();
@@ -166,12 +183,15 @@ router.get('/utm', async (req, res) => {
     // else the visitor's most-recent UTM visit. One order per visitor (dedupe refreshes).
     const ordersByCh = {}, ordersByCombo = {}; let totalOrders = 0;
     try {
-      let cq = supabase.from('page_views').select('page_url, page_path, visitor_id, created_at')
-        .or('page_url.ilike.*thank*,page_url.ilike.*confirm*,page_url.ilike.*/complete/*,page_url.ilike.*receipt*,page_url.ilike.*order-received*,page_url.ilike.*order-success*,page_url.ilike.*order_received*')
-        .order('created_at', { ascending: false }).range(0, 49999);
-      if (r.start_date && r.end_date) cq = cq.gte('created_at', etBoundUTC(r.start_date, false)).lte('created_at', etBoundUTC(r.end_date, true));
-      else { const days = safeDays(req.query.days); if (days > 0) cq = cq.gte('created_at', new Date(Date.now() - days * 86400000).toISOString()); }
-      const { data: confs } = await cq;
+      const buildConfQuery = () => {
+        let cq = supabase.from('page_views').select('page_url, page_path, visitor_id, created_at')
+          .or('page_url.ilike.*thank*,page_url.ilike.*confirm*,page_url.ilike.*/complete/*,page_url.ilike.*receipt*,page_url.ilike.*order-received*,page_url.ilike.*order-success*,page_url.ilike.*order_received*')
+          .order('created_at', { ascending: false });
+        if (r.start_date && r.end_date) cq = cq.gte('created_at', etBoundUTC(r.start_date, false)).lte('created_at', etBoundUTC(r.end_date, true));
+        else { const days = safeDays(req.query.days); if (days > 0) cq = cq.gte('created_at', new Date(Date.now() - days * 86400000).toISOString()); }
+        return cq;
+      };
+      const confs = await fetchAllPages(buildConfQuery);
       const seen = new Set();
       for (const cv of (confs || [])) {
         if (!isConfirmationUrl(cv.page_url)) continue;
