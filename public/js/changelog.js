@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.14.0', date: '2026-06-26', title: 'Form Submissions — Data Analysis',
+    changes: [
+      { title: 'Answer breakdowns', detail: 'A new Data Analysis sub-tab on the Form Submissions page: pick a form, then any question, and instantly see how its answers break down — counts and percentages — as a donut chart, a ranked bar chart, and a table with mini-bars. Perfect for "how many people chose X vs Y" (e.g. which product each person was approved for).' },
+      { title: 'Download the breakdown', detail: 'Export any breakdown to CSV in one click. Works on forms of any size (paged past the 1,000-row limit) and counts each respondent once, so percentages always add up.' },
+    ],
+  },
+  {
     version: '1.13.1', date: '2026-06-26', title: 'Fix: complete UTM data (channels were being dropped)',
     changes: [
       { title: 'All UTM views now counted', detail: 'The UTM report was silently capped at the newest 1,000 tracked views — under-counting busy channels and dropping low-traffic ones entirely (e.g. FB Stories & IG Stories on the Reconnection Compass campaign). It now pages through the full data, so every channel shows up with accurate view & unique counts — including channels that have views but no sales yet.' },

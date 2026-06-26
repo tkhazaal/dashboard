@@ -1,6 +1,6 @@
 {
   "name": "metric-tracking-dashboard",
-  "version": "1.13.1",
+  "version": "1.14.0",
   "description": "Landing page analytics + SamCart purchase behavior dashboard",
   "main": "server.js",
   "engines": {

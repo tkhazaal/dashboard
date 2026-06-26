@@ -2881,6 +2881,7 @@ async function loadForms() {
     state.fxForms = forms;
     renderFxWebhooks(hooks);
     renderFxForms(forms);
+    faSyncForms();
     const sel = $('fx-form-filter'), cur = sel.value;
     sel.innerHTML = '<option value="">All forms</option>' + forms.map(f => `<option value="${escHtml(f.form_key)}">${escHtml(f.name)} (${f.count})</option>`).join('');
     sel.value = forms.some(f => f.form_key === cur) ? cur : '';
@@ -2969,13 +2970,115 @@ let _fxT; if ($('fx-search')) $('fx-search').addEventListener('input', () => { c
 if ($('fx-form-filter')) $('fx-form-filter').addEventListener('change', fxSearch);
 if ($('fx-modal-x')) $('fx-modal-x').addEventListener('click', closeFxModal);
 if ($('fx-modal-close')) $('fx-modal-close').addEventListener('click', closeFxModal);
-// Sub-navigation: Submissions ⇄ Webhooks
+// Sub-navigation: Submissions ⇄ Data Analysis ⇄ Webhooks
 document.querySelectorAll('.fx-subtab').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.fx-subtab').forEach(x => x.classList.toggle('active', x === b));
   const v = b.dataset.fxview;
-  if ($('fxview-subs')) $('fxview-subs').hidden = v !== 'subs';
-  if ($('fxview-hooks')) $('fxview-hooks').hidden = v !== 'hooks';
+  document.querySelectorAll('#tab-forms .fx-view').forEach(view => { view.hidden = view.id !== 'fxview-' + v; });
+  if (v === 'analysis') faSyncForms();
 }));
+
+// ── Data Analysis: form → column → answer breakdown ───────────────────
+const FA_COLORS = ['#8b5cf6','#4c1d95','#a78bfa','#6d28d9','#c4b5fd','#5b21b6','#7c3aed','#3b0764','#9d7bf5','#2e1065','#b794f6','#1e1b4b'];
+let faBreakdown = null;   // last rendered breakdown (for CSV)
+let faSeq = 0;            // request token — discard stale responses when switching form/column quickly
+
+function faSyncForms() {
+  const sel = $('fa-form'); if (!sel) return;
+  const forms = state.fxForms || [], cur = sel.value;
+  sel.innerHTML = '<option value="">Select a form…</option>' + forms.map(f => `<option value="${escHtml(f.form_key)}">${escHtml(f.name)} (${f.count})</option>`).join('');
+  if (forms.some(f => f.form_key === cur)) sel.value = cur;
+}
+function faShowEmpty(msg) { if ($('fa-empty')) { $('fa-empty').textContent = msg; $('fa-empty').hidden = false; } if ($('fa-body')) $('fa-body').hidden = true; if ($('fa-export')) $('fa-export').hidden = true; }
+function faClearCharts() { ['fa-donut','fa-bar'].forEach(id => { if (reportCharts[id]) { reportCharts[id].destroy(); delete reportCharts[id]; } }); if ($('fa-table')) $('fa-table').innerHTML = ''; faBreakdown = null; }
+const faTrunc = (s, n) => { s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+
+async function faLoadColumns() {
+  const form = $('fa-form').value, colSel = $('fa-column');
+  faClearCharts(); $('fa-summary').textContent = '';
+  if (!form) { colSel.innerHTML = '<option value="">Select a form first…</option>'; colSel.disabled = true; faShowEmpty('Select a form, then a question, to see the breakdown.'); return; }
+  const my = ++faSeq;
+  colSel.disabled = true; colSel.innerHTML = '<option value="">Loading…</option>';
+  try {
+    const d = await api('/api/forms/columns?form=' + encodeURIComponent(form));
+    if (my !== faSeq) return;
+    if (!d.columns || !d.columns.length) { colSel.innerHTML = '<option value="">No questions found</option>'; faShowEmpty('This form has no answer fields to analyse yet.'); return; }
+    colSel.innerHTML = '<option value="">Select a question…</option>' + d.columns.map(c => `<option value="${escHtml(c.q)}">${escHtml(faTrunc(c.q, 60))} (${c.count})</option>`).join('');
+    colSel.disabled = false;
+    faShowEmpty('Now pick a question above to see how its answers break down.');
+  } catch (e) { if (my !== faSeq) return; colSel.innerHTML = '<option value="">Error</option>'; faShowEmpty('Could not load questions: ' + e.message); }
+}
+async function faLoadBreakdown() {
+  const form = $('fa-form').value, column = $('fa-column').value;
+  faClearCharts();
+  if (!form || !column) { faShowEmpty('Pick a question to see the breakdown.'); return; }
+  const my = ++faSeq;
+  faShowEmpty('Loading…'); $('fa-summary').textContent = '';
+  try {
+    const d = await api('/api/forms/breakdown?form=' + encodeURIComponent(form) + '&column=' + encodeURIComponent(column));
+    if (my !== faSeq) return;
+    renderFaBreakdown(d);
+  } catch (e) { if (my !== faSeq) return; $('fa-summary').textContent = ''; faShowEmpty('Could not load breakdown: ' + e.message); }
+}
+function renderFaBreakdown(d) {
+  faBreakdown = d;
+  const values = d.values || [];
+  if (!values.length) { $('fa-summary').textContent = ''; faShowEmpty('No answers recorded for this question yet.'); return; }
+  $('fa-empty').hidden = true; $('fa-body').hidden = false; $('fa-export').hidden = false;
+  $('fa-summary').innerHTML = `<strong>${escHtml(d.column)}</strong> — ${fmtNum(d.answered)} ${d.answered === 1 ? 'person' : 'people'} answered · ${fmtNum(d.distinct)} distinct ${d.distinct === 1 ? 'answer' : 'answers'}`;
+
+  // top 10 + Other for the charts (table shows everything)
+  const N = 10; let chartVals = values;
+  if (values.length > N) {
+    const rest = values.slice(N), otherCount = rest.reduce((s, v) => s + v.count, 0);
+    chartVals = [...values.slice(0, N), { value: `Other (${rest.length})`, count: otherCount, pct: d.answered ? Math.round(otherCount / d.answered * 1000) / 10 : 0 }];
+  }
+  const labels = chartVals.map(v => faTrunc(v.value, 28));
+  const counts = chartVals.map(v => v.count);
+  const colors = chartVals.map((_, i) => FA_COLORS[i % FA_COLORS.length]);
+
+  mkChart('fa-donut', {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10, font: { size: 11 }, color: TICK } }, tooltip: { callbacks: { label: c => ` ${c.label}: ${fmtNum(c.parsed)} (${chartVals[c.dataIndex].pct}%)` } } } },
+    plugins: [faDonutCenter(fmtNum(d.answered), d.answered === 1 ? 'person' : 'people')],
+  });
+  mkChart('fa-bar', {
+    type: 'bar',
+    data: { labels, datasets: [{ data: counts, backgroundColor: colors, borderRadius: 4, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${fmtNum(c.parsed.x)} (${chartVals[c.dataIndex].pct}%)` } } }, scales: { x: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, precision: 0 }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 11 }, color: TICK } } } },
+  });
+  const TBL = 100, tblRows = values.slice(0, TBL);
+  $('fa-table').innerHTML = tblRows.map((v, i) => `
+    <tr>
+      <td><span class="fa-swatch" style="background:${FA_COLORS[i % FA_COLORS.length]}"></span>${escHtml(v.value)}</td>
+      <td class="fa-num">${fmtNum(v.count)}</td>
+      <td class="fa-num">${v.pct}%</td>
+      <td class="fa-barcell"><span class="fa-barfill" style="width:${Math.min(100, v.pct)}%;background:${FA_COLORS[i % FA_COLORS.length]}"></span></td>
+    </tr>`).join('') + (values.length > TBL ? `<tr><td colspan="4" class="th-hint">…and ${fmtNum(values.length - TBL)} more distinct answers — use ⬇ CSV for the full list.</td></tr>` : '');
+}
+function faDonutCenter(text, sub) {
+  return { id: 'faDonutCenter', afterDraw(chart) {
+    const a = chart.chartArea; if (!a) return; const ctx = chart.ctx;
+    const x = (a.left + a.right) / 2, y = (a.top + a.bottom) / 2;
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = (getComputedStyle(document.body).getPropertyValue('--text') || '#1a1a1a').trim();
+    ctx.font = '700 20px Inter, system-ui, sans-serif'; ctx.fillText(text, x, y - 7);
+    ctx.font = '500 11px Inter, system-ui, sans-serif'; ctx.fillStyle = TICK; ctx.fillText(sub, x, y + 12);
+    ctx.restore();
+  } };
+}
+if ($('fa-form')) $('fa-form').addEventListener('change', faLoadColumns);
+if ($('fa-column')) $('fa-column').addEventListener('change', faLoadBreakdown);
+if ($('fa-export')) $('fa-export').addEventListener('click', () => {
+  if (!faBreakdown) return;
+  const esc = v => { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const rows = [['Answer', 'People', 'Percent'].join(','), ...faBreakdown.values.map(v => [esc(v.value), v.count, v.pct + '%'].join(','))];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = (faBreakdown.column || 'breakdown').replace(/[^a-z0-9]+/gi, '-').slice(0, 50) + '.csv';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {

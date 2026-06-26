@@ -989,6 +989,24 @@ table.show-upsell .upsell-col { display: table-cell; }
 .fx-mini.fx-del:hover { border-color: var(--danger); color: var(--danger); }
 .fx-form-actions { white-space: nowrap; }
 .fx-modal-actions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+/* Data Analysis */
+.fa-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin: 6px 2px 14px; }
+.fa-field { display: flex; flex-direction: column; gap: 5px; font: 600 11.5px var(--font-body); color: var(--sub); }
+.fa-field select { min-width: 230px; }
+.fa-controls .clear-btn { margin-bottom: 1px; }
+.fa-summary { font: 500 13px var(--font-body); color: var(--text); margin: 0 2px 14px; min-height: 18px; }
+.fa-summary strong { color: var(--accent); }
+.fa-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+.fa-chart-box { background: var(--surface-alt); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.fa-chart-box .chart-wrap { height: 300px; position: relative; }
+.fa-table .fa-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+.fa-table .fa-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fa-table .fa-barcell { width: 32%; }
+.fa-barfill { display: block; height: 8px; border-radius: 4px; min-width: 2px; }
+.fa-empty { padding: 28px 8px; text-align: center; color: var(--sub); font: 500 13px var(--font-body); }
+@media (max-width: 760px) { .fa-charts { grid-template-columns: 1fr; } .fa-field select { min-width: 160px; } }
+
 .fx-hook { border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
 .fx-hook-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .fx-hook-top strong { font-size: 14px; }

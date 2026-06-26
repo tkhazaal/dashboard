@@ -170,6 +170,66 @@ router.get('/export', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Data Analysis: column picker + value breakdown ──────────────────────────
+// Supabase caps responses at 1000 rows, so page through to get every submission.
+async function fetchAllSubs(form, select) {
+  const all = [], PAGE = 1000;
+  for (let from = 0; from < 200000; from += PAGE) {
+    let q = supabase.from('form_submissions').select(select).order('created_at', { ascending: false }).order('id', { ascending: false });
+    if (form) q = q.eq('form_key', form);
+    const { data, error } = await q.range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || !data.length) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return all;
+}
+
+// Columns (questions) available for a form, with how many submissions answered each.
+router.get('/columns', async (req, res) => {
+  try {
+    const form = (req.query.form || '').toString();
+    if (!form) return res.status(400).json({ error: 'form required' });
+    const subs = await fetchAllSubs(form, 'fields');
+    const counts = new Map();
+    for (const s of subs) {
+      const seen = new Set();
+      for (const f of (s.fields || [])) {
+        if (!f || !f.q || seen.has(f.q)) continue;        // count one per submission
+        if (f.a == null || String(f.a).trim() === '') continue;
+        seen.add(f.q);
+        counts.set(f.q, (counts.get(f.q) || 0) + 1);
+      }
+    }
+    const columns = [...counts.entries()].map(([q, count]) => ({ q, count })).sort((a, b) => b.count - a.count || a.q.localeCompare(b.q));
+    res.json({ columns, submissions: subs.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Value distribution for one column across a form's submissions.
+router.get('/breakdown', async (req, res) => {
+  try {
+    const form = (req.query.form || '').toString();
+    const column = (req.query.column || '').toString();
+    if (!form || !column) return res.status(400).json({ error: 'form and column required' });
+    const subs = await fetchAllSubs(form, 'fields');
+    const tally = new Map();
+    let answered = 0;
+    for (const s of subs) {
+      let val = null;                                   // first non-empty answer → one value per person (pct never exceeds 100)
+      for (const f of (s.fields || [])) if (f && f.q === column && f.a != null && String(f.a).trim() !== '') { val = String(f.a).trim(); break; }
+      if (val == null) continue;
+      answered++;
+      tally.set(val, (tally.get(val) || 0) + 1);
+    }
+    const values = [...tally.entries()]
+      .map(([value, count]) => ({ value, count, pct: answered ? Math.round(count / answered * 1000) / 10 : 0 }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+    res.json({ column, submissions: subs.length, answered, distinct: values.length, values });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Recent submissions with full payload — the "test / inspect a new webhook" view.
 router.get('/recent', async (req, res) => {
   try {

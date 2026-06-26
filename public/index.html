@@ -1186,6 +1186,7 @@
       <!-- Sub-navigation -->
       <div class="fx-subnav">
         <button class="fx-subtab active" data-fxview="subs">Submissions</button>
+        <button class="fx-subtab" data-fxview="analysis">Data Analysis</button>
         <button class="fx-subtab" data-fxview="hooks">Webhooks</button>
       </div>
 
@@ -1216,6 +1217,39 @@
               <tbody id="fx-forms"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- Data Analysis sub-view -->
+      <div class="fx-view" id="fxview-analysis" hidden>
+        <div class="card">
+          <div class="card-header">
+            <h2>Data Analysis</h2>
+            <span class="th-hint">pick a form and a question to see how answers break down</span>
+          </div>
+          <div class="fa-controls">
+            <label class="fa-field"><span>Form</span>
+              <select id="fa-form" class="cmp-preset"><option value="">Select a form…</option></select>
+            </label>
+            <label class="fa-field"><span>Column / question</span>
+              <select id="fa-column" class="cmp-preset" disabled><option value="">Select a form first…</option></select>
+            </label>
+            <button class="clear-btn" id="fa-export" title="Download this breakdown as CSV" hidden>⬇ CSV</button>
+          </div>
+          <div class="fa-summary" id="fa-summary"></div>
+          <div class="fa-body" id="fa-body" hidden>
+            <div class="fa-charts">
+              <div class="fa-chart-box"><div class="chart-wrap"><canvas id="fa-donut"></canvas></div></div>
+              <div class="fa-chart-box"><div class="chart-wrap"><canvas id="fa-bar"></canvas></div></div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table fa-table">
+                <thead><tr><th>Answer</th><th>People</th><th>%</th><th></th></tr></thead>
+                <tbody id="fa-table"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="fa-empty" id="fa-empty">Select a form, then a question, to see the breakdown.</div>
         </div>
       </div>
 
