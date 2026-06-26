@@ -1369,6 +1369,31 @@ const legendBottom = { legend: { position: 'bottom', labels: { font: { size: 10 
 const shorten = (s, n = 22) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const monthLbl = m => { const [y, mo] = String(m).split('-'); return new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); };
 
+// Mini SVG sparkline for a KPI card (gradient area + line + end dot).
+function kpiSpark(vals, color) {
+  const w = 240, h = 42;
+  const data = (vals || []).map(v => (typeof v === 'number' && isFinite(v)) ? v : 0);
+  if (data.length < 2) return '<div class="kpi-viz"></div>';
+  const min = Math.min(...data), max = Math.max(...data), range = (max - min) || 1;
+  const X = i => (i / (data.length - 1)) * w;
+  const Y = v => h - 3 - ((v - min) / range) * (h - 7);
+  const line = data.map((v, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ');
+  const area = `M0 ${h} ` + data.map((v, i) => 'L' + X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' ') + ` L${w} ${h} Z`;
+  const id = 'sp' + Math.random().toString(36).slice(2, 8);
+  const lx = X(data.length - 1).toFixed(1), ly = Y(data[data.length - 1]).toFixed(1);
+  return `<div class="kpi-viz"><svg class="kpi-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity="0.22"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <path d="${area}" fill="url(#${id})"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lx}" cy="${ly}" r="2.6" fill="${color}"/></svg></div>`;
+}
+// Mini proportional split bar + legend for two-part KPIs.
+function kpiSplit(parts) {
+  const tot = parts.reduce((s, p) => s + (p.value > 0 ? p.value : 0), 0);
+  const bar = tot > 0 ? parts.map(p => `<span style="width:${Math.max(0, p.value) / tot * 100}%;background:${p.color}"></span>`).join('') : '<span style="width:100%;background:var(--border)"></span>';
+  const leg = parts.map(p => `<span><i style="background:${p.color}"></i>${escHtml(p.label)}</span>`).join('');
+  return `<div class="kpi-viz"><div class="kpi-splitbar">${bar}</div><div class="kpi-splitleg">${leg}</div></div>`;
+}
+
 // Executive revenue snapshot — fixed periods (today / MTD / rolling 30d), business-wide
 // (SamCart + Kajabi). Independent of the source selector + date range below.
 async function renderRevenueKpis() {
@@ -1413,24 +1438,36 @@ async function renderRevenueKpis() {
   const ltvcac = (cac && ltv > 0) ? ltv / cac : null;
   const ig = (state.instagram && state.instagram.followers != null) ? state.instagram : null;
 
+  // ── Daily series (last 30 days) for the sparklines ──
+  const C = { blue: '#2563eb', green: '#16a34a', amber: '#f59e0b', violet: '#8b5cf6', pink: '#ec4899' };
+  const combRev = d => cell(scD, d, 'revenue') + cell(kjD, d, 'revenue');
+  const combOrd = d => cell(scD, d, 'orders') + cell(kjD, d, 'orders');
+  const revSeries = d30.map(combRev);
+  const ordSeries = d30.map(combOrd);
+  const newSeries = d30.map(d => fob[d] || 0);
+  const adSeries  = d30.map(d => camps.reduce((s, c) => s + adSpend(c, d, d), 0));
+  const aovSeries = d30.map(d => { const o = combOrd(d); return o ? combRev(d) / o : 0; });
+  const roasSeries = d30.map((d, i) => adSeries[i] > 0 ? revSeries[i] / adSeries[i] : 0);
+  const igHist = ig ? Object.keys(ig.history || {}).sort().map(m => ig.history[m]) : [];
+
   const cards = [
-    ['Revenue today', fmtMoney(revToday), 'SamCart + Kajabi · today (ET)'],
-    ['Revenue MTD', fmtMoney(revMTD), `month to date · ${fmtNum(ordMTD)} orders`],
-    ['Orders today', fmtNum(ordToday), 'SamCart + Kajabi'],
-    ['ROAS MTD', roas != null ? roas.toFixed(2) + '×' : '—', adMTD > 0 ? `revenue ÷ ${fmtMoney(adMTD)} ad spend` : 'add ad budgets in Ads tab'],
-    ['Ad spend today', fmtMoney(adToday), 'from campaign budgets'],
-    ['Revenue 30 days', fmtMoney(rev30), 'rolling 30 days'],
-    ['Avg order value', fmtMoney(aov), 'month to date'],
-    ['LTV : CAC', ltvcac != null ? ltvcac.toFixed(1) + ' : 1' : '—', cac != null ? `LTV ${fmtMoney(ltv)} ÷ CAC ${fmtMoney(cac)}` : `avg LTV ${fmtMoney(ltv)} · add ad budgets`, 'Lifetime value ÷ customer-acquisition cost. CAC = ad spend ÷ new customers (last 90 days).'],
-    ['CAC (90d)', cac != null ? fmtMoney(cac) : '—', cac != null ? `${fmtMoney(adSpend90)} ÷ ${fmtNum(newCust90)} new` : 'add ad budgets in Ads tab', 'Customer acquisition cost = ad spend ÷ new customers, last 90 days.'],
-    ['Revenue source MTD', fmtMoney(revMTD), `SamCart ${fmtMoney(scMTD)} · Kajabi ${fmtMoney(kjMTD)}`],
-    ['Acquisition MTD', acq ? Math.round(paid / acq * 100) + '% ads' : '—', acq ? `${Math.round(organic / acq * 100)}% organic · ${fmtNum(acq)} tagged orders` : 'needs UTM-tagged orders', 'Paid = orders from ad channels (FB Ads, etc.); organic = the rest, from UTM-attributed orders this month.'],
-    ['New customers (90d)', fmtNum(newCust90), 'first-time buyers · last 90 days', 'Customers whose first-ever purchase was in the last 90 days.'],
-    ['IG followers gained', ig && ig.gainThisMonth != null ? '+' + fmtNum(ig.gainThisMonth) : (ig ? 'baseline set' : '—'), ig ? 'this month' : 'connect Instagram', ig && ig.gainThisMonth == null ? 'First month sets the baseline — next month shows the gain.' : 'New followers vs last month (Apify, refreshed monthly).'],
-    ['Instagram followers', ig ? fmtNum(ig.followers) : '—', ig ? (ig.verified ? '✔ @' : '@') + ig.username : 'connect Instagram', 'Current follower count (Apify Instagram scraper, monthly).'],
+    ['Revenue today', fmtMoney(revToday), 'SamCart + Kajabi · today (ET)', '', kpiSpark(revSeries, C.blue)],
+    ['Revenue MTD', fmtMoney(revMTD), `month to date · ${fmtNum(ordMTD)} orders`, '', kpiSpark(revSeries, C.blue)],
+    ['Orders today', fmtNum(ordToday), 'SamCart + Kajabi', '', kpiSpark(ordSeries, C.green)],
+    ['ROAS MTD', roas != null ? roas.toFixed(2) + '×' : '—', adMTD > 0 ? `revenue ÷ ${fmtMoney(adMTD)} ad spend` : 'add ad budgets in Ads tab', '', kpiSpark(roasSeries, C.violet)],
+    ['Ad spend today', fmtMoney(adToday), 'from campaign budgets', '', kpiSpark(adSeries, C.amber)],
+    ['Revenue 30 days', fmtMoney(rev30), 'rolling 30 days', '', kpiSpark(revSeries, C.blue)],
+    ['Avg order value', fmtMoney(aov), 'month to date', '', kpiSpark(aovSeries, C.blue)],
+    ['LTV : CAC', ltvcac != null ? ltvcac.toFixed(1) + ' : 1' : '—', cac != null ? `LTV ${fmtMoney(ltv)} ÷ CAC ${fmtMoney(cac)}` : `avg LTV ${fmtMoney(ltv)} · add ad budgets`, 'Lifetime value ÷ customer-acquisition cost. CAC = ad spend ÷ new customers (last 90 days).', kpiSplit([{ label: 'LTV', value: ltv, color: C.green }, { label: 'CAC', value: cac || 0, color: C.amber }])],
+    ['CAC (90d)', cac != null ? fmtMoney(cac) : '—', cac != null ? `${fmtMoney(adSpend90)} ÷ ${fmtNum(newCust90)} new` : 'add ad budgets in Ads tab', 'Customer acquisition cost = ad spend ÷ new customers, last 90 days.', kpiSpark(adSeries, C.amber)],
+    ['Revenue source MTD', fmtMoney(revMTD), `SamCart ${fmtMoney(scMTD)} · Kajabi ${fmtMoney(kjMTD)}`, '', kpiSplit([{ label: 'SamCart', value: scMTD, color: C.blue }, { label: 'Kajabi', value: kjMTD, color: C.violet }])],
+    ['Acquisition MTD', acq ? Math.round(paid / acq * 100) + '% ads' : '—', acq ? `${Math.round(organic / acq * 100)}% organic · ${fmtNum(acq)} tagged orders` : 'needs UTM-tagged orders', 'Paid = orders from ad channels (FB Ads, etc.); organic = the rest, from UTM-attributed orders this month.', kpiSplit([{ label: 'Ads', value: paid, color: C.blue }, { label: 'Organic', value: organic, color: C.green }])],
+    ['New customers (90d)', fmtNum(newCust90), 'first-time buyers · last 90 days', 'Customers whose first-ever purchase was in the last 90 days.', kpiSpark(newSeries, C.green)],
+    ['IG followers gained', ig && ig.gainThisMonth != null ? '+' + fmtNum(ig.gainThisMonth) : (ig ? 'baseline set' : '—'), ig ? 'this month' : 'connect Instagram', ig && ig.gainThisMonth == null ? 'First month sets the baseline — next month shows the gain.' : 'New followers vs last month (Apify, refreshed monthly).', kpiSpark(igHist, C.pink)],
+    ['Instagram followers', ig ? fmtNum(ig.followers) : '—', ig ? (ig.verified ? '✔ @' : '@') + ig.username : 'connect Instagram', 'Current follower count (Apify Instagram scraper, monthly).', kpiSpark(igHist, C.pink)],
   ];
-  grid.innerHTML = cards.map(([l, v, s, h]) =>
-    `<div class="stat-card"><div class="stat-label">${escHtml(l)}${h ? ` <span class="help" data-tip="${escHtml(h)}">?</span>` : ''}</div><div class="stat-value">${v}</div><div class="stat-sub">${escHtml(s)}</div></div>`
+  grid.innerHTML = cards.map(([l, v, s, h, viz]) =>
+    `<div class="stat-card kpi-card"><div class="stat-label">${escHtml(l)}${h ? ` <span class="help" data-tip="${escHtml(h)}">?</span>` : ''}</div><div class="stat-value">${v}</div>${viz || ''}<div class="stat-sub">${escHtml(s)}</div></div>`
   ).join('');
 }
 
