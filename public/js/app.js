@@ -1747,10 +1747,9 @@ function uniqueGroupName(base) {
 }
 
 // slug -> { unique, checkout, label, isLanding } from tracked pages
-function pageViewsMap() {
+function pageViewsMapFrom(pages) {
   const m = {};
-  // Use date-scoped pages when a funnel range is active, else all-time
-  for (const e of buildSlugRows(state.funnelPages || state.pagesData || [])) {
+  for (const e of buildSlugRows(pages || [])) {
     const isLanding = !!e.landingPath;
     // Landing → campaign label. Checkout → channel from the SamCart product (IG Posts,
     // FB Ads, …), falling back to the page title.
@@ -1762,6 +1761,37 @@ function pageViewsMap() {
     };
   }
   return m;
+}
+// Use date-scoped pages when a funnel range is active, else all-time
+function pageViewsMap() { return pageViewsMapFrom(state.funnelPages || state.pagesData || []); }
+
+// Slug/product → {unique, checkout} keyed exactly like buildFunnelPages (landing by
+// slug, products by name), for an arbitrary pages array — used for period comparison.
+function slugStatsFrom(pages) {
+  const pvm = pageViewsMapFrom(pages);
+  const map = {};
+  for (const sl of Object.keys(pvm)) if (pvm[sl].isLanding) map[sl] = { unique: pvm[sl].unique, checkout: pvm[sl].checkout };
+  const list = (state.scData && state.scData.productList) || [];
+  const ps   = (state.scData && state.scData.productSlug) || {};
+  list.forEach(name => { const sl = ps[name]; const pv = (sl && pvm[sl]) || { unique: 0, checkout: 0 }; map[name] = { unique: pv.unique, checkout: pv.checkout }; });
+  return map;
+}
+// Aggregate funnel metrics per group (+ total) for a period: page stats from slugStats,
+// orders/revenue from SamCart day-level sales between start..end.
+function funnelGroupMetrics(slugStats, start, end) {
+  const cfg = state.funnelsConfig || [];
+  const groups = {}; const total = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
+  for (const r of cfg) {
+    const pv = slugStats[r.pageSlug] || { unique: 0, checkout: 0 };
+    const m  = prodSalesBetween(r.main, start, end);
+    const u1 = prodSalesBetween(r.upsell1, start, end);
+    const u2 = prodSalesBetween(r.upsell2, start, end);
+    const rev = m.revenue + u1.revenue + u2.revenue;
+    const g = groups[r.group] || (groups[r.group] = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 });
+    g.U += pv.unique; g.C += pv.checkout; g.M += m.orders; g.U1 += u1.orders; g.U2 += u2.orders; g.R += rev;
+    total.U += pv.unique; total.C += pv.checkout; total.M += m.orders; total.U1 += u1.orders; total.U2 += u2.orders; total.R += rev;
+  }
+  return { groups, total };
 }
 function prodSales(name) {
   const ps = state.scData && state.scData.productSales;
@@ -1944,6 +1974,46 @@ function renderFunnels() {
     </tr>` : '';
 }
 
+// ── Funnel comparison: current range vs the previous period of equal length ──
+const _addDays = (s, n) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return d; };
+async function renderFunnelCompare() {
+  const card = $('fn-compare-card'); if (!card) return;
+  if (!state.funnelCompare) { card.hidden = true; return; }
+  card.hidden = false;
+  const aS = state.funnelStart, aE = state.funnelEnd;
+  if (!aS || !aE) {
+    $('fn-compare-label').textContent = '';
+    $('fn-compare-body').innerHTML = `<tr class="empty-row"><td colspan="5">Pick a date range above (e.g. Today or This week) to compare it with the period before.</td></tr>`;
+    return;
+  }
+  const len = daysInRange(aS, aE).length;
+  const bE = ymd(_addDays(aS, -1)), bS = ymd(_addDays(aS, -len));
+  $('fn-compare-label').textContent = `${fmtRange(new Date(aS + 'T00:00:00'), new Date(aE + 'T00:00:00'))}  vs  ${fmtRange(new Date(bS + 'T00:00:00'), new Date(bE + 'T00:00:00'))}`;
+  $('fn-compare-body').innerHTML = `<tr class="empty-row"><td colspan="5">Loading…</td></tr>`;
+  let bPages = [];
+  try { bPages = await api(`/api/analytics/pages?start=${bS}&end=${bE}`); } catch { /* ignore */ }
+  const aM = funnelGroupMetrics(slugStatsFrom(state.funnelPages || []), aS, aE);
+  const bM = funnelGroupMetrics(slugStatsFrom(bPages), bS, bE);
+  renderCompareTable(aM, bM);
+}
+function renderCompareTable(aM, bM) {
+  const cell = (a, b, money) => {
+    const fa = money ? fmtMoney(a) : fmtNum(a);
+    const fb = money ? fmtMoney(b) : fmtNum(b);
+    let badge;
+    if (b > 0) { const dv = Math.round(((a - b) / b) * 1000) / 10; badge = `<span class="delta ${dv >= 0 ? 'up' : 'down'}">${dv >= 0 ? '▲' : '▼'}${Math.abs(dv)}%</span>`; }
+    else badge = a > 0 ? '<span class="delta up">new</span>' : '<span class="delta flat">—</span>';
+    return `<div class="cmp-cur">${fa}</div><div class="cmp-prev">vs ${fb} ${badge}</div>`;
+  };
+  const empty = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
+  const row = (label, a, b, cls) => `<tr class="${cls || ''}"><td>${label}</td><td>${cell(a.U, b.U)}</td><td>${cell(a.C, b.C)}</td><td>${cell(a.M, b.M)}</td><td>${cell(a.R, b.R, true)}</td></tr>`;
+  const names = [...new Set([...Object.keys(aM.groups), ...Object.keys(bM.groups)])].sort();
+  let html = '';
+  for (const n of names) html += row(escHtml(n), aM.groups[n] || empty, bM.groups[n] || empty);
+  html += row('<strong>TOTAL</strong>', aM.total, bM.total, 'funnel-total');
+  $('fn-compare-body').innerHTML = html || `<tr class="empty-row"><td colspan="5">No data</td></tr>`;
+}
+
 function saveFunnels() {
   clearTimeout(_funnelSaveTimer);
   const pill = $('funnel-saved');
@@ -1971,6 +2041,7 @@ async function loadFunnels() {
   if (!state.pagesData || !state.pagesData.length) tasks.push(loadPagesTable().catch(() => {}));
   if (tasks.length) await Promise.all(tasks);
   renderFunnels();
+  renderFunnelCompare();
 }
 
 // Apply the Funnels date range — refetch page views for the range, re-render
@@ -1980,6 +2051,7 @@ async function applyFunnelRange() {
     catch { state.funnelPages = null; }
   } else { state.funnelPages = null; }
   renderFunnels();
+  renderFunnelCompare();
 }
 // Resolve a preset to [startDate, endDate] (Date objects, or [null,null] for all-time)
 function funnelPresetRange(v) {
@@ -2016,6 +2088,11 @@ function applyFunnelCustom() {
 }
 $('fn-start').addEventListener('change', applyFunnelCustom);
 $('fn-end').addEventListener('change', applyFunnelCustom);
+if ($('fn-compare-toggle')) $('fn-compare-toggle').addEventListener('click', () => {
+  state.funnelCompare = !state.funnelCompare;
+  $('fn-compare-toggle').classList.toggle('active', state.funnelCompare);
+  renderFunnelCompare();
+});
 
 // Row + group edits (event delegation)
 $('funnelBody').addEventListener('change', e => {

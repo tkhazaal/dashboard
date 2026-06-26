@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.9.0', date: '2026-06-26', title: 'Funnel period comparison',
+    changes: [
+      { title: 'Compare day-by-day / week-by-week', detail: 'On the Funnels page, click "⇄ Compare" to see the selected range vs the previous period of equal length — pick Today for day-over-day, This week for week-over-week, etc. Each channel shows current vs previous for Unique Views, Checkout Views, Orders and Revenue, with the % change.' },
+    ],
+  },
+  {
     version: '1.8.0', date: '2026-06-26', title: 'Channel × Product breakdown + date picker',
     changes: [
       { title: 'Channel × Product', detail: 'On the UTM page, pick a campaign and see how each channel performed per product — channel-level views & unique, then per-product checkout views, orders and revenue. Answers "which channel sold which product."' },

@@ -398,6 +398,7 @@
               <input type="date" id="fn-end" class="date-input" aria-label="End date">
             </span>
           </div>
+          <button class="clear-btn" id="fn-compare-toggle" title="Compare the selected range with the previous period of the same length">⇄ Compare</button>
           <span class="pill" id="funnel-saved"></span>
           <button class="clear-btn" id="funnel-add">+ Platform</button>
           <button class="btn-primary sm" id="funnel-add-group">+ Group</button>
@@ -425,6 +426,22 @@
         </div>
       </div>
       <p class="chart-insight" style="padding:0 2px;">Sales counts come from SamCart (a product's total purchases). Because your products are named per channel (e.g. “RM Upsell — CC — FB”), selecting the exact product gives that channel's numbers. Conversion rates: Checkout→Main, Main→Upsell 1, Upsell 1→Upsell 2.</p>
+
+      <!-- Period comparison (this period vs the previous one of equal length) -->
+      <div class="card" id="fn-compare-card" hidden>
+        <div class="card-header">
+          <h2>Period comparison</h2>
+          <span class="pill" id="fn-compare-label"></span>
+        </div>
+        <p class="th-hint" style="padding:0 2px 8px;">Each channel's funnel for the selected range vs the previous period of the same length (today→yesterday, this week→last week, etc.). Top number = current, below = previous + change.</p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Channel</th><th>Unique&nbsp;Views</th><th>Checkout&nbsp;Views</th><th>Orders</th><th>Revenue</th></tr></thead>
+            <tbody id="fn-compare-body"></tbody>
+          </table>
+        </div>
+      </div>
+
       <datalist id="fn-products"></datalist>
       <datalist id="fn-pages"></datalist>
     </section>
