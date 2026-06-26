@@ -1366,6 +1366,61 @@ const legendBottom = { legend: { position: 'bottom', labels: { font: { size: 10 
 const shorten = (s, n = 22) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const monthLbl = m => { const [y, mo] = String(m).split('-'); return new Date(y, mo - 1, 1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }); };
 
+// Executive revenue snapshot — fixed periods (today / MTD / rolling 30d), business-wide
+// (SamCart + Kajabi). Independent of the source selector + date range below.
+async function renderRevenueKpis() {
+  const grid = $('rev-kpis'); if (!grid) return;
+  if (!grid.innerHTML) grid.innerHTML = '<div class="stat-card"><div class="stat-sub">Loading…</div></div>';
+  if (!state.scData) await loadSamCart().catch(() => {});
+  if (!state.kajabiData) { try { state.kajabiData = await api('/api/kajabi/data'); } catch { state.kajabiData = {}; } }
+  ensureAdCampaigns();
+  const sc = state.scData || {}, kj = state.kajabiData || {};
+  const scD = sc.dailyRevenue || {}, kjD = kj.dailyRevenue || {};
+  const now = nowET(), today = ymd(now);
+  const monthStart = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+  const monthDays = daysInRange(monthStart, today);
+  const d30 = daysInRange(ymd(_addDays(today, -29)), today);
+  const cell = (D, d, f) => (D[d] && D[d][f]) || 0;
+  const sumR = (D, days) => Math.round(days.reduce((s, d) => s + cell(D, d, 'revenue'), 0) * 100) / 100;
+  const sumO = (D, days) => days.reduce((s, d) => s + cell(D, d, 'orders'), 0);
+
+  const revToday = cell(scD, today, 'revenue') + cell(kjD, today, 'revenue');
+  const ordToday = cell(scD, today, 'orders') + cell(kjD, today, 'orders');
+  const scMTD = sumR(scD, monthDays), kjMTD = sumR(kjD, monthDays);
+  const revMTD = Math.round((scMTD + kjMTD) * 100) / 100;
+  const ordMTD = sumO(scD, monthDays) + sumO(kjD, monthDays);
+  const rev30 = Math.round((sumR(scD, d30) + sumR(kjD, d30)) * 100) / 100;
+  const aov = ordMTD ? revMTD / ordMTD : 0;
+  const camps = state.adCampaigns || [];
+  const adToday = Math.round(camps.reduce((s, c) => s + adSpend(c, today, today), 0) * 100) / 100;
+  const adMTD = Math.round(camps.reduce((s, c) => s + adSpend(c, monthStart, today), 0) * 100) / 100;
+  const roas = adMTD > 0 ? revMTD / adMTD : null;
+  let paid = 0, organic = 0; const obc = sc.ordersByChannelByDay || {};
+  for (const d of monthDays) { const e = obc[d]; if (!e) continue; for (const ch in e) { (/\bads?\b/i.test(ch) ? paid += e[ch].orders : organic += e[ch].orders); } }
+  const acq = paid + organic;
+  const ig = state.instagram || null;   // filled in later by the P5 / Instagram API
+
+  const cards = [
+    ['Revenue today', fmtMoney(revToday), 'SamCart + Kajabi · today (ET)'],
+    ['Revenue MTD', fmtMoney(revMTD), `month to date · ${fmtNum(ordMTD)} orders`],
+    ['Orders today', fmtNum(ordToday), 'SamCart + Kajabi'],
+    ['ROAS MTD', roas != null ? roas.toFixed(2) + '×' : '—', adMTD > 0 ? `revenue ÷ ${fmtMoney(adMTD)} ad spend` : 'add ad budgets in Ads tab'],
+    ['Ad spend today', fmtMoney(adToday), 'from campaign budgets'],
+    ['Revenue 30 days', fmtMoney(rev30), 'rolling 30 days'],
+    ['Avg order value', fmtMoney(aov), 'month to date'],
+    ['LTV : CAC', '—', `avg LTV ${fmtMoney(sc.avgLtv || 0)}`, 'LTV-to-CAC ratio. Tell me how you define customer-acquisition cost (e.g. ad spend ÷ new customers) and I will compute it.'],
+    ['CSE', '—', 'define this metric', "I don't know what CSE stands for — tell me the formula and I'll wire it up."],
+    ['Revenue source MTD', fmtMoney(revMTD), `SamCart ${fmtMoney(scMTD)} · Kajabi ${fmtMoney(kjMTD)}`],
+    ['Acquisition MTD', acq ? Math.round(paid / acq * 100) + '% ads' : '—', acq ? `${Math.round(organic / acq * 100)}% organic · ${fmtNum(acq)} tagged orders` : 'needs UTM-tagged orders', 'Paid = orders from ad channels (FB Ads, etc.); organic = the rest, from UTM-attributed orders this month.'],
+    ['New customers today', '—', '90-day new buyers', 'Needs a new-customer definition (first-ever purchase). Confirm it and I will wire it.'],
+    ['Instagram gain today', ig ? '+' + fmtNum(ig.gainToday || 0) : '—', ig ? 'followers today' : 'connect Instagram (next)', 'Add your P5 / Instagram API next and this fills in automatically.'],
+    ['Instagram followers', ig ? fmtNum(ig.followers || 0) : '—', ig ? 'current total' : 'connect Instagram (next)', 'Add your P5 / Instagram API next and this fills in automatically.'],
+  ];
+  grid.innerHTML = cards.map(([l, v, s, h]) =>
+    `<div class="stat-card"><div class="stat-label">${escHtml(l)}${h ? ` <span class="help" data-tip="${escHtml(h)}">?</span>` : ''}</div><div class="stat-value">${v}</div><div class="stat-sub">${escHtml(s)}</div></div>`
+  ).join('');
+}
+
 async function loadReports() {
   // SamCart data drives most charts; ensure it's loaded, and fetch traffic trend + referrers.
   const tasks = [
@@ -1380,6 +1435,7 @@ async function loadReports() {
   state.reportsReferrers = referrers;
   if (state.scData?.syncedAt) $('rep-syncedAt').textContent = (state.scData.isDemo ? 'Demo data' : 'Synced ' + timeAgo(state.scData.syncedAt));
   applyReportView();
+  renderRevenueKpis();
 }
 
 // Source + date aware reporting. Summary KPIs + trend work for both sources from

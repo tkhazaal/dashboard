@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.10.0', date: '2026-06-26', title: 'Revenue executive snapshot',
+    changes: [
+      { title: 'Executive KPI cards', detail: 'The Reporting page now opens with a business-wide snapshot (SamCart + Kajabi): Revenue today / MTD / 30-day, Orders today, AOV, ROAS MTD, Ad spend today, Revenue-by-source MTD, and Acquisition (ads vs organic). Fixed periods, independent of the date filter below.' },
+      { title: 'Placeholders for pending metrics', detail: 'CSE, LTV:CAC, 90-day new customers and Instagram follower cards are in place with "?" notes — they fill in once their definition / the Instagram (P5) API is added.' },
+    ],
+  },
+  {
     version: '1.9.0', date: '2026-06-26', title: 'Funnel period comparison',
     changes: [
       { title: 'Compare day-by-day / week-by-week', detail: 'On the Funnels page, click "⇄ Compare" to see the selected range vs the previous period of equal length — pick Today for day-over-day, This week for week-over-week, etc. Each channel shows current vs previous for Unique Views, Checkout Views, Orders and Revenue, with the % change.' },
