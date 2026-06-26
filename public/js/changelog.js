@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.15.0', date: '2026-06-27', title: 'Refunds tracker',
+    changes: [
+      { title: 'Refunds sub-tab on Purchase Behaviour', detail: 'Every refund from SamCart & Kajabi in one place — source, date, product, amount and full/partial — with summary cards (total lost, count, by source) and filters by date, source and product. Export to CSV.' },
+      { title: 'Tag why you refunded + “why” chart', detail: 'Pick a reason for each refund from a dropdown (saved to your database). A “Why we’re refunding” donut shows where the money is going, alongside a by-product breakdown — so you can see which products and which reasons are costing you most.' },
+    ],
+  },
+  {
     version: '1.14.0', date: '2026-06-26', title: 'Form Submissions — Data Analysis',
     changes: [
       { title: 'Answer breakdowns', detail: 'A new Data Analysis sub-tab on the Form Submissions page: pick a form, then any question, and instantly see how its answers break down — counts and percentages — as a donut chart, a ranked bar chart, and a table with mini-bars. Perfect for "how many people chose X vs Y" (e.g. which product each person was approved for).' },

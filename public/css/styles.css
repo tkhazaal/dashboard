@@ -1007,6 +1007,34 @@ table.show-upsell .upsell-col { display: table-cell; }
 .fa-empty { padding: 28px 8px; text-align: center; color: var(--sub); font: 500 13px var(--font-body); }
 @media (max-width: 760px) { .fa-charts { grid-template-columns: 1fr; } .fa-field select { min-width: 160px; } }
 
+/* Refunds (Purchase Behaviour → Refunds) */
+.pb-subnav { margin-top: 4px; }
+.rf-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+.rf-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.rf-card-label { font: 600 11px var(--font-body); color: var(--sub); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
+.rf-card-val { font: 700 22px var(--font-body); color: var(--text); }
+.rf-card-val.danger { color: var(--danger); }
+.rf-charts { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; margin-bottom: 18px; }
+.rf-chart-title { font: 700 14px var(--font-body); color: var(--text); margin-bottom: 12px; }
+.rf-chart-title .th-hint { font-weight: 500; }
+.rf-charts .chart-wrap { height: 280px; position: relative; }
+.rf-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rf-date { font: 500 12.5px var(--font-body); color: var(--text); background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px; padding: 6px 9px; }
+.rf-arrow { color: var(--sub); }
+.rf-banner { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.4); color: var(--text); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font: 500 13px var(--font-body); }
+.rf-banner code { background: rgba(0,0,0,0.08); padding: 1px 5px; border-radius: 4px; }
+.rf-table td { vertical-align: middle; }
+.rf-date-cell { white-space: nowrap; color: var(--sub); font-size: 12.5px; }
+.rf-cust { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf-amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--danger); white-space: nowrap; }
+.rf-src { display: inline-block; font: 600 11px var(--font-body); padding: 2px 8px; border-radius: 6px; }
+.rf-src-samcart { background: rgba(139,92,246,0.16); color: #7c3aed; }
+.rf-src-kajabi { background: rgba(37,99,235,0.14); color: #2563eb; }
+.rf-partial { font: 600 11px var(--font-body); color: #b45309; background: rgba(245,158,11,0.16); padding: 2px 7px; border-radius: 6px; }
+.rf-reason { font: 500 12.5px var(--font-body); color: var(--text); background: var(--surface); border: 1.5px solid var(--border); border-radius: 8px; padding: 5px 8px; max-width: 230px; cursor: pointer; }
+.rf-reason-empty { border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.06); }
+@media (max-width: 900px) { .rf-cards { grid-template-columns: repeat(2, 1fr); } .rf-charts { grid-template-columns: 1fr; } }
+
 .fx-hook { border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
 .fx-hook-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .fx-hook-top strong { font-size: 14px; }

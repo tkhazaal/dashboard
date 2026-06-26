@@ -146,7 +146,7 @@ router.delete('/form/:key', async (req, res) => {
 function toCsv(subs) {
   const cols = [], seen = new Set();
   for (const s of subs) for (const f of (s.fields || [])) if (!seen.has(f.q)) { seen.add(f.q); cols.push(f.q); }
-  const esc = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const esc = v => { let s = v == null ? '' : String(v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const out = [['Form', 'Name', 'Email', 'Received', ...cols].map(esc).join(',')];
   for (const s of subs) {
     const fm = {}; for (const f of (s.fields || [])) fm[f.q] = f.a;

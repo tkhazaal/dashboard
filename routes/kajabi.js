@@ -190,21 +190,36 @@ async function computeKajabiMetrics(creds, onProgress) {
   // Refunds & charges (transactions — needs site_id filter). action: charge | refund
   let totalRefunded = 0, refundCount = 0;
   const refundsByDay = {};
+  const refunds = [];
   try {
     const siteId = await getSiteId(creds);
     if (siteId) {
-      const txns = await fetchAll(`transactions?filter%5Bsite_id%5D=${siteId}`, creds, { maxPages: 300, onProgress: n => onProgress && onProgress('transactions', n) });
+      const inc = {};
+      const txns = await fetchAll(`transactions?filter%5Bsite_id%5D=${siteId}&include=offer,customer`, creds, { maxPages: 300, includedMap: inc, onProgress: n => onProgress && onProgress('transactions', n) });
       for (const t of txns) {
         const a = attrs(t);
-        if (/refund/i.test(String(a.action || ''))) {
-          const amt = Math.abs(cents(a.amount_in_cents));
-          totalRefunded += amt; refundCount++;
-          const dy = etDay(a.created_at);
-          if (dy) refundsByDay[dy] = (refundsByDay[dy] || 0) + amt;
-        }
+        if (!/refund/i.test(String(a.action || ''))) continue;
+        const amt = Math.abs(cents(a.amount_in_cents));
+        totalRefunded += amt; refundCount++;
+        const dy = etDay(a.created_at);
+        if (dy) refundsByDay[dy] = (refundsByDay[dy] || 0) + amt;
+        const rel = t.relationships || {};
+        const oRef = rel.offer && rel.offer.data, cRef = rel.customer && rel.customer.data;
+        const oa = attrs(oRef && inc[`${oRef.type}:${oRef.id}`]), ca = attrs(cRef && inc[`${cRef.type}:${cRef.id}`]);
+        refunds.push({
+          id: 'kajabi:' + t.id,
+          source: 'Kajabi',
+          date: a.created_at,
+          amount: Math.round(amt * 100) / 100,
+          status: /partial/i.test(String(a.state || '')) ? 'Partial' : 'Full',
+          product: oa.title || oa.name || oa.internal_title || 'Unknown',
+          customer: ca.name || ca.email || '',
+          orderId: null,
+        });
       }
     }
   } catch { /* refunds best-effort */ }
+  refunds.sort((a, b) => String(b.date).replace(' ', 'T').localeCompare(String(a.date).replace(' ', 'T')));
 
   // Engagement / login (customers carry sign_in_count + last_request_at)
   let custTotal = 0, loggedIn = 0, active30 = 0, signInSum = 0;
@@ -233,6 +248,7 @@ async function computeKajabiMetrics(creds, onProgress) {
     avgOrderValue: orderCount ? Math.round((totalRevenue / orderCount) * 100) / 100 : 0,
     totalRefunded: Math.round(totalRefunded * 100) / 100,
     refundCount,
+    refunds,
     netRevenue: Math.round((totalRevenue - totalRefunded) * 100) / 100,
     contactCount,
     purchaseCount: purchasesScanned,

@@ -198,9 +198,10 @@ async function computeMetrics(orders, apiKey) {
   let totalRefunded = 0, refundCount = 0;
   const refundsByMonth = {};
   const refundsByDay = {};
+  let rawRefunds = [];
   try {
-    const refunds = await fetchAllRefunds(apiKey);
-    for (const r of refunds) {
+    rawRefunds = await fetchAllRefunds(apiKey);
+    for (const r of rawRefunds) {
       if (r.test_mode) continue;
       const amt = (parseFloat(r.refund_amount) || 0) / 100;   // cents -> dollars
       if (!amt) continue;
@@ -216,6 +217,7 @@ async function computeMetrics(orders, apiKey) {
   const dailyRevenue = {};   // 'YYYY-MM-DD' -> { revenue, orders } (distinct orders; for date-filtered Reporting)
 
   const custMap = new Map();
+  const orderInfoById = {};     // order.id -> { product, email }  (to enrich refunds with product/customer)
   const ordersBySlug = {};      // slug -> { orders, revenue }  (all-time)
   const ordersBySlugByDay = {}; // 'YYYY-MM-DD' -> { slug -> { orders, revenue } } (date-filtered Page Analytics)
   const ordersByChannelByDay = {}; // 'YYYY-MM-DD' -> { channel -> { orders, revenue } } from order.utm_parameters
@@ -234,6 +236,7 @@ async function computeMetrics(orders, apiKey) {
     const amount  = (parseFloat(o.total) || 0) / 100;  // SamCart amounts are in cents
     const date    = o.order_date || null;
     const product = orderProduct(o);
+    orderInfoById[o.id] = { product: cleanProduct(product), email: o.email || (o.customer && o.customer.email) || '' };
 
     // Daily revenue + distinct order count (drives date-filtered Reporting)
     const dRev = etDay(date);
@@ -493,6 +496,29 @@ async function computeMetrics(orders, apiKey) {
     return (isDraft(a) - isDraft(b)) || (sb - sa) || a.localeCompare(b);
   });
 
+  // Detailed refund list for the Refunds page — product/customer joined from the orders crawl.
+  // Wrapped so a malformed refund can never fail the whole sync (cache stays writable).
+  const refunds = [];
+  try {
+    for (const r of rawRefunds) {
+      if (!r || r.test_mode) continue;
+      const amt = (parseFloat(r.refund_amount) || 0) / 100;
+      if (!amt) continue;
+      const info = orderInfoById[r.order && r.order.id] || {};
+      refunds.push({
+        id: 'samcart:' + r.id,
+        source: 'SamCart',
+        date: r.created_at,
+        amount: Math.round(amt * 100) / 100,
+        status: r.charge_refund_status === 'partially_refunded' ? 'Partial' : 'Full',
+        product: info.product || 'Unknown',
+        customer: info.email || (r.charge && r.charge.paypal_email) || '',
+        orderId: (r.order && r.order.id) || null,
+      });
+    }
+    refunds.sort((a, b) => String(b.date).replace(' ', 'T').localeCompare(String(a.date).replace(' ', 'T')));
+  } catch { /* refund detail is best-effort */ }
+
   return {
     totalCustomers: total,
     totalRevenue:   Math.round(revenue * 100) / 100,
@@ -511,6 +537,7 @@ async function computeMetrics(orders, apiKey) {
     refundCount,
     refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
+    refunds,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
     ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, ordersByChannelProductByDay, estOrdersByChannelProductByDay, firstOrderByDay, upsellProducts, upsellBySlug,
     productSales, productList: sortedProductList, productSlug, salesByDay,

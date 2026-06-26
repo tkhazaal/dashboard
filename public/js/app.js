@@ -2971,8 +2971,8 @@ if ($('fx-form-filter')) $('fx-form-filter').addEventListener('change', fxSearch
 if ($('fx-modal-x')) $('fx-modal-x').addEventListener('click', closeFxModal);
 if ($('fx-modal-close')) $('fx-modal-close').addEventListener('click', closeFxModal);
 // Sub-navigation: Submissions ⇄ Data Analysis ⇄ Webhooks
-document.querySelectorAll('.fx-subtab').forEach(b => b.addEventListener('click', () => {
-  document.querySelectorAll('.fx-subtab').forEach(x => x.classList.toggle('active', x === b));
+document.querySelectorAll('#tab-forms .fx-subtab').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#tab-forms .fx-subtab').forEach(x => x.classList.toggle('active', x === b));
   const v = b.dataset.fxview;
   document.querySelectorAll('#tab-forms .fx-view').forEach(view => { view.hidden = view.id !== 'fxview-' + v; });
   if (v === 'analysis') faSyncForms();
@@ -3072,12 +3072,129 @@ if ($('fa-form')) $('fa-form').addEventListener('change', faLoadColumns);
 if ($('fa-column')) $('fa-column').addEventListener('change', faLoadBreakdown);
 if ($('fa-export')) $('fa-export').addEventListener('click', () => {
   if (!faBreakdown) return;
-  const esc = v => { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const esc = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const rows = [['Answer', 'People', 'Percent'].join(','), ...faBreakdown.values.map(v => [esc(v.value), v.count, v.pct + '%'].join(','))];
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
   a.download = (faBreakdown.column || 'breakdown').replace(/[^a-z0-9]+/gi, '-').slice(0, 50) + '.csv';
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// ── Refunds (Purchase Behaviour → Refunds sub-tab) ────────────────────
+const RF_REASONS = ['Customer changed mind', 'Did not like the product', 'Did not meet expectations', 'Duplicate purchase', 'Accidental purchase', 'Technical / access issue', 'Wanted a different product', 'Chargeback / dispute', 'Could not afford it', 'No longer needed', 'Other'];
+let rfData = null;
+let _rfSeq = 0;   // request token — discard stale responses when changing filters quickly
+const RF_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// Show the refund date as the SAME day the server buckets/filters it on — no Date()/timezone
+// drift for naive SamCart strings; only tz-aware (Kajabi) strings go through Intl.
+function rfDate(ts) {
+  const s = String(ts || '');
+  let ymd;
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) ymd = s.slice(0, 10);
+  else { try { ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(s)); } catch { ymd = s.slice(0, 10); } }
+  const [Y, M, D] = ymd.split('-').map(Number);
+  return (RF_MONTHS[M - 1] || '') + ' ' + D + ', ' + Y;
+}
+
+document.querySelectorAll('.pb-subnav .fx-subtab').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.pb-subnav .fx-subtab').forEach(x => x.classList.toggle('active', x === b));
+  const v = b.dataset.pbview;
+  if ($('pbview-main')) $('pbview-main').hidden = v !== 'main';
+  if ($('pbview-refunds')) $('pbview-refunds').hidden = v !== 'refunds';
+  if (v === 'refunds') loadRefunds();
+}));
+
+async function loadRefunds() {
+  const qs = new URLSearchParams();
+  const sd = $('rf-start').value, ed = $('rf-end').value, src = $('rf-source').value, prod = $('rf-product').value;
+  if (sd) qs.set('start_date', sd); if (ed) qs.set('end_date', ed); if (src) qs.set('source', src); if (prod) qs.set('product', prod);
+  $('rf-rows').innerHTML = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
+  const seq = ++_rfSeq;
+  try { const d = await api('/api/refunds?' + qs.toString()); if (seq !== _rfSeq) return; rfData = d; renderRefunds(rfData); }
+  catch (e) { if (seq !== _rfSeq) return; $('rf-rows').innerHTML = `<tr class="empty-row"><td colspan="7">Could not load refunds: ${escHtml(e.message)}</td></tr>`; }
+}
+
+function renderRefunds(d) {
+  const s = d.summary || {};
+  $('rf-total').textContent = fmtMoney(s.total || 0);
+  $('rf-count').textContent = fmtNum(s.count || 0);
+  $('rf-sc').textContent = fmtMoney((s.bySource && s.bySource.SamCart) || 0);
+  $('rf-kj').textContent = fmtMoney((s.bySource && s.bySource.Kajabi) || 0);
+  $('rf-untagged').textContent = fmtNum(s.untagged || 0);
+
+  const ban = $('rf-banner');
+  if (d.reasonsTableMissing) { ban.hidden = false; ban.innerHTML = '⚠ Run <code>refunds-schema.sql</code> in Supabase once to enable saving reasons — refunds still show below.'; }
+  else ban.hidden = true;
+
+  const psel = $('rf-product'), cur = psel.value;
+  psel.innerHTML = '<option value="">All products</option>' + (d.products || []).map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+  psel.value = (d.products || []).includes(cur) ? cur : '';
+
+  const used = (d.byReason || []).map(r => r.reason).filter(r => r && r !== 'Untagged');
+  const opts = [...new Set([...RF_REASONS, ...used])];
+  const srcBadge = src => `<span class="rf-src rf-src-${String(src).toLowerCase()}">${escHtml(src)}</span>`;
+  const rows = d.refunds || [];
+  $('rf-rows').innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td class="rf-date-cell">${escHtml(rfDate(r.date))}</td>
+      <td>${srcBadge(r.source)}</td>
+      <td>${escHtml(r.product || 'Unknown')}</td>
+      <td class="rf-cust">${escHtml(r.customer || '—')}</td>
+      <td class="rf-amt">${fmtMoney(r.amount)}</td>
+      <td>${r.status === 'Partial' ? '<span class="rf-partial">Partial</span>' : 'Full'}</td>
+      <td><select class="rf-reason${r.reason ? '' : ' rf-reason-empty'}" data-key="${escHtml(r.id)}"${d.reasonsTableMissing ? ' disabled' : ''}>
+        <option value="">— select reason —</option>
+        ${opts.map(o => `<option value="${escHtml(o)}"${o === r.reason ? ' selected' : ''}>${escHtml(o)}</option>`).join('')}
+      </select></td>
+    </tr>`).join('') : '<tr class="empty-row"><td colspan="7">No refunds in this range.</td></tr>';
+
+  buildRefundCharts(d);
+}
+
+function buildRefundCharts(d) {
+  const reasons = d.byReason || [];
+  mkChart('rf-reason-chart', {
+    type: 'doughnut',
+    data: { labels: reasons.map(r => r.reason), datasets: [{ data: reasons.map(r => r.amount), backgroundColor: reasons.map((r, i) => r.reason === 'Untagged' ? '#cbd5e1' : FA_COLORS[i % FA_COLORS.length]), borderWidth: 0, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '58%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 9, font: { size: 11 }, color: TICK } }, tooltip: { callbacks: { label: c => ` ${c.label}: ${fmtMoney(c.parsed)} (${reasons[c.dataIndex].count} refund${reasons[c.dataIndex].count === 1 ? '' : 's'})` } } } },
+  });
+  const prods = (d.byProduct || []).slice(0, 10);
+  mkChart('rf-product-chart', {
+    type: 'bar',
+    data: { labels: prods.map(p => p.product), datasets: [{ data: prods.map(p => p.amount), backgroundColor: prods.map((_, i) => FA_COLORS[i % FA_COLORS.length]), borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.parsed.x) } } }, scales: { x: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: moneyTick }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: { size: 11 }, color: TICK } } } },
+  });
+}
+
+if ($('rf-rows')) $('rf-rows').addEventListener('change', async e => {
+  const sel = e.target.closest('.rf-reason'); if (!sel) return;
+  const key = sel.dataset.key, reason = sel.value;
+  sel.disabled = true;
+  try {
+    await fxPost('/api/refunds/reason', { key, reason });
+    if (rfData) { const r = (rfData.refunds || []).find(x => x.id === key); if (r) r.reason = reason; recomputeRefundReasons(); }
+    sel.classList.toggle('rf-reason-empty', !reason);
+  } catch (err) { alert('Could not save reason: ' + err.message); }
+  finally { sel.disabled = false; }
+});
+function recomputeRefundReasons() {
+  const byReason = {}; let untagged = 0;
+  for (const r of (rfData.refunds || [])) { const k = r.reason || 'Untagged'; (byReason[k] = byReason[k] || { amount: 0, count: 0 }); byReason[k].amount += r.amount; byReason[k].count++; if (!r.reason) untagged++; }
+  rfData.byReason = Object.entries(byReason).map(([reason, v]) => ({ reason, amount: Math.round(v.amount * 100) / 100, count: v.count })).sort((a, b) => b.amount - a.amount);
+  rfData.summary.untagged = untagged;
+  $('rf-untagged').textContent = fmtNum(untagged);
+  buildRefundCharts(rfData);
+}
+
+let _rfT;
+['rf-start', 'rf-end', 'rf-source', 'rf-product'].forEach(id => { if ($(id)) $(id).addEventListener('change', () => { clearTimeout(_rfT); _rfT = setTimeout(loadRefunds, 150); }); });
+if ($('rf-export')) $('rf-export').addEventListener('click', () => {
+  if (!rfData || !rfData.refunds) return;
+  const esc = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const rows = [['Date', 'Source', 'Product', 'Customer', 'Amount', 'Type', 'Reason'].join(','), ...rfData.refunds.map(r => [esc(String(r.date)), r.source, esc(r.product), esc(r.customer), r.amount, r.status, esc(r.reason)].join(','))];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'refunds.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
 // ── Boot ──────────────────────────────────────────────────────────

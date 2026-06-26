@@ -940,6 +940,13 @@
         <div><h1>Sales Analytics</h1><p class="subtitle">Revenue performance, retention &amp; repeat-purchase behaviour</p></div>
       </div>
 
+      <div class="fx-subnav pb-subnav">
+        <button class="fx-subtab active" data-pbview="main">Sales Analytics</button>
+        <button class="fx-subtab" data-pbview="refunds">Refunds</button>
+      </div>
+
+      <div class="pb-view" id="pbview-main">
+
       <!-- Conversion funnel -->
       <div class="card">
         <div class="card-header">
@@ -1056,6 +1063,45 @@
             <div class="rd-row"><span>Purchase gap</span><strong>24 hours or more</strong></div>
             <div class="rd-row"><span>Driver</span><strong>Results → return</strong></div>
             <div class="rd-row"><span>Count</span><strong id="rd-ecosystem">—</strong></div>
+          </div>
+        </div>
+      </div>
+      </div><!-- /pbview-main -->
+
+      <!-- Refunds sub-view -->
+      <div class="pb-view" id="pbview-refunds" hidden>
+        <div class="rf-cards">
+          <div class="rf-card"><div class="rf-card-label">Total refunded</div><div class="rf-card-val danger" id="rf-total">—</div></div>
+          <div class="rf-card"><div class="rf-card-label">Refunds</div><div class="rf-card-val" id="rf-count">—</div></div>
+          <div class="rf-card"><div class="rf-card-label">From SamCart</div><div class="rf-card-val" id="rf-sc">—</div></div>
+          <div class="rf-card"><div class="rf-card-label">From Kajabi</div><div class="rf-card-val" id="rf-kj">—</div></div>
+          <div class="rf-card"><div class="rf-card-label">Untagged (no reason)</div><div class="rf-card-val" id="rf-untagged">—</div></div>
+        </div>
+
+        <div class="rf-banner" id="rf-banner" hidden></div>
+
+        <div class="rf-charts">
+          <div class="fa-chart-box"><div class="rf-chart-title">Why we’re refunding <span class="th-hint">(money lost by reason)</span></div><div class="chart-wrap"><canvas id="rf-reason-chart"></canvas></div></div>
+          <div class="fa-chart-box"><div class="rf-chart-title">By product <span class="th-hint">(money lost)</span></div><div class="chart-wrap"><canvas id="rf-product-chart"></canvas></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Refunds</h2>
+            <div class="rf-filters">
+              <input type="date" id="rf-start" class="rf-date" title="From date">
+              <span class="rf-arrow">→</span>
+              <input type="date" id="rf-end" class="rf-date" title="To date">
+              <select id="rf-source" class="cmp-preset"><option value="">All sources</option><option value="SamCart">SamCart</option><option value="Kajabi">Kajabi</option></select>
+              <select id="rf-product" class="cmp-preset"><option value="">All products</option></select>
+              <button class="clear-btn" id="rf-export" title="Download as CSV">⬇ CSV</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table rf-table">
+              <thead><tr><th>Date</th><th>Source</th><th>Product</th><th>Customer</th><th>Amount</th><th>Type</th><th>Reason (why we refunded)</th></tr></thead>
+              <tbody id="rf-rows"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
+            </table>
           </div>
         </div>
       </div>
