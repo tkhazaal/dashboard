@@ -357,6 +357,14 @@ async function computeMetrics(orders, apiKey) {
     orderList: c.orders,
   }));
 
+  // New customers by first-ever-purchase day (Eastern) → powers "new customers in N days"
+  const firstOrderByDay = {};
+  for (const c of custMap.values()) {
+    let first = null;
+    for (const o of c.orders) { const dy = etDay(o.date); if (dy && (!first || dy < first)) first = dy; }
+    if (first) firstOrderByDay[first] = (firstOrderByDay[first] || 0) + 1;
+  }
+
   const total   = customers.length;
   const revenue = customers.reduce((s, c) => s + c.ltv, 0);
   const avgLtv  = total > 0 ? revenue / total : 0;
@@ -504,7 +512,7 @@ async function computeMetrics(orders, apiKey) {
     refundRate:     revenue ? Math.round((totalRefunded / revenue) * 1000) / 10 : 0,
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
-    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, ordersByChannelProductByDay, estOrdersByChannelProductByDay, upsellProducts, upsellBySlug,
+    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, ordersByChannelProductByDay, estOrdersByChannelProductByDay, firstOrderByDay, upsellProducts, upsellBySlug,
     productSales, productList: sortedProductList, productSlug, salesByDay,
     dailyRevenue, refundsByDay,
   };

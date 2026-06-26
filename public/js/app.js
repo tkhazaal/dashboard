@@ -1398,6 +1398,15 @@ async function renderRevenueKpis() {
   let paid = 0, organic = 0; const obc = sc.ordersByChannelByDay || {};
   for (const d of monthDays) { const e = obc[d]; if (!e) continue; for (const ch in e) { (/\bads?\b/i.test(ch) ? paid += e[ch].orders : organic += e[ch].orders); } }
   const acq = paid + organic;
+
+  // New customers (first-ever purchase) in the last 90 days, + LTV:CAC
+  const d90 = daysInRange(ymd(_addDays(today, -89)), today);
+  const fob = sc.firstOrderByDay || {};
+  const newCust90 = d90.reduce((s, d) => s + (fob[d] || 0), 0);
+  const adSpend90 = Math.round(camps.reduce((s, c) => s + adSpend(c, ymd(_addDays(today, -89)), today), 0) * 100) / 100;
+  const ltv = sc.avgLtv || 0;
+  const cac = (newCust90 > 0 && adSpend90 > 0) ? adSpend90 / newCust90 : null;
+  const ltvcac = (cac && ltv > 0) ? ltv / cac : null;
   const ig = state.instagram || null;   // filled in later by the P5 / Instagram API
 
   const cards = [
@@ -1408,11 +1417,11 @@ async function renderRevenueKpis() {
     ['Ad spend today', fmtMoney(adToday), 'from campaign budgets'],
     ['Revenue 30 days', fmtMoney(rev30), 'rolling 30 days'],
     ['Avg order value', fmtMoney(aov), 'month to date'],
-    ['LTV : CAC', '—', `avg LTV ${fmtMoney(sc.avgLtv || 0)}`, 'LTV-to-CAC ratio. Tell me how you define customer-acquisition cost (e.g. ad spend ÷ new customers) and I will compute it.'],
+    ['LTV : CAC', ltvcac != null ? ltvcac.toFixed(1) + ' : 1' : '—', cac != null ? `LTV ${fmtMoney(ltv)} ÷ CAC ${fmtMoney(cac)}` : `avg LTV ${fmtMoney(ltv)} · add ad budgets`, 'Lifetime value ÷ customer-acquisition cost. CAC = ad spend ÷ new customers (last 90 days).'],
     ['CSE', '—', 'define this metric', "I don't know what CSE stands for — tell me the formula and I'll wire it up."],
     ['Revenue source MTD', fmtMoney(revMTD), `SamCart ${fmtMoney(scMTD)} · Kajabi ${fmtMoney(kjMTD)}`],
     ['Acquisition MTD', acq ? Math.round(paid / acq * 100) + '% ads' : '—', acq ? `${Math.round(organic / acq * 100)}% organic · ${fmtNum(acq)} tagged orders` : 'needs UTM-tagged orders', 'Paid = orders from ad channels (FB Ads, etc.); organic = the rest, from UTM-attributed orders this month.'],
-    ['New customers today', '—', '90-day new buyers', 'Needs a new-customer definition (first-ever purchase). Confirm it and I will wire it.'],
+    ['New customers (90d)', fmtNum(newCust90), 'first-time buyers · last 90 days', 'Customers whose first-ever purchase was in the last 90 days.'],
     ['Instagram gain today', ig ? '+' + fmtNum(ig.gainToday || 0) : '—', ig ? 'followers today' : 'connect Instagram (next)', 'Add your P5 / Instagram API next and this fills in automatically.'],
     ['Instagram followers', ig ? fmtNum(ig.followers || 0) : '—', ig ? 'current total' : 'connect Instagram (next)', 'Add your P5 / Instagram API next and this fills in automatically.'],
   ];
