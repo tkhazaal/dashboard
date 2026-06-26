@@ -263,6 +263,7 @@ function activateTab(tab) {
   if (tab === 'kajabi') loadKajabi();
   if (tab === 'email') loadEmail();
   if (tab === 'utm') loadUtm();
+  if (tab === 'forms') loadForms();
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', e => { e.preventDefault(); activateTab(item.dataset.tab); });
@@ -2803,6 +2804,90 @@ function sumCxpOrders(byDay, camp) {
   }
   return out;
 }
+
+// ── Form Submissions ──────────────────────────────────────────────
+const fxHookUrl = token => `${location.origin}/hook/${token}`;
+const fxPost = async (path, body) => { const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); if (!r.ok) throw new Error(await r.text()); return r.json(); };
+const fxDel  = async (path) => { const r = await fetch(path, { method: 'DELETE' }); if (!r.ok) throw new Error(await r.text()); return r.json(); };
+
+async function loadForms() {
+  $('fx-status').textContent = 'Loading…';
+  try {
+    const [hooks, forms] = await Promise.all([api('/api/forms/webhooks'), api('/api/forms/list')]);
+    state.fxForms = forms;
+    renderFxWebhooks(hooks);
+    renderFxForms(forms);
+    const sel = $('fx-form-filter'), cur = sel.value;
+    sel.innerHTML = '<option value="">All forms</option>' + forms.map(f => `<option value="${escHtml(f.form_key)}">${escHtml(f.name)} (${f.count})</option>`).join('');
+    sel.value = forms.some(f => f.form_key === cur) ? cur : '';
+    await fxSearch();
+    $('fx-status').textContent = '';
+  } catch (e) { $('fx-status').textContent = '⚠ Run forms-schema.sql in Supabase'; $('fx-webhooks').innerHTML = '<p class="th-hint" style="padding:6px 2px;">Once the form tables are created (one-time SQL), this page is fully self-service.</p>'; }
+}
+function renderFxWebhooks(hooks) {
+  $('fx-webhooks').innerHTML = (hooks && hooks.length) ? hooks.map(h => `
+    <div class="fx-hook">
+      <div class="fx-hook-top"><strong>${escHtml(h.name)}</strong><span class="fx-hook-meta">${fmtNum(h.count)} received${h.last_fired_at ? ' · last ' + timeAgo(h.last_fired_at) : ' · never fired'}</span><button class="fx-hook-del" data-id="${h.id}" title="Delete webhook">✕</button></div>
+      <div class="fx-hook-url"><input readonly value="${escHtml(fxHookUrl(h.token))}"><button class="fx-copy" data-url="${escHtml(fxHookUrl(h.token))}">Copy</button></div>
+    </div>`).join('')
+    : '<p class="th-hint" style="padding:6px 2px;">No webhooks yet. Click “+ Create webhook”, then paste the URL into your other software’s webhook/automation step.</p>';
+}
+function renderFxForms(forms) {
+  $('fx-forms').innerHTML = (forms && forms.length) ? forms.map(f => `
+    <tr><td><input class="fx-form-name" data-key="${escHtml(f.form_key)}" value="${escHtml(f.name)}" title="Rename this form"></td>
+      <td><a href="#" class="fx-form-link" data-key="${escHtml(f.form_key)}"><span class="orders-count">${fmtNum(f.count)}</span></a></td>
+      <td>${f.lastAt ? timeAgo(f.lastAt) : '—'}</td>
+      <td><span class="th-hint">${escHtml(f.form_key)}</span></td></tr>`).join('')
+    : '<tr class="empty-row"><td colspan="4">No forms yet</td></tr>';
+}
+async function fxSearch() {
+  const search = $('fx-search').value.trim(), form = $('fx-form-filter').value;
+  const qs = new URLSearchParams(); if (search) qs.set('search', search); if (form) qs.set('form', form);
+  let subs = []; try { subs = await api('/api/forms/submissions?' + qs.toString()); } catch {}
+  const fname = k => ((state.fxForms || []).find(f => f.form_key === k) || {}).name || k || '—';
+  $('fx-subs').innerHTML = (subs && subs.length) ? subs.map(s => `
+    <tr class="fx-sub-row" data-id="${s.id}">
+      <td><strong>${escHtml(s.contact_name || '—')}</strong></td>
+      <td>${escHtml(s.contact_email || '—')}</td>
+      <td>${escHtml(fname(s.form_key))}</td>
+      <td>${s.created_at ? timeAgo(s.created_at) : ''}</td>
+    </tr>`).join('')
+    : `<tr class="empty-row"><td colspan="4">${(search || form) ? 'No matches' : 'No submissions yet — fire your webhook to test it'}</td></tr>`;
+}
+async function openSubmission(id) {
+  try {
+    const s = await api('/api/forms/submissions/' + id);
+    $('fx-modal-title').textContent = s.contact_name || s.contact_email || 'Submission';
+    const fields = Array.isArray(s.fields) ? s.fields : [];
+    const qa = fields.length ? fields.map(f => `<div class="fx-qa"><div class="fx-q">${escHtml(f.q)}</div><div class="fx-a">${escHtml(f.a)}</div></div>`).join('') : '<p class="th-hint">No parsed fields — see raw payload below.</p>';
+    $('fx-modal-body').innerHTML = `
+      <div class="fx-meta">${s.contact_email ? '✉ ' + escHtml(s.contact_email) + ' · ' : ''}${s.created_at ? fmtET(s.created_at) : ''}</div>
+      ${qa}
+      <details class="fx-raw"><summary>Raw payload</summary><pre>${escHtml(JSON.stringify(s.payload, null, 2))}</pre></details>`;
+    $('fx-modal').hidden = false;
+  } catch {}
+}
+const closeFxModal = () => { $('fx-modal').hidden = true; };
+if ($('fx-new-webhook')) $('fx-new-webhook').addEventListener('click', async () => {
+  const name = prompt('Name this webhook (e.g. "Reconnection quiz"):');
+  if (name === null) return;
+  try { await fxPost('/api/forms/webhooks', { name }); loadForms(); } catch (e) { alert('Could not create webhook: ' + e.message); }
+});
+if ($('fx-webhooks')) $('fx-webhooks').addEventListener('click', async e => {
+  const cp = e.target.closest('.fx-copy');
+  if (cp) { navigator.clipboard.writeText(cp.dataset.url); cp.textContent = 'Copied!'; setTimeout(() => cp.textContent = 'Copy', 1500); return; }
+  const del = e.target.closest('.fx-hook-del');
+  if (del && confirm('Delete this webhook? (Captured submissions are kept.)')) { try { await fxDel('/api/forms/webhooks/' + del.dataset.id); loadForms(); } catch {} }
+});
+if ($('fx-subs')) $('fx-subs').addEventListener('click', e => { const r = e.target.closest('.fx-sub-row'); if (r) openSubmission(r.dataset.id); });
+if ($('fx-forms')) {
+  $('fx-forms').addEventListener('click', e => { const l = e.target.closest('.fx-form-link'); if (l) { e.preventDefault(); $('fx-form-filter').value = l.dataset.key; fxSearch(); document.getElementById('fx-subs').scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
+  $('fx-forms').addEventListener('change', async e => { const n = e.target.closest('.fx-form-name'); if (n) { try { await fxPost('/api/forms/rename', { form_key: n.dataset.key, name: n.value }); (state.fxForms || []).forEach(f => { if (f.form_key === n.dataset.key) f.name = n.value; }); fxSearch(); } catch {} } });
+}
+let _fxT; if ($('fx-search')) $('fx-search').addEventListener('input', () => { clearTimeout(_fxT); _fxT = setTimeout(fxSearch, 300); });
+if ($('fx-form-filter')) $('fx-form-filter').addEventListener('change', fxSearch);
+if ($('fx-modal-x')) $('fx-modal-x').addEventListener('click', closeFxModal);
+if ($('fx-modal-close')) $('fx-modal-close').addEventListener('click', closeFxModal);
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function refreshAll(force = false) {

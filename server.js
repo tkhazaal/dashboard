@@ -57,6 +57,11 @@ app.use('/api/samcart',    samcartRouter);
 app.use('/api/kajabi',     require('./routes/kajabi'));
 app.use('/api/ac',         require('./routes/activecampaign'));
 app.use('/api/instagram',  require('./routes/instagram'));
+const forms = require('./routes/forms');
+app.use('/api/forms',      forms.router);
+// Public webhook receiver — accept any content-type (JSON already parsed globally;
+// express.text catches text/plain etc.; body-parser skips if already parsed).
+app.use('/hook',           express.text({ type: () => true, limit: '2mb' }), forms.hook);
 app.use('/api/settings',   require('./routes/settings'));
 
 // Dashboard UI

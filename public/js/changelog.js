@@ -2,6 +2,14 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.12.0', date: '2026-06-26', title: 'Form Submissions + webhooks',
+    changes: [
+      { title: 'Create your own webhooks', detail: 'A new Form Submissions page where you create a webhook URL in one click and paste it into any software (GHL, Typeform, etc.). Every form/quiz submission sent to it is captured and saved automatically.' },
+      { title: 'Auto-grouped forms, renameable', detail: 'Submissions are grouped into forms automatically (by the form name in the payload, else the webhook). Rename any form in-place. Each submission stores the full raw payload + a clean question/answer list.' },
+      { title: 'Search a lead instantly', detail: "Search by name or email to pull up a lead's submissions on a call — click one to see their questions & answers in a clean popup." },
+    ],
+  },
+  {
     version: '1.11.0', date: '2026-06-26', title: 'Instagram follower tracking',
     changes: [
       { title: 'Instagram cards live', detail: 'The Reporting snapshot now shows current Instagram followers and followers gained this month, via the Apify Instagram scraper. It snapshots once a month so month-over-month follower growth is tracked automatically.' },

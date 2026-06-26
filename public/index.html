@@ -78,6 +78,10 @@
         <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
         Product Paths
       </a>
+      <a href="#" class="nav-item" data-tab="forms">
+        <svg viewBox="0 0 24 24"><path d="M9 11H3v10h6V11zM21 3h-6v18h6V3zM15 7H9v14h6V7z"/></svg>
+        Form Submissions
+      </a>
       <a href="#" class="nav-item" data-tab="settings">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
         Settings
@@ -1171,6 +1175,54 @@
         </div>
       </div>
     </section>
+
+    <!-- ── FORM SUBMISSIONS ────────────────── -->
+    <section class="tab" id="tab-forms">
+      <div class="page-header">
+        <div><h1>Form Submissions</h1><p class="subtitle">Capture form &amp; quiz answers from any software via webhooks</p></div>
+        <div class="header-pills"><span class="pill" id="fx-status"></span><button class="btn-primary sm" id="fx-new-webhook">+ Create webhook</button></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Your webhooks</h2><span class="th-hint">paste a URL into your other software (GHL, Typeform, etc.) to send submissions here</span></div>
+        <div id="fx-webhooks"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Submissions</h2>
+          <div class="email-filters">
+            <input id="fx-search" class="search-input" placeholder="Search by name or email…">
+            <select id="fx-form-filter" class="cmp-preset"><option value="">All forms</option></select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Form</th><th>Received</th></tr></thead>
+            <tbody id="fx-subs"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Forms</h2><span class="th-hint">rename a form, or click a row to filter its submissions above</span></div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Form</th><th>Submissions</th><th>Last received</th><th></th></tr></thead>
+            <tbody id="fx-forms"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Submission detail modal -->
+    <div class="fx-modal" id="fx-modal" hidden>
+      <div class="fx-modal-backdrop" id="fx-modal-close"></div>
+      <div class="fx-modal-card">
+        <div class="fx-modal-head"><h3 id="fx-modal-title">Submission</h3><button class="fx-modal-x" id="fx-modal-x">✕</button></div>
+        <div class="fx-modal-body" id="fx-modal-body"></div>
+      </div>
+    </div>
 
     <!-- ── WHAT'S NEW ──────────────────────── -->
     <section class="tab" id="tab-whatsnew">
