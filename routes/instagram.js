@@ -2,7 +2,8 @@ const express  = require('express');
 const router   = express.Router();
 const fetch    = require('node-fetch');
 const supabase = require('../database');
-const { etMonth } = require('../tz');
+// Eastern-Time month 'YYYY-MM' (inline, like the other routes) for monthly snapshots.
+const etMonth = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit' }).format(d instanceof Date ? d : new Date(d));
 
 // Apify Instagram Profile Scraper. We run it ~monthly, snapshot the follower count
 // per month, and derive "followers gained this month" = current − last month's snapshot.
