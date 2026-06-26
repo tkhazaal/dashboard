@@ -1419,7 +1419,7 @@ async function renderRevenueKpis() {
     ['Revenue 30 days', fmtMoney(rev30), 'rolling 30 days'],
     ['Avg order value', fmtMoney(aov), 'month to date'],
     ['LTV : CAC', ltvcac != null ? ltvcac.toFixed(1) + ' : 1' : '—', cac != null ? `LTV ${fmtMoney(ltv)} ÷ CAC ${fmtMoney(cac)}` : `avg LTV ${fmtMoney(ltv)} · add ad budgets`, 'Lifetime value ÷ customer-acquisition cost. CAC = ad spend ÷ new customers (last 90 days).'],
-    ['CSE', '—', 'define this metric', "I don't know what CSE stands for — tell me the formula and I'll wire it up."],
+    ['CAC (90d)', cac != null ? fmtMoney(cac) : '—', cac != null ? `${fmtMoney(adSpend90)} ÷ ${fmtNum(newCust90)} new` : 'add ad budgets in Ads tab', 'Customer acquisition cost = ad spend ÷ new customers, last 90 days.'],
     ['Revenue source MTD', fmtMoney(revMTD), `SamCart ${fmtMoney(scMTD)} · Kajabi ${fmtMoney(kjMTD)}`],
     ['Acquisition MTD', acq ? Math.round(paid / acq * 100) + '% ads' : '—', acq ? `${Math.round(organic / acq * 100)}% organic · ${fmtNum(acq)} tagged orders` : 'needs UTM-tagged orders', 'Paid = orders from ad channels (FB Ads, etc.); organic = the rest, from UTM-attributed orders this month.'],
     ['New customers (90d)', fmtNum(newCust90), 'first-time buyers · last 90 days', 'Customers whose first-ever purchase was in the last 90 days.'],
