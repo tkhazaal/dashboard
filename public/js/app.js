@@ -2599,6 +2599,7 @@ function renderEmail(d) {
   renderEmailCampaigns();
   renderEmailAutomations();
   renderEmailLists();
+  lgSyncLists();
 }
 function renderEmailLists() {
   const d = state.acData; if (!d || !$('emailLists')) return;
@@ -2641,6 +2642,53 @@ function renderEmailAutomations() {
 ['email-camp-filter', 'email-camp-search'].forEach(id => $(id).addEventListener('input', renderEmailCampaigns));
 ['email-auto-filter', 'email-auto-search'].forEach(id => $(id).addEventListener('input', renderEmailAutomations));
 if ($('email-list-search')) $('email-list-search').addEventListener('input', renderEmailLists);
+// List growth — pick a list → month-by-month gained/lost + active-over-time
+function lgSyncLists() {
+  const sel = $('lg-list'); if (!sel) return;
+  const lists = (state.acData && state.acData.lists) || [], cur = sel.value;
+  sel.innerHTML = '<option value="">Select a list…</option>' + lists.map(l => `<option value="${l.id}">${escHtml(l.name)} (${fmtNum(l.active)})</option>`).join('');
+  if (lists.some(l => String(l.id) === cur)) sel.value = cur;
+}
+let lgSeq = 0;
+async function loadListGrowth(listid) {
+  if (!listid) { $('lg-body').hidden = true; $('lg-summary').hidden = true; $('lg-empty').hidden = false; $('lg-empty').textContent = 'Pick a list to see its month-to-month subscriber growth and loss.'; $('lg-status').textContent = ''; return; }
+  const seq = ++lgSeq;
+  $('lg-empty').hidden = false; $('lg-empty').textContent = 'Loading… (large lists can take up to a minute the first time)'; $('lg-body').hidden = true; $('lg-summary').hidden = true; $('lg-status').textContent = 'loading…';
+  try {
+    const d = await api('/api/ac/list-growth?listid=' + encodeURIComponent(listid));
+    if (seq !== lgSeq) return;
+    renderListGrowth(d);
+  } catch (e) { if (seq !== lgSeq) return; $('lg-empty').hidden = false; $('lg-empty').textContent = 'Could not load: ' + escHtml(e.message); $('lg-status').textContent = ''; }
+}
+function renderListGrowth(d) {
+  const s = d.series || [];
+  $('lg-status').textContent = '';
+  if (!s.length) { $('lg-empty').hidden = false; $('lg-empty').textContent = 'No membership history for this list yet.'; $('lg-body').hidden = true; $('lg-summary').hidden = true; return; }
+  $('lg-empty').hidden = true; $('lg-body').hidden = false; $('lg-summary').hidden = false;
+  const last = s[s.length - 1];
+  const totalGained = s.reduce((a, x) => a + x.added, 0), totalLost = s.reduce((a, x) => a + x.removed, 0);
+  $('lg-summary').innerHTML =
+    `<span class="lg-stat"><b>${fmtNum(d.currentActive)}</b> active now</span>` +
+    `<span class="lg-stat lg-up">+${fmtNum(last.added)} <small>last mo</small></span>` +
+    `<span class="lg-stat lg-down">−${fmtNum(last.removed)} <small>last mo</small></span>` +
+    `<span class="lg-stat"><b>${fmtNum(totalGained)}</b> gained · <b>${fmtNum(totalLost)}</b> lost <small>(${s.length} mo)</small></span>` +
+    (d.capped ? `<span class="lg-stat lg-warn">⚠ ${fmtNum(d.totalMembers)} members — showing recent activity (older history approximate)</span>` : '');
+  const labels = s.map(x => x.month);
+  mkChart('lg-line', {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Active', data: s.map(x => x.active), borderColor: PALETTE[0], backgroundColor: 'rgba(37,99,235,0.10)', fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmtNum(c.parsed.y) + ' active' } } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } }, y: { grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, precision: 0 }, beginAtZero: true } } },
+  });
+  mkChart('lg-bars', {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Gained', data: s.map(x => x.added), backgroundColor: '#16a34a', borderRadius: 3 },
+      { label: 'Lost', data: s.map(x => -x.removed), backgroundColor: '#dc2626', borderRadius: 3 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: TICK } }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtNum(Math.abs(c.parsed.y)) } } }, scales: { x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 }, color: TICK } }, y: { stacked: true, grid: { color: GRID }, ticks: { font: { size: 10 }, color: TICK, callback: v => fmtNum(Math.abs(v)) } } } },
+  });
+}
+if ($('lg-list')) $('lg-list').addEventListener('change', e => loadListGrowth(e.target.value));
 // Collapsible cards — click a card header (not its filters) to expand/collapse.
 document.addEventListener('click', e => {
   if (e.target.closest('input, select, button, a, label')) return;

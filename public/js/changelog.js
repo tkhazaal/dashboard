@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.18.0', date: '2026-06-28', title: 'List growth tracker',
+    changes: [
+      { title: 'Month-to-month list growth & loss', detail: 'On the Email page, pick any ActiveCampaign list to see subscribers gained vs lost each month and the active-subscriber trend over time — built from real join/unsubscribe dates. The dashboard also snapshots each list monthly so the trend stays exact going forward (very large lists show recent activity, noted).' },
+    ],
+  },
+  {
     version: '1.17.0', date: '2026-06-28', title: 'ActiveCampaign lists + collapsible sections',
     changes: [
       { title: 'Contact lists', detail: 'The Email page now shows every ActiveCampaign list with its active subscriber count (and total contacts), sorted by size and searchable, with the grand total of active subscribers.' },

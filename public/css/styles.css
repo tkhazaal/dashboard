@@ -998,6 +998,16 @@ table.show-upsell .upsell-col { display: table-cell; }
 .card.collapsible.collapsed > *:not(.card-header) { display: none; }
 .card.collapsible.collapsed > .card-header .email-filters { display: none; }
 
+/* List growth */
+.lg-summary { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; margin: 2px 2px 16px; }
+.lg-stat { font: 500 13px var(--font-body); color: var(--sub); }
+.lg-stat b { color: var(--text); font-weight: 700; font-size: 15px; }
+.lg-stat small { color: var(--sub); font-weight: 500; }
+.lg-stat.lg-up { color: #16a34a; font-weight: 700; }
+.lg-stat.lg-down { color: #dc2626; font-weight: 700; }
+.lg-stat.lg-warn { color: #b45309; font-weight: 600; }
+.lg-body .chart-wrap { height: 280px; position: relative; }
+
 /* Data Analysis */
 .fa-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin: 6px 2px 14px; }
 .fa-field { display: flex; flex-direction: column; gap: 5px; font: 600 11.5px var(--font-body); color: var(--sub); }

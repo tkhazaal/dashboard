@@ -137,6 +137,15 @@ async function computeACMetrics(creds, onProgress) {
   })).sort((a, b) => b.active - a.active || a.name.localeCompare(b.name));
   const listsActiveTotal = lists.reduce((s, l) => s + l.active, 0);
 
+  // Monthly snapshot of each list's active count (builds the growth-over-time series).
+  try {
+    const month = new Date().toISOString().slice(0, 7);   // YYYY-MM
+    const { data: hRow } = await supabase.from('samcart_cache').select('data').eq('cache_key', 'ac_list_history').single();
+    const hist = (hRow && hRow.data) ? JSON.parse(hRow.data) : {};
+    for (const l of lists) (hist[l.id] = hist[l.id] || {})[month] = l.active;
+    await supabase.from('samcart_cache').upsert({ cache_key: 'ac_list_history', data: JSON.stringify(hist), cached_at: new Date().toISOString() }, { onConflict: 'cache_key' });
+  } catch { /* snapshot best-effort */ }
+
   return {
     configured: true, syncedAt: new Date().toISOString(),
     lists, listsActiveTotal,
@@ -193,6 +202,75 @@ router.get('/data', async (req, res) => {
     res.status(500).json({ configured: true, error: err.message });
   }
 });
+// On-demand month-by-month growth for one list: additions (join date) + removals
+// (unsubscribe date) per month, the reconstructed active line, and any monthly snapshots.
+router.get('/list-growth', async (req, res) => {
+  try {
+    const listid = parseInt(req.query.listid, 10);
+    if (!listid) return res.status(400).json({ error: 'listid required' });
+    const creds = await getCreds();
+    if (!creds.url || !creds.token) return res.status(400).json({ error: 'ActiveCampaign not configured' });
+    const ckey = 'ac_growth:' + listid;
+    // serve cached (1-day) unless ?force=1
+    if (!req.query.force) {
+      const { data: c } = await supabase.from('samcart_cache').select('data, cached_at').eq('cache_key', ckey).single();
+      if (c && c.data && (Date.now() - new Date(c.cached_at).getTime() < 24 * 3600 * 1000)) return res.json(JSON.parse(c.data));
+    }
+    const { url: base, token } = creds;
+    // contactLists ignores listid filters, so page through contacts?listid=X with the
+    // membership records included, and keep the ones for this list (sdate/udate/status).
+    const totalMembers = await acCount(base, token, `contacts?listid=${listid}`);
+    const MAXP = 100, LIMIT = 100;
+    const recs = [];
+    let offset = 0, pages = 0;
+    while (pages < MAXP) {
+      const j = await acFetch(base, token, `contacts?listid=${listid}&include=contactLists&limit=${LIMIT}&offset=${offset}`);
+      for (const cl of (j.contactLists || [])) if (String(cl.list) === String(listid)) recs.push(cl);
+      const got = (j.contacts || []).length;
+      pages++; offset += LIMIT;
+      if (got < LIMIT) break;
+      if (THROTTLE_MS) await sleep(THROTTLE_MS);
+    }
+    const capped = totalMembers > recs.length;
+
+    const added = {}, removed = {};
+    let activeInFetch = 0;
+    for (const r of recs) {
+      const sm = String(r.sdate || '').slice(0, 7);
+      if (/^\d{4}-\d{2}$/.test(sm)) added[sm] = (added[sm] || 0) + 1;
+      if (String(r.status) === '1') activeInFetch++;
+      else if (String(r.status) === '2' && r.udate) { const um = String(r.udate).slice(0, 7); if (/^\d{4}-\d{2}$/.test(um)) removed[um] = (removed[um] || 0) + 1; }
+    }
+    // anchor the active line to the list's true current active count (from the AC cache)
+    let currentActive = activeInFetch;
+    try {
+      const { data: m } = await supabase.from('samcart_cache').select('data').eq('cache_key', CACHE_KEY).single();
+      const L = m && m.data && (JSON.parse(m.data).lists || []).find(x => String(x.id) === String(listid));
+      if (L) currentActive = L.active;
+    } catch { /* fall back to fetched count */ }
+    // monthly snapshots (reliable net over time, going forward)
+    let snaps = {};
+    try {
+      const { data: h } = await supabase.from('samcart_cache').select('data').eq('cache_key', 'ac_list_history').single();
+      if (h && h.data) snaps = JSON.parse(h.data)[listid] || {};
+    } catch { /* none yet */ }
+
+    const months = [...new Set([...Object.keys(added), ...Object.keys(removed), ...Object.keys(snaps)])].sort();
+    // reconstruct active-at-end-of-month backwards from the current active count
+    const activeLine = {};
+    let run = currentActive;
+    for (let i = months.length - 1; i >= 0; i--) {
+      const m = months[i];
+      activeLine[m] = (snaps[m] != null) ? snaps[m] : run;     // prefer a real snapshot
+      run = activeLine[m] - ((added[m] || 0) - (removed[m] || 0));
+    }
+    const series = months.map(m => ({ month: m, added: added[m] || 0, removed: removed[m] || 0, net: (added[m] || 0) - (removed[m] || 0), active: Math.max(0, Math.round(activeLine[m])) }));
+    const payload = { listid, currentActive, totalMembers, fetched: recs.length, capped, series };
+    await supabase.from('samcart_cache').upsert({ cache_key: ckey, data: JSON.stringify(payload), cached_at: new Date().toISOString() }, { onConflict: 'cache_key' });
+    res.json(payload);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/sync', async (req, res) => {
   const creds = await getCreds();
   if (!creds.url || !creds.token) return res.status(400).json({ error: 'No ActiveCampaign credentials configured.' });

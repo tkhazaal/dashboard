@@ -693,6 +693,24 @@
             </table>
           </div>
         </div>
+
+        <div class="card collapsible">
+          <div class="card-header">
+            <h2>List growth</h2>
+            <div class="email-filters">
+              <select id="lg-list" class="cmp-preset"><option value="">Select a list…</option></select>
+              <span class="pill" id="lg-status"></span>
+            </div>
+          </div>
+          <div class="lg-summary" id="lg-summary" hidden></div>
+          <div class="lg-body" id="lg-body" hidden>
+            <div class="fa-charts">
+              <div class="fa-chart-box"><div class="rf-chart-title">Active subscribers over time</div><div class="chart-wrap"><canvas id="lg-line"></canvas></div></div>
+              <div class="fa-chart-box"><div class="rf-chart-title">Gained vs lost per month</div><div class="chart-wrap"><canvas id="lg-bars"></canvas></div></div>
+            </div>
+          </div>
+          <div class="fa-empty" id="lg-empty">Pick a list to see its month-to-month subscriber growth and loss.</div>
+        </div>
       </div>
     </section>
 
