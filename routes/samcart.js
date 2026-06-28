@@ -174,6 +174,15 @@ function orderProduct(o) {
 // slugs line up. Shared shape lives in ../product.js.
 const { cleanProduct, productFromUrl } = require('../product');
 
+// ActiveCampaign rewrites email links to carry ITS OWN campaign name (the email's name),
+// overwriting our real utm_campaign. The quiz landing URLs prove which AC email carried a
+// given campaign's link, so we map that AC campaign name back to the real campaign — making
+// those email sales attribute to the right campaign (channel stays Email, product from the
+// order). Deterministic, not guesswork: keyed on the exact AC email name. Lower-cased keys.
+const CAMPAIGN_ALIAS = {
+  'father s day launch email 6 (copy)': 'reconnection_compass_quiz',
+};
+
 async function computeMetrics(orders, apiKey) {
   // Map product_id -> checkout slug so orders can be attributed to a funnel slug.
   const slugById = {};
@@ -244,6 +253,7 @@ async function computeMetrics(orders, apiKey) {
 
     // Attribute the order to a UTM channel + full UTM combo (when the checkout carried UTM)
     const up = o.utm_parameters || {};
+    if (up.campaign) { const al = CAMPAIGN_ALIAS[String(up.campaign).trim().toLowerCase()]; if (al) up.campaign = al; }   // restore real campaign over AC's rewrite
     if (dRev && (up.source || up.medium || up.content || up.campaign)) {
       const ch = utmChannel(up.content, up.source, up.medium);
       if (ch && ch !== '(untagged)') {
