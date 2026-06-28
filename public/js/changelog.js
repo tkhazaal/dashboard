@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.16.0', date: '2026-06-28', title: 'Accurate email campaign attribution',
+    changes: [
+      { title: 'Email sales land under the right campaign', detail: 'When ActiveCampaign rewrites an email link’s tracking with its own email name (overwriting your campaign UTM), the dashboard now maps it back — so sales from a campaign’s email attribute to that campaign (channel Email, product pulled from the order), not the email’s name. Real order data, not estimates.' },
+    ],
+  },
+  {
     version: '1.15.0', date: '2026-06-27', title: 'Refunds tracker',
     changes: [
       { title: 'Refunds sub-tab on Purchase Behaviour', detail: 'Every refund from SamCart & Kajabi in one place — source, date, product, amount and full/partial — with summary cards (total lost, count, by source) and filters by date, source and product. Export to CSV.' },
