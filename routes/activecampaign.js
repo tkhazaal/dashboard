@@ -126,8 +126,20 @@ async function computeACMetrics(creds, onProgress) {
 
   const campaignStatusCounts = campaignList.reduce((m, c) => { m[c.status] = (m[c.status] || 0) + 1; return m; }, {});
 
+  // Contact lists — every list with its active subscriber count
+  if (onProgress) onProgress('lists', 0);
+  const acLists = await acAll(base, token, 'lists', 'lists', { maxPages: 6, limit: 100 });
+  const lists = acLists.map(l => ({
+    id: l.id, name: l.name,
+    active: num(l.active_subscribers),
+    total: num(l.non_deleted_subscribers),
+    created: l.created_timestamp || l.cdate || null,
+  })).sort((a, b) => b.active - a.active || a.name.localeCompare(b.name));
+  const listsActiveTotal = lists.reduce((s, l) => s + l.active, 0);
+
   return {
     configured: true, syncedAt: new Date().toISOString(),
+    lists, listsActiveTotal,
     contacts: { total: totalContacts, active, unsubscribed: unsub, bounced, activeRate: rate(active, totalContacts), unsubRate: rate(unsub, totalContacts) },
     deliverability,
     campaigns: campaignList,

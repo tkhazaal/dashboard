@@ -990,6 +990,14 @@ table.show-upsell .upsell-col { display: table-cell; }
 .fx-form-actions { white-space: nowrap; }
 .fx-modal-actions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
 
+/* Collapsible cards */
+.card.collapsible > .card-header { cursor: pointer; user-select: none; }
+.card.collapsible > .card-header h2 { display: inline-flex; align-items: center; gap: 8px; }
+.card.collapsible > .card-header h2::before { content: '▾'; font-size: 0.72em; color: var(--sub); transition: transform 0.15s ease; }
+.card.collapsible.collapsed > .card-header h2::before { transform: rotate(-90deg); }
+.card.collapsible.collapsed > *:not(.card-header) { display: none; }
+.card.collapsible.collapsed > .card-header .email-filters { display: none; }
+
 /* Data Analysis */
 .fa-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin: 6px 2px 14px; }
 .fa-field { display: flex; flex-direction: column; gap: 5px; font: 600 11.5px var(--font-body); color: var(--sub); }

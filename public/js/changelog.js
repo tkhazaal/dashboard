@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.17.0', date: '2026-06-28', title: 'ActiveCampaign lists + collapsible sections',
+    changes: [
+      { title: 'Contact lists', detail: 'The Email page now shows every ActiveCampaign list with its active subscriber count (and total contacts), sorted by size and searchable, with the grand total of active subscribers.' },
+      { title: 'Collapsible sections', detail: 'Campaign performance and Automations are now collapsible — and collapsed by default — so the Email page stays compact. Click any section header to expand or collapse it.' },
+    ],
+  },
+  {
     version: '1.16.0', date: '2026-06-28', title: 'Accurate email campaign attribution',
     changes: [
       { title: 'Email sales land under the right campaign', detail: 'When ActiveCampaign rewrites an email link’s tracking with its own email name (overwriting your campaign UTM), the dashboard now maps it back — so sales from a campaign’s email attribute to that campaign (channel Email, product pulled from the order), not the email’s name. Real order data, not estimates.' },

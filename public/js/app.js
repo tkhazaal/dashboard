@@ -2598,6 +2598,17 @@ function renderEmail(d) {
   $('email-camp-filter').value = [...$('email-camp-filter').options].some(o => o.value === cur) ? cur : 'all';
   renderEmailCampaigns();
   renderEmailAutomations();
+  renderEmailLists();
+}
+function renderEmailLists() {
+  const d = state.acData; if (!d || !$('emailLists')) return;
+  const q = ($('email-list-search').value || '').toLowerCase();
+  let rows = d.lists || [];
+  if (q) rows = rows.filter(l => (l.name || '').toLowerCase().includes(q));
+  $('email-list-count').textContent = `${fmtNum(rows.length)} lists · ${fmtNum(d.listsActiveTotal || 0)} active`;
+  $('emailLists').innerHTML = rows.map(l =>
+    `<tr><td>${escHtml(l.name)}</td><td><span class="orders-count">${fmtNum(l.active)}</span></td><td class="muted">${fmtNum(l.total)}</td></tr>`).join('')
+    || `<tr class="empty-row"><td colspan="3">${(d.lists || []).length ? 'No lists match' : 'No lists found'}</td></tr>`;
 }
 function renderEmailCampaigns() {
   const d = state.acData; if (!d) return;
@@ -2629,6 +2640,15 @@ function renderEmailAutomations() {
 }
 ['email-camp-filter', 'email-camp-search'].forEach(id => $(id).addEventListener('input', renderEmailCampaigns));
 ['email-auto-filter', 'email-auto-search'].forEach(id => $(id).addEventListener('input', renderEmailAutomations));
+if ($('email-list-search')) $('email-list-search').addEventListener('input', renderEmailLists);
+// Collapsible cards — click a card header (not its filters) to expand/collapse.
+document.addEventListener('click', e => {
+  if (e.target.closest('input, select, button, a, label')) return;
+  const hdr = e.target.closest('.card-header');
+  if (!hdr) return;
+  const card = hdr.parentElement;
+  if (card && card.classList.contains('collapsible')) card.classList.toggle('collapsed');
+});
 $('email-sync').addEventListener('click', async () => {
   const btn = $('email-sync'); btn.disabled = true; $('email-status').textContent = 'Syncing…';
   try {
