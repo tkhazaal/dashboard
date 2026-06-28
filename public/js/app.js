@@ -2979,7 +2979,7 @@ document.querySelectorAll('#tab-forms .fx-subtab').forEach(b => b.addEventListen
 }));
 
 // ── Data Analysis: form → column → answer breakdown ───────────────────
-const FA_COLORS = ['#8b5cf6','#4c1d95','#a78bfa','#6d28d9','#c4b5fd','#5b21b6','#7c3aed','#3b0764','#9d7bf5','#2e1065','#b794f6','#1e1b4b'];
+const FA_COLORS = ['#2563eb','#1e3a8a','#60a5fa','#1d4ed8','#93c5fd','#3b82f6','#1e40af','#38bdf8','#172554','#0ea5e9','#7dd3fc','#0369a1'];
 let faBreakdown = null;   // last rendered breakdown (for CSV)
 let faSeq = 0;            // request token — discard stale responses when switching form/column quickly
 
