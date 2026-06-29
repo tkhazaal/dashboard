@@ -3112,7 +3112,7 @@ async function loadSocialData() {
     return true;
   } catch (e) {
     if ($('social-banner')) { $('social-banner').hidden = false; $('social-banner').innerHTML = '⚠ Run <code>social-schema.sql</code> in Supabase once, then click “Refresh now”.'; }
-    if ($('social-rows')) $('social-rows').innerHTML = '<tr class="empty-row"><td colspan="15">No data yet.</td></tr>';
+    if ($('social-feed')) $('social-feed').innerHTML = '<div class="soc-empty">No data yet.</div>';
     if ($('social-cards')) $('social-cards').innerHTML = '';
     return false;
   }
@@ -3183,26 +3183,35 @@ function renderSocial() {
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtNum(c.parsed.x) + ' views' } } }, scales: { x: { grid: { color: GRID }, ticks: { color: TICK, font: { size: 10 }, callback: v => v >= 1000 ? (v / 1000) + 'k' : v }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: TICK, font: { size: 10 } } } } },
   });
   const rows = socialFiltered();
-  const platBadge = p => `<span class="soc-plat soc-${String(p).toLowerCase()}">${escHtml(p)}</span>`;
   const edit = (id, f, val, ph) => `<input class="soc-edit" data-post="${escHtml(id)}" data-field="${f}" value="${escHtml(val || '')}" placeholder="${escHtml(ph || '')}">`;
-  $('social-rows').innerHTML = rows.length ? rows.map(p => {
-    const dt = socialDateParts(p.posted_at);
-    return `<tr>
-      <td>${dt.day}</td><td class="soc-nowrap">${dt.date}</td><td class="soc-nowrap">${dt.time}</td>
-      <td>${platBadge(p.platform)}</td><td><span class="soc-type">${escHtml(p.content_type)}</span></td>
-      <td class="soc-pnum">${edit(p.post_id, 'post_num', p.post_num)}</td>
-      <td>${edit(p.post_id, 'hook_topic', p.hook_topic, (p.caption || '').replace(/\n/g, ' ').slice(0, 36))}</td>
-      <td>${edit(p.post_id, 'offer', p.offer)}</td>
-      <td>${edit(p.post_id, 'status', p.status)}</td>
-      <td class="soc-metric">${fmtNum(p.views)}</td><td class="soc-metric">${fmtNum(p.likes)}</td>
-      <td class="soc-metric">${fmtNum(p.comments)}</td><td class="soc-metric">${fmtNum(p.shares)}</td>
-      <td>${p.url ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" class="soc-link" title="Open">↗</a>` : '—'}</td>
-      <td>${edit(p.post_id, 'notes', p.notes)}</td>
-    </tr>`;
-  }).join('') : '<tr class="empty-row"><td colspan="15">No posts match — or click “Refresh now” to scrape.</td></tr>';
+  $('social-feed').innerHTML = rows.length ? rows.map(p => {
+    const dt = socialDateParts(p.posted_at), plat = String(p.platform).toLowerCase();
+    return `<div class="soc-card">
+      <div class="soc-card-media">
+        ${p.thumbnail ? `<img src="${escHtml(p.thumbnail)}" alt="" loading="lazy" onerror="this.remove()">` : `<div class="soc-noimg soc-bg-${plat}">${escHtml(p.platform)}</div>`}
+        <span class="soc-plat soc-${plat}">${escHtml(p.platform)} · ${escHtml(p.content_type)}</span>
+        ${p.url ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" class="soc-card-open" title="Open post">↗</a>` : ''}
+      </div>
+      <div class="soc-card-body">
+        <div class="soc-card-date">${dt.day} · ${dt.date} · ${dt.time}</div>
+        <div class="soc-card-cap" title="${escHtml(p.caption || '')}">${escHtml((p.caption || '(no caption)').replace(/\n/g, ' ').slice(0, 130))}</div>
+        <div class="soc-card-metrics">
+          <span title="Views">👁 ${fmtNum(p.views)}</span><span title="Likes">❤️ ${fmtNum(p.likes)}</span>
+          <span title="Comments">💬 ${fmtNum(p.comments)}</span><span title="Shares">🔁 ${fmtNum(p.shares)}</span>
+        </div>
+        <div class="soc-card-fields">
+          <label class="soc-f-wide"><span>Hook / Topic</span>${edit(p.post_id, 'hook_topic', p.hook_topic, 'add a hook…')}</label>
+          <label><span>Offer</span>${edit(p.post_id, 'offer', p.offer, '—')}</label>
+          <label><span>Status</span>${edit(p.post_id, 'status', p.status, '—')}</label>
+          <label class="soc-f-num"><span>Post #</span>${edit(p.post_id, 'post_num', p.post_num, '#')}</label>
+          <label class="soc-f-wide"><span>Notes</span>${edit(p.post_id, 'notes', p.notes, 'notes…')}</label>
+        </div>
+      </div>
+    </div>`;
+  }).join('') : '<div class="soc-empty">No posts match — or click “↻ Refresh now” to scrape.</div>';
 }
 ['social-plat-filter', 'social-type-filter', 'social-search'].forEach(id => { const el = $(id); if (el) el.addEventListener('input', renderSocial); });
-if ($('social-rows')) $('social-rows').addEventListener('change', async e => {
+if ($('social-feed')) $('social-feed').addEventListener('change', async e => {
   const inp = e.target.closest('.soc-edit'); if (!inp) return;
   try {
     await fxPost('/api/social/field', { post_id: inp.dataset.post, field: inp.dataset.field, value: inp.value });
