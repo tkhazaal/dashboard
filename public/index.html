@@ -58,6 +58,10 @@
         <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>
         Email
       </a>
+      <a href="#" class="nav-item" data-tab="social">
+        <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+        Social Report
+      </a>
       <a href="#" class="nav-item" data-tab="pages">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         Page Analytics
@@ -710,6 +714,41 @@
             </div>
           </div>
           <div class="fa-empty" id="lg-empty">Pick a list to see its month-to-month subscriber growth and loss.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SOCIAL REPORT ───────────────────── -->
+    <section class="tab" id="tab-social">
+      <div class="page-header">
+        <div><h1>Social Report</h1><p class="subtitle">Facebook &amp; Instagram posts &amp; reels — metrics auto-update daily (Apify, 8am)</p></div>
+        <div class="header-pills"><span class="pill" id="social-synced"></span><button class="clear-btn" id="social-sync">↻ Refresh now</button></div>
+      </div>
+      <div class="social-banner" id="social-banner" hidden></div>
+      <div class="rf-cards" id="social-cards"></div>
+      <div class="social-charts">
+        <div class="fa-chart-box"><div class="rf-chart-title">Views by platform</div><div class="chart-wrap"><canvas id="social-platform-chart"></canvas></div></div>
+        <div class="fa-chart-box"><div class="rf-chart-title">Top posts by views</div><div class="chart-wrap"><canvas id="social-top-chart"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Posts &amp; Reels</h2>
+          <div class="email-filters">
+            <select id="social-plat-filter" class="cmp-preset"><option value="">All platforms</option><option>Facebook</option><option>Instagram</option></select>
+            <select id="social-type-filter" class="cmp-preset"><option value="">All types</option><option>Post</option><option>Reel</option><option>Video</option></select>
+            <input id="social-search" class="search-input" placeholder="Search caption / topic…">
+            <button class="clear-btn" id="social-export" title="Download as CSV">⬇ CSV</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table social-table">
+            <thead><tr>
+              <th>Day</th><th>Date</th><th>Time</th><th>Platform</th><th>Type</th><th>Post#</th>
+              <th>Hook / Topic</th><th>Offer</th><th>Status</th>
+              <th>Views</th><th>Likes</th><th>Comments</th><th>Shares</th><th>Link</th><th>Notes</th>
+            </tr></thead>
+            <tbody id="social-rows"><tr class="empty-row"><td colspan="15">Loading…</td></tr></tbody>
+          </table>
         </div>
       </div>
     </section>

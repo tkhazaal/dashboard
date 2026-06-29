@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.26.0', date: '2026-06-30', title: 'Social Report (Facebook + Instagram)',
+    changes: [
+      { title: 'New Social Report page', detail: 'Pulls your Facebook & Instagram posts and reels via Apify — views, likes, comments and shares auto-update every day at 8am. Summary totals, a views-by-platform donut and a top-posts chart, plus a full table where you can add your own Hook/Topic, Offer, Status, Post # and Notes per post. Export to CSV. (One-time setup: run social-schema.sql in Supabase.)' },
+    ],
+  },
+  {
     version: '1.25.0', date: '2026-06-30', title: 'Bulk-delete form submissions',
     changes: [
       { title: 'Select & delete in bulk', detail: 'Form Submissions now has a checkbox on every row (plus a select-all in the header). Tick the ones you want and click “Delete selected” to remove them all at once — respects the current search/form filter.' },

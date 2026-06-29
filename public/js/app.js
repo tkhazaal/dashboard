@@ -264,6 +264,7 @@ function activateTab(tab) {
   if (tab === 'ads') loadAds();
   if (tab === 'kajabi') loadKajabi();
   if (tab === 'email') loadEmail();
+  if (tab === 'social') loadSocial();
   if (tab === 'utm') loadUtm();
   if (tab === 'forms') loadForms();
 }
@@ -279,7 +280,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Per-tab Refresh ───────────────────────────────────────────────
 // Each reporting tab gets its own Refresh button that reloads only that tab's data
 // (and re-renders the widgets it shows). Sidebar "Refresh All Data" still does everything.
-const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 'email', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
+const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 'email', 'social', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
 async function refreshTab(tab, btn) {
   if (btn) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Refreshing…'; }
   try {
@@ -289,6 +290,7 @@ async function refreshTab(tab, btn) {
     else if (tab === 'ads')      { await loadSamCart(); renderAds(); }
     else if (tab === 'kajabi')   await loadKajabi();
     else if (tab === 'email')    await loadEmail();
+    else if (tab === 'social')   await loadSocial();
     else if (tab === 'pages')    await Promise.allSettled([loadPagesTable(), loadSamCart()]);
     else if (tab === 'utm')      await loadUtm();
     else if (tab === 'customers' || tab === 'behaviour' || tab === 'paths') await loadSamCart();
@@ -3088,6 +3090,104 @@ if ($('fx-bulk-del')) $('fx-bulk-del').addEventListener('click', async () => {
   if (!confirm(`Delete ${n} selected submission${n === 1 ? '' : 's'}? This cannot be undone.`)) return;
   try { await fxPost('/api/forms/submissions/bulk-delete', { ids: [...fxSelected] }); fxSelected.clear(); fxSearch(); loadForms(); loadSourceSummary(); }
   catch (e) { alert('Delete failed: ' + e.message); }
+});
+
+// ── Social Report (Facebook + Instagram via Apify) ────────────────────
+const SOC_PLAT_COLOR = { Facebook: '#1877f2', Instagram: '#E1306C' };
+function socialDateParts(ts) {
+  if (!ts) return { day: '', date: '', time: '' };
+  const d = new Date(ts); if (isNaN(d)) return { day: '', date: '', time: '' };
+  const tz = { timeZone: 'America/New_York' };
+  return {
+    day: d.toLocaleDateString('en-US', { ...tz, weekday: 'short' }),
+    date: d.toLocaleDateString('en-US', { ...tz, month: 'short', day: 'numeric', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-US', { ...tz, hour: 'numeric', minute: '2-digit' }),
+  };
+}
+async function loadSocial() {
+  try {
+    const d = await api('/api/social/data');
+    state.socialData = d;
+    if ($('social-banner')) $('social-banner').hidden = true;
+    if ($('social-synced')) $('social-synced').textContent = d.synced ? 'Updated ' + timeAgo(d.synced) : 'Not synced yet';
+    renderSocial();
+  } catch (e) {
+    if ($('social-banner')) { $('social-banner').hidden = false; $('social-banner').innerHTML = '⚠ Run <code>social-schema.sql</code> in Supabase once, then click “Refresh now”.'; }
+    if ($('social-rows')) $('social-rows').innerHTML = '<tr class="empty-row"><td colspan="15">No data yet.</td></tr>';
+    if ($('social-cards')) $('social-cards').innerHTML = '';
+  }
+}
+function socialFiltered() {
+  const d = state.socialData; if (!d) return [];
+  const plat = $('social-plat-filter').value, type = $('social-type-filter').value, q = ($('social-search').value || '').toLowerCase();
+  return (d.posts || []).filter(p =>
+    (!plat || p.platform === plat) && (!type || p.content_type === type) &&
+    (!q || (p.caption || '').toLowerCase().includes(q) || (p.hook_topic || '').toLowerCase().includes(q) || (p.offer || '').toLowerCase().includes(q)));
+}
+function renderSocial() {
+  const d = state.socialData; if (!d) return;
+  const t = d.totals || {};
+  $('social-cards').innerHTML = [['Posts', t.posts], ['Views', t.views], ['Likes', t.likes], ['Comments', t.comments], ['Shares', t.shares]]
+    .map(([l, v]) => `<div class="rf-card"><div class="rf-card-label">${l}</div><div class="rf-card-val">${fmtNum(v || 0)}</div></div>`).join('');
+  const bp = d.byPlatform || [];
+  mkChart('social-platform-chart', {
+    type: 'doughnut',
+    data: { labels: bp.map(p => p.platform), datasets: [{ data: bp.map(p => p.views), backgroundColor: bp.map(p => SOC_PLAT_COLOR[p.platform] || '#8b5cf6'), borderWidth: 0, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '58%', plugins: { legend: { position: 'bottom', labels: { color: TICK, font: { size: 11 } } }, tooltip: { callbacks: { label: c => ` ${c.label}: ${fmtNum(c.parsed)} views` } } } },
+  });
+  const top = (d.top || []).slice(0, 8);
+  mkChart('social-top-chart', {
+    type: 'bar',
+    data: { labels: top.map(p => faTrunc((p.caption || p.content_type || '—').replace(/\n/g, ' '), 26)), datasets: [{ data: top.map(p => p.views), backgroundColor: top.map(p => SOC_PLAT_COLOR[p.platform] || '#8b5cf6'), borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtNum(c.parsed.x) + ' views' } } }, scales: { x: { grid: { color: GRID }, ticks: { color: TICK, font: { size: 10 }, callback: v => v >= 1000 ? (v / 1000) + 'k' : v }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: TICK, font: { size: 10 } } } } },
+  });
+  const rows = socialFiltered();
+  const platBadge = p => `<span class="soc-plat soc-${String(p).toLowerCase()}">${escHtml(p)}</span>`;
+  const edit = (id, f, val, ph) => `<input class="soc-edit" data-post="${escHtml(id)}" data-field="${f}" value="${escHtml(val || '')}" placeholder="${escHtml(ph || '')}">`;
+  $('social-rows').innerHTML = rows.length ? rows.map(p => {
+    const dt = socialDateParts(p.posted_at);
+    return `<tr>
+      <td>${dt.day}</td><td class="soc-nowrap">${dt.date}</td><td class="soc-nowrap">${dt.time}</td>
+      <td>${platBadge(p.platform)}</td><td><span class="soc-type">${escHtml(p.content_type)}</span></td>
+      <td class="soc-pnum">${edit(p.post_id, 'post_num', p.post_num)}</td>
+      <td>${edit(p.post_id, 'hook_topic', p.hook_topic, (p.caption || '').replace(/\n/g, ' ').slice(0, 36))}</td>
+      <td>${edit(p.post_id, 'offer', p.offer)}</td>
+      <td>${edit(p.post_id, 'status', p.status)}</td>
+      <td class="soc-metric">${fmtNum(p.views)}</td><td class="soc-metric">${fmtNum(p.likes)}</td>
+      <td class="soc-metric">${fmtNum(p.comments)}</td><td class="soc-metric">${fmtNum(p.shares)}</td>
+      <td>${p.url ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" class="soc-link" title="Open">↗</a>` : '—'}</td>
+      <td>${edit(p.post_id, 'notes', p.notes)}</td>
+    </tr>`;
+  }).join('') : '<tr class="empty-row"><td colspan="15">No posts match — or click “Refresh now” to scrape.</td></tr>';
+}
+['social-plat-filter', 'social-type-filter', 'social-search'].forEach(id => { const el = $(id); if (el) el.addEventListener('input', renderSocial); });
+if ($('social-rows')) $('social-rows').addEventListener('change', async e => {
+  const inp = e.target.closest('.soc-edit'); if (!inp) return;
+  try {
+    await fxPost('/api/social/field', { post_id: inp.dataset.post, field: inp.dataset.field, value: inp.value });
+    const p = (state.socialData.posts || []).find(x => x.post_id === inp.dataset.post); if (p) p[inp.dataset.field] = inp.value;
+    inp.classList.add('soc-saved'); setTimeout(() => inp.classList.remove('soc-saved'), 700);
+  } catch { alert('Could not save'); }
+});
+if ($('social-sync')) $('social-sync').addEventListener('click', async () => {
+  const btn = $('social-sync'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Scraping…';
+  try {
+    await fetch('/api/social/sync', { method: 'POST' });
+    const poll = setInterval(async () => {
+      const s = await api('/api/social/sync/status').catch(() => ({}));
+      if (s.running === false) { clearInterval(poll); btn.disabled = false; btn.textContent = old; loadSocial(); }
+    }, 4000);
+    setTimeout(() => { clearInterval(poll); btn.disabled = false; btn.textContent = old; loadSocial(); }, 240000);
+  } catch { btn.disabled = false; btn.textContent = old; }
+});
+if ($('social-export')) $('social-export').addEventListener('click', () => {
+  const rows = socialFiltered(); if (!rows.length) return;
+  const esc = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head = ['Day', 'Date', 'Time', 'Platform', 'Type', 'Post#', 'Hook/Topic', 'Offer', 'Status', 'Views', 'Likes', 'Comments', 'Shares', 'Link', 'Notes', 'Caption'];
+  const lines = [head.join(',')];
+  for (const p of rows) { const dt = socialDateParts(p.posted_at); lines.push([dt.day, dt.date, dt.time, p.platform, p.content_type, p.post_num, p.hook_topic, p.offer, p.status, p.views, p.likes, p.comments, p.shares, p.url, p.notes, (p.caption || '').replace(/\n/g, ' ')].map(esc).join(',')); }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'social-report.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 if ($('fx-export')) $('fx-export').addEventListener('click', () => {
   const qs = new URLSearchParams();
