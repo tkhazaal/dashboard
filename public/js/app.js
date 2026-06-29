@@ -3105,7 +3105,7 @@ function renderFaBreakdown(d) {
   }
   const labels = chartVals.map(v => faTrunc(v.value, 28));
   const counts = chartVals.map(v => v.count);
-  const colors = chartVals.map((_, i) => FA_COLORS[i % FA_COLORS.length]);
+  const colors = chartVals.map((_, i) => PALETTE[i % PALETTE.length]);
 
   mkChart('fa-donut', {
     type: 'doughnut',
@@ -3121,10 +3121,10 @@ function renderFaBreakdown(d) {
   const TBL = 100, tblRows = values.slice(0, TBL);
   $('fa-table').innerHTML = tblRows.map((v, i) => `
     <tr>
-      <td><span class="fa-swatch" style="background:${FA_COLORS[i % FA_COLORS.length]}"></span>${escHtml(v.value)}</td>
+      <td><span class="fa-swatch" style="background:${PALETTE[i % PALETTE.length]}"></span>${escHtml(v.value)}</td>
       <td class="fa-num">${fmtNum(v.count)}</td>
       <td class="fa-num">${v.pct}%</td>
-      <td class="fa-barcell"><span class="fa-barfill" style="width:${Math.min(100, v.pct)}%;background:${FA_COLORS[i % FA_COLORS.length]}"></span></td>
+      <td class="fa-barcell"><span class="fa-barfill" style="width:${Math.min(100, v.pct)}%;background:${PALETTE[i % PALETTE.length]}"></span></td>
     </tr>`).join('') + (values.length > TBL ? `<tr><td colspan="4" class="th-hint">…and ${fmtNum(values.length - TBL)} more distinct answers — use ⬇ CSV for the full list.</td></tr>` : '');
 }
 function faDonutCenter(text, sub) {
