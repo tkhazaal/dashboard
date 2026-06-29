@@ -989,6 +989,15 @@ table.show-upsell .upsell-col { display: table-cell; }
 .fx-mini.fx-del:hover { border-color: var(--danger); color: var(--danger); }
 .fx-form-actions { white-space: nowrap; }
 .fx-modal-actions { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.fx-source-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 2px 14px; }
+.fx-source-summary:empty { display: none; }
+.fx-ss-label { font: 700 11px var(--font-body); color: var(--sub); text-transform: uppercase; letter-spacing: 0.04em; margin-right: 4px; }
+.fx-ss-pill { font: 500 12.5px var(--font-body); color: var(--text); background: var(--surface-alt); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; }
+.fx-ss-pill.top { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.fx-ss-pill strong { font-weight: 700; }
+.fx-ss-pct { color: var(--sub); font-size: 11px; }
+.fx-ss-pill.top .fx-ss-pct { color: var(--accent); opacity: 0.85; }
+.fx-src-tag { display: inline-block; font: 600 11px var(--font-body); padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
 
 /* Collapsible cards */
 .card.collapsible > .card-header { cursor: pointer; user-select: none; }

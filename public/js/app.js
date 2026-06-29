@@ -2930,6 +2930,7 @@ async function loadForms() {
     sel.innerHTML = '<option value="">All forms</option>' + forms.map(f => `<option value="${escHtml(f.form_key)}">${escHtml(f.name)} (${f.count})</option>`).join('');
     sel.value = forms.some(f => f.form_key === cur) ? cur : '';
     await fxSearch();
+    loadSourceSummary();
     $('fx-status').textContent = '';
   } catch (e) { $('fx-status').textContent = '⚠ Run forms-schema.sql in Supabase'; $('fx-webhooks').innerHTML = '<p class="th-hint" style="padding:6px 2px;">Once the form tables are created (one-time SQL), this page is fully self-service.</p>'; }
 }
@@ -2954,14 +2955,29 @@ async function fxSearch() {
   const qs = new URLSearchParams(); if (search) qs.set('search', search); if (form) qs.set('form', form);
   let subs = []; try { subs = await api('/api/forms/submissions?' + qs.toString()); } catch {}
   const fname = k => ((state.fxForms || []).find(f => f.form_key === k) || {}).name || k || '—';
+  const srcTag = s => s && s !== 'Direct / Unknown' ? `<span class="fx-src-tag">${escHtml(s)}</span>` : '<span class="muted">—</span>';
   $('fx-subs').innerHTML = (subs && subs.length) ? subs.map(s => `
     <tr class="fx-sub-row" data-id="${s.id}">
       <td><strong>${escHtml(s.contact_name || '—')}</strong></td>
       <td>${escHtml(s.contact_email || '—')}</td>
       <td>${escHtml(fname(s.form_key))}</td>
+      <td>${srcTag(s.source)}</td>
       <td>${s.created_at ? timeAgo(s.created_at) : ''}</td>
     </tr>`).join('')
-    : `<tr class="empty-row"><td colspan="4">${(search || form) ? 'No matches' : 'No submissions yet — fire your webhook to test it'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="5">${(search || form) ? 'No matches' : 'No submissions yet — fire your webhook to test it'}</td></tr>`;
+}
+async function loadSourceSummary() {
+  const el = $('fx-source-summary'); if (!el) return;
+  const form = $('fx-form-filter').value;
+  try { renderSourceSummary(await api('/api/forms/source-summary' + (form ? '?form=' + encodeURIComponent(form) : ''))); }
+  catch { el.innerHTML = ''; }
+}
+function renderSourceSummary(d) {
+  const el = $('fx-source-summary'); if (!el) return;
+  const src = (d && d.sources) || [];
+  if (!src.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<span class="fx-ss-label">Submissions by source</span>` + src.map((s, i) =>
+    `<span class="fx-ss-pill${i === 0 ? ' top' : ''}">${escHtml(s.source)} <strong>${fmtNum(s.count)}</strong> <span class="fx-ss-pct">${s.pct}%</span></span>`).join('');
 }
 async function openSubmission(id) {
   try {
@@ -3011,7 +3027,7 @@ if ($('fx-forms')) {
   $('fx-forms').addEventListener('change', async e => { const n = e.target.closest('.fx-form-name'); if (n) { try { await fxPost('/api/forms/rename', { form_key: n.dataset.key, name: n.value }); (state.fxForms || []).forEach(f => { if (f.form_key === n.dataset.key) f.name = n.value; }); fxSearch(); } catch {} } });
 }
 let _fxT; if ($('fx-search')) $('fx-search').addEventListener('input', () => { clearTimeout(_fxT); _fxT = setTimeout(fxSearch, 300); });
-if ($('fx-form-filter')) $('fx-form-filter').addEventListener('change', fxSearch);
+if ($('fx-form-filter')) $('fx-form-filter').addEventListener('change', () => { fxSearch(); loadSourceSummary(); });
 if ($('fx-modal-x')) $('fx-modal-x').addEventListener('click', closeFxModal);
 if ($('fx-modal-close')) $('fx-modal-close').addEventListener('click', closeFxModal);
 // Sub-navigation: Submissions ⇄ Data Analysis ⇄ Webhooks

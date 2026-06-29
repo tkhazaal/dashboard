@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.19.0', date: '2026-06-28', title: 'Form submission source',
+    changes: [
+      { title: 'See which channel each submission came from', detail: 'Form Submissions now shows a Source column (the channel — Email, FB Post, IG Post, etc. — parsed from the form’s captured UTM), plus a “Submissions by source” summary at the top so you can instantly see which channel drove the most submissions.' },
+    ],
+  },
+  {
     version: '1.18.0', date: '2026-06-28', title: 'List growth tracker',
     changes: [
       { title: 'Month-to-month list growth & loss', detail: 'On the Email page, pick any ActiveCampaign list to see subscribers gained vs lost each month and the active-subscriber trend over time — built from real join/unsubscribe dates. The dashboard also snapshots each list monthly so the trend stays exact going forward (very large lists show recent activity, noted).' },

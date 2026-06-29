@@ -1,6 +1,7 @@
 const express  = require('express');
 const crypto   = require('crypto');
 const supabase = require('../database');
+const { utmChannel } = require('../channel');
 
 const router = express.Router();   // mounted at /api/forms  (dashboard API)
 const hook   = express.Router();   // mounted at /hook       (public receiver)
@@ -51,6 +52,19 @@ function flattenFields(obj) {
   };
   try { walk(obj, ''); } catch (e) { if (!e.__stop) throw e; }
   return out;
+}
+
+// Channel/source of a submission — parse the UTM the form captured (usually in
+// payload.utm_params), else any payload string carrying utm_*; map to a channel.
+const getp = (s, k) => { const m = String(s).match(new RegExp('[?&]' + k + '=([^&#]*)', 'i')); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')).trim() : ''; };
+function submissionSource(payload) {
+  if (!payload || typeof payload !== 'object') return 'Direct / Unknown';
+  let utm = typeof payload.utm_params === 'string' ? payload.utm_params : '';
+  if (!utm) for (const k in payload) if (typeof payload[k] === 'string' && /utm_[a-z]+=/i.test(payload[k])) { utm = payload[k]; break; }
+  if (!utm) return 'Direct / Unknown';
+  const c = getp(utm, 'utm_content'), s = getp(utm, 'utm_source'), m = getp(utm, 'utm_medium');
+  if (!c && !s && !m) return 'Direct / Unknown';
+  return utmChannel(c, s, m) || 'Direct / Unknown';
 }
 
 // ── Webhooks (create / list / delete) ───────────────────────────────────────
@@ -112,12 +126,36 @@ router.get('/submissions', async (req, res) => {
   try {
     const search = (req.query.search || '').toString().trim().slice(0, 100);
     const form = (req.query.form || '').toString();
-    let q = supabase.from('form_submissions').select('id, form_key, contact_name, contact_email, created_at').order('created_at', { ascending: false }).limit(300);
+    let q = supabase.from('form_submissions').select('id, form_key, contact_name, contact_email, created_at, payload').order('created_at', { ascending: false }).limit(300);
     if (form) q = q.eq('form_key', form);
     if (search) q = q.or(`contact_name.ilike.*${search}*,contact_email.ilike.*${search}*`);
     const { data, error } = await q;
     if (error) throw error;
-    res.json(data || []);
+    // attach the channel/source (from the payload UTM); don't ship the full payload to the list
+    res.json((data || []).map(({ payload, ...row }) => ({ ...row, source: submissionSource(payload) })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+// Channel/source breakdown across a form's submissions (which channel drove the most).
+router.get('/source-summary', async (req, res) => {
+  try {
+    const form = (req.query.form || '').toString();
+    const search = (req.query.search || '').toString().trim().slice(0, 100);
+    const all = [], PAGE = 1000;
+    for (let from = 0; from < 200000; from += PAGE) {
+      let q = supabase.from('form_submissions').select('payload').order('created_at', { ascending: false });
+      if (form) q = q.eq('form_key', form);
+      if (search) q = q.or(`contact_name.ilike.*${search}*,contact_email.ilike.*${search}*`);
+      const { data, error } = await q.range(from, from + PAGE - 1);
+      if (error) throw error;
+      if (!data || !data.length) break;
+      all.push(...data);
+      if (data.length < PAGE) break;
+    }
+    const counts = {};
+    for (const s of all) { const src = submissionSource(s.payload); counts[src] = (counts[src] || 0) + 1; }
+    const total = all.length;
+    const sources = Object.entries(counts).map(([source, count]) => ({ source, count, pct: total ? Math.round(count / total * 1000) / 10 : 0 })).sort((a, b) => b.count - a.count);
+    res.json({ total, sources });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 router.get('/submissions/:id', async (req, res) => {
