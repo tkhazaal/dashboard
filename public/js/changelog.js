@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.22.0', date: '2026-06-28', title: 'Apify credentials in Settings',
+    changes: [
+      { title: 'Edit your Apify token + social accounts', detail: 'Settings now has fields for your Apify personal token, Instagram username and Facebook page URL — so you can update the follower-tracking credentials yourself. The token is stored securely and only ever shown masked. Saving re-syncs Instagram & Facebook automatically.' },
+      { title: 'Snapshot in a 4-column grid', detail: 'The Executive snapshot KPI cards now sit in a tidy 4×4 grid.' },
+    ],
+  },
+  {
     version: '1.21.0', date: '2026-06-28', title: 'Facebook followers in snapshot',
     changes: [
       { title: 'Facebook follower cards', detail: 'The Reporting Executive snapshot now shows current Facebook page followers and followers gained this month — via the Apify Facebook Pages scraper, snapshotted monthly so month-over-month growth tracks automatically (same as Instagram).' },

@@ -1038,6 +1038,9 @@ async function loadSettings() {
     : 'Not connected';
   $('acHint').textContent = s.ac_api_token_masked
     ? `Connected ✓ · key ${s.ac_api_token_masked}` : 'Not connected';
+  if ($('apifyHint')) $('apifyHint').textContent = s.apify_token_masked ? `Connected ✓ · token ${s.apify_token_masked}` : 'Not connected';
+  if (form.instagram_username && s.instagram_username) form.instagram_username.value = s.instagram_username;
+  if (form.facebook_page_url && s.facebook_page_url) form.facebook_page_url.value = s.facebook_page_url;
   state.monthlyGoal = parseFloat(s.monthly_goal) || 0;
   if (s.funnels_config) { try { state.funnelsConfig = JSON.parse(s.funnels_config); } catch {} }
   if (s.ad_campaigns)   { try { state.adCampaigns   = JSON.parse(s.ad_campaigns);   } catch {} }
@@ -1130,6 +1133,8 @@ $('settingsForm').addEventListener('submit', async e => {
     // Re-sync integrations whose credentials just changed
     if (body.kajabi_client_id || body.kajabi_client_secret) { $('settingsSaved').textContent = '✓ Saved — syncing Kajabi…'; fetch('/api/kajabi/sync', { method: 'POST' }); }
     if (body.ac_api_url || body.ac_api_token)               { $('settingsSaved').textContent = '✓ Saved — syncing Email…';  fetch('/api/ac/sync', { method: 'POST' }); }
+    if (body.apify_token || body.instagram_username) fetch('/api/instagram/sync', { method: 'POST' });
+    if (body.apify_token || body.facebook_page_url)  fetch('/api/facebook/sync', { method: 'POST' });
     e.target.reset(); loadSettings();    // clear secret fields + refresh hints
     setTimeout(() => { $('settingsSaved').textContent = ''; }, 4000);
   } else {
