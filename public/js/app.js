@@ -3104,18 +3104,59 @@ function socialDateParts(ts) {
     time: d.toLocaleTimeString('en-US', { ...tz, hour: 'numeric', minute: '2-digit' }),
   };
 }
-async function loadSocial() {
+async function loadSocialData() {
   try {
-    const d = await api('/api/social/data');
-    state.socialData = d;
+    state.socialData = await api('/api/social/data');
     if ($('social-banner')) $('social-banner').hidden = true;
-    if ($('social-synced')) $('social-synced').textContent = d.synced ? 'Updated ' + timeAgo(d.synced) : 'Not synced yet';
     renderSocial();
+    return true;
   } catch (e) {
     if ($('social-banner')) { $('social-banner').hidden = false; $('social-banner').innerHTML = '⚠ Run <code>social-schema.sql</code> in Supabase once, then click “Refresh now”.'; }
     if ($('social-rows')) $('social-rows').innerHTML = '<tr class="empty-row"><td colspan="15">No data yet.</td></tr>';
     if ($('social-cards')) $('social-cards').innerHTML = '';
+    return false;
   }
+}
+async function loadSocial() {
+  await loadSocialData();
+  try {
+    const s = await api('/api/social/sync/status');
+    if (s.running) startSocialPolling();            // a scrape is already running (e.g. the 8am job) → show it live
+    else { hideSocialProgress(); if ($('social-synced')) $('social-synced').textContent = (state.socialData && state.socialData.synced) ? 'Updated ' + timeAgo(state.socialData.synced) : 'Not synced yet'; }
+  } catch {}
+}
+function showSocialProgress(s) {
+  const el = $('social-progress'); if (!el) return;
+  el.hidden = false;
+  const done = s.scrapersDone || 0, total = s.scrapersTotal || 4, found = s.found || 0;
+  el.innerHTML = `<span class="soc-spinner"></span><div class="soc-prog-text"><strong>Scraping…</strong> ${escHtml(s.phase || '')} · ${fmtNum(found)} posts so far</div><div class="soc-prog-bar"><span style="width:${Math.round(done / total * 100)}%"></span></div>`;
+}
+function hideSocialProgress() { const el = $('social-progress'); if (el) el.hidden = true; }
+let _socPoll = null;
+function startSocialPolling() {
+  if (_socPoll) return;
+  const btn = $('social-sync'); if (btn) { btn.disabled = true; btn.textContent = 'Scraping…'; }
+  showSocialProgress({ phase: 'Starting…', scrapersDone: 0, scrapersTotal: 4, found: 0 });
+  _socPoll = setInterval(async () => {
+    let s = { running: false };
+    try { s = await api('/api/social/sync/status'); } catch {}
+    showSocialProgress(s);
+    await loadSocialData();                          // real-time: posts appear as each scraper upserts
+    if (!s.running) stopSocialPolling(s);
+  }, 3000);
+  setTimeout(() => stopSocialPolling({ running: false, finishedAt: 1 }), 300000);   // safety stop
+}
+function stopSocialPolling(s) {
+  if (_socPoll) { clearInterval(_socPoll); _socPoll = null; }
+  hideSocialProgress();
+  const btn = $('social-sync'); if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh now'; }
+  if (s && s.error && $('social-banner')) { $('social-banner').hidden = false; $('social-banner').innerHTML = '⚠ Scrape error: ' + escHtml(s.error); }
+  loadSocialData();
+  if ($('social-synced') && state.socialData) $('social-synced').textContent = state.socialData.synced ? 'Updated ' + timeAgo(state.socialData.synced) : 'Updated just now';
+}
+function runSocialSync() {
+  fetch('/api/social/sync', { method: 'POST' }).catch(() => {});
+  setTimeout(startSocialPolling, 600);
 }
 function socialFiltered() {
   const d = state.socialData; if (!d) return [];
@@ -3169,17 +3210,7 @@ if ($('social-rows')) $('social-rows').addEventListener('change', async e => {
     inp.classList.add('soc-saved'); setTimeout(() => inp.classList.remove('soc-saved'), 700);
   } catch { alert('Could not save'); }
 });
-if ($('social-sync')) $('social-sync').addEventListener('click', async () => {
-  const btn = $('social-sync'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Scraping…';
-  try {
-    await fetch('/api/social/sync', { method: 'POST' });
-    const poll = setInterval(async () => {
-      const s = await api('/api/social/sync/status').catch(() => ({}));
-      if (s.running === false) { clearInterval(poll); btn.disabled = false; btn.textContent = old; loadSocial(); }
-    }, 4000);
-    setTimeout(() => { clearInterval(poll); btn.disabled = false; btn.textContent = old; loadSocial(); }, 240000);
-  } catch { btn.disabled = false; btn.textContent = old; }
-});
+if ($('social-sync')) $('social-sync').addEventListener('click', runSocialSync);
 if ($('social-export')) $('social-export').addEventListener('click', () => {
   const rows = socialFiltered(); if (!rows.length) return;
   const esc = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };

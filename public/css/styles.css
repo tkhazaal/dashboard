@@ -1022,6 +1022,13 @@ table.show-upsell .upsell-col { display: table-cell; }
 .soc-edit.soc-saved { border-color: var(--accent2); background: rgba(16,163,74,0.08); }
 .soc-pnum .soc-edit { min-width: 46px; width: 52px; }
 .soc-link { color: var(--accent); font-weight: 700; text-decoration: none; font-size: 15px; }
+.social-progress { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; padding: 11px 16px; margin-bottom: 14px; }
+.soc-spinner { width: 16px; height: 16px; border: 2.5px solid var(--accent-ring); border-top-color: var(--accent); border-radius: 50%; animation: socspin 0.8s linear infinite; flex-shrink: 0; }
+@keyframes socspin { to { transform: rotate(360deg); } }
+.soc-prog-text { font: 500 13px var(--font-body); color: var(--text); }
+.soc-prog-text strong { color: var(--accent); }
+.soc-prog-bar { flex: 1; min-width: 120px; height: 6px; background: var(--accent-ring); border-radius: 4px; overflow: hidden; }
+.soc-prog-bar span { display: block; height: 100%; background: var(--accent); transition: width 0.4s; }
 @media (max-width: 900px) { .social-charts { grid-template-columns: 1fr; } }
 
 /* Collapsible cards */

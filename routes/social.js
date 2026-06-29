@@ -58,51 +58,53 @@ function parseIg(o) {
     shares: num(o.sharesCount || o.reshareCount || o.sharescount) };
 }
 
-let syncState = { running: false, error: null, startedAt: null, finishedAt: null, upserted: 0 };
+let syncState = { running: false, error: null, startedAt: null, finishedAt: null, upserted: 0, phase: '', scrapersDone: 0, scrapersTotal: 4, found: 0 };
+
+function mergeOne(merged, p) {
+  const e = merged[p.key];
+  if (!e) { merged[p.key] = { ...p }; return; }
+  e.views = Math.max(e.views, p.views); e.likes = Math.max(e.likes, p.likes);
+  e.comments = Math.max(e.comments, p.comments); e.shares = Math.max(e.shares, p.shares);
+  e.caption = e.caption || p.caption; e.url = e.url || p.url; e.thumbnail = e.thumbnail || p.thumbnail;
+  if (!e.posted_at) e.posted_at = p.posted_at;
+  if (p.content_type === 'Reel') e.content_type = 'Reel';
+}
+// Upsert scraped columns only — manual columns are omitted so they're preserved on conflict.
+async function upsertMerged(merged) {
+  const rows = Object.values(merged).map(p => ({
+    post_id: p.key, platform: p.platform, content_type: p.content_type, url: p.url,
+    posted_at: p.posted_at, caption: p.caption, thumbnail: p.thumbnail,
+    views: p.views, likes: p.likes, comments: p.comments, shares: p.shares,
+    last_updated: new Date().toISOString(),
+  }));
+  if (rows.length) { const { error } = await supabase.from('social_posts').upsert(rows, { onConflict: 'post_id' }); if (error) throw error; }
+  return rows.length;
+}
 
 async function syncSocial() {
   if (syncState.running) return;
-  syncState = { running: true, error: null, startedAt: new Date().toISOString(), finishedAt: null, upserted: 0 };
+  syncState = { running: true, error: null, startedAt: new Date().toISOString(), finishedAt: null, upserted: 0, phase: 'Starting…', scrapersDone: 0, scrapersTotal: 4, found: 0 };
   try {
     const { token, fbPage, igUser } = await getCreds();
     if (!token) throw new Error('No Apify token configured');
-    const [fbReels, igReels, fbPosts, igPosts] = await Promise.all([
-      runActor(token, 'apify~facebook-reels-scraper',  { resultsLimit: RESULTS, startUrls: [{ url: fbPage }] }),
-      runActor(token, 'apify~instagram-reel-scraper',  { includeDownloadedVideo: false, includeTranscript: false, includeSharesCount: true, resultsLimit: RESULTS, skipPinnedPosts: false, skipTrialReels: false, username: [igUser] }),
-      runActor(token, 'apify~facebook-posts-scraper',  { captionText: true, resultsLimit: RESULTS, startUrls: [{ url: fbPage }] }),
-      runActor(token, 'apify~instagram-post-scraper',  { dataDetailLevel: 'basicData', resultsLimit: RESULTS, skipPinnedPosts: false, username: [igUser] }),
-    ]);
-    const parsed = [
-      ...(fbReels || []).map(parseFbReel),
-      ...(fbPosts || []).map(parseFbPost),
-      ...(igReels || []).map(parseIg),
-      ...(igPosts || []).map(parseIg),
-    ].filter(Boolean);
-
-    // Merge by key — take the richest value for each metric across scrapers.
     const merged = {};
-    for (const p of parsed) {
-      const e = merged[p.key];
-      if (!e) { merged[p.key] = { ...p }; continue; }
-      e.views = Math.max(e.views, p.views); e.likes = Math.max(e.likes, p.likes);
-      e.comments = Math.max(e.comments, p.comments); e.shares = Math.max(e.shares, p.shares);
-      e.caption = e.caption || p.caption; e.url = e.url || p.url; e.thumbnail = e.thumbnail || p.thumbnail;
-      if (!e.posted_at) e.posted_at = p.posted_at;
-      if (p.content_type === 'Reel') e.content_type = 'Reel';
-    }
-    // Upsert scraped columns only — manual columns (hook_topic, offer, status, notes, post_num) are
-    // omitted from the payload so they're preserved on conflict.
-    const rows = Object.values(merged).map(p => ({
-      post_id: p.key, platform: p.platform, content_type: p.content_type, url: p.url,
-      posted_at: p.posted_at, caption: p.caption, thumbnail: p.thumbnail,
-      views: p.views, likes: p.likes, comments: p.comments, shares: p.shares,
-      last_updated: new Date().toISOString(),
-    }));
-    if (rows.length) {
-      const { error } = await supabase.from('social_posts').upsert(rows, { onConflict: 'post_id' });
-      if (error) throw error;
-    }
-    syncState.upserted = rows.length;
+    // As each scraper finishes, merge + upsert the cumulative set so the UI shows posts appearing live.
+    const step = async (label, itemsPromise, parser) => {
+      const items = await itemsPromise;
+      for (const o of (items || [])) { const p = parser(o); if (p) mergeOne(merged, p); }
+      syncState.scrapersDone++;
+      syncState.found = Object.keys(merged).length;
+      syncState.phase = `${label} done (${syncState.scrapersDone}/4)`;
+      syncState.upserted = await upsertMerged(merged);
+    };
+    syncState.phase = 'Scraping Facebook & Instagram…';
+    await Promise.all([
+      step('Facebook reels',  runActor(token, 'apify~facebook-reels-scraper',  { resultsLimit: RESULTS, startUrls: [{ url: fbPage }] }), parseFbReel),
+      step('Instagram reels', runActor(token, 'apify~instagram-reel-scraper',  { includeDownloadedVideo: false, includeTranscript: false, includeSharesCount: true, resultsLimit: RESULTS, skipPinnedPosts: false, skipTrialReels: false, username: [igUser] }), parseIg),
+      step('Facebook posts',  runActor(token, 'apify~facebook-posts-scraper',  { captionText: true, resultsLimit: RESULTS, startUrls: [{ url: fbPage }] }), parseFbPost),
+      step('Instagram posts', runActor(token, 'apify~instagram-post-scraper',  { dataDetailLevel: 'basicData', resultsLimit: RESULTS, skipPinnedPosts: false, username: [igUser] }), parseIg),
+    ]);
+    syncState.phase = 'Done';
     syncState.finishedAt = new Date().toISOString();
   } catch (e) { syncState.error = e.message; throw e; }
   finally { syncState.running = false; }
