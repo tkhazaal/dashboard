@@ -245,7 +245,7 @@ async function computeMetrics(orders, apiKey) {
     const amount  = (parseFloat(o.total) || 0) / 100;  // SamCart amounts are in cents
     const date    = o.order_date || null;
     const product = orderProduct(o);
-    orderInfoById[o.id] = { product: cleanProduct(product), email: o.email || (o.customer && o.customer.email) || '' };
+    orderInfoById[o.id] = { product: cleanProduct(product), email: o.email || (o.customer && o.customer.email) || '', customerId: o.customer_id };
 
     // Daily revenue + distinct order count (drives date-filtered Reporting)
     const dRev = etDay(date);
@@ -508,21 +508,30 @@ async function computeMetrics(orders, apiKey) {
 
   // Detailed refund list for the Refunds page — product/customer joined from the orders crawl.
   // Wrapped so a malformed refund can never fail the whole sync (cache stays writable).
+  // Orders don't carry the buyer email inline (only PayPal charges do), so look up each
+  // refunded customer once by id for the email + name — fills card-payment refunds too.
   const refunds = [];
   try {
-    for (const r of rawRefunds) {
-      if (!r || r.test_mode) continue;
-      const amt = (parseFloat(r.refund_amount) || 0) / 100;
-      if (!amt) continue;
+    const valid = rawRefunds.filter(r => r && !r.test_mode && (parseFloat(r.refund_amount) || 0) > 0);
+    const custIds = [...new Set(valid.map(r => (orderInfoById[r.order && r.order.id] || {}).customerId).filter(v => v != null))];
+    const custInfo = {};
+    for (const cid of custIds.slice(0, 800)) {
+      const c = await fetchCustomer(cid, apiKey); const cu = c && (c.data || c);
+      if (cu) custInfo[cid] = { email: cu.email || '', name: [cu.first_name, cu.last_name].filter(Boolean).join(' ').trim() };
+      if (THROTTLE_MS) await sleep(THROTTLE_MS);
+    }
+    for (const r of valid) {
       const info = orderInfoById[r.order && r.order.id] || {};
+      const ci = custInfo[info.customerId] || {};
       refunds.push({
         id: 'samcart:' + r.id,
         source: 'SamCart',
         date: r.created_at,
-        amount: Math.round(amt * 100) / 100,
+        amount: Math.round(((parseFloat(r.refund_amount) || 0) / 100) * 100) / 100,
         status: r.charge_refund_status === 'partially_refunded' ? 'Partial' : 'Full',
         product: info.product || 'Unknown',
-        customer: info.email || (r.charge && r.charge.paypal_email) || '',
+        customer: ci.email || info.email || (r.charge && r.charge.paypal_email) || '',
+        customerName: ci.name || '',
         orderId: (r.order && r.order.id) || null,
       });
     }

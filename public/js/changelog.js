@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.23.0', date: '2026-06-28', title: 'Refund customer emails',
+    changes: [
+      { title: 'Every refund shows the buyer', detail: 'Refunds paid by card now show the customer email (and name) too — not just PayPal ones. The dashboard looks each refunded customer up by ID, so all refunds are identifiable instead of showing a blank.' },
+    ],
+  },
+  {
     version: '1.22.0', date: '2026-06-28', title: 'Apify credentials in Settings',
     changes: [
       { title: 'Edit your Apify token + social accounts', detail: 'Settings now has fields for your Apify personal token, Instagram username and Facebook page URL — so you can update the follower-tracking credentials yourself. The token is stored securely and only ever shown masked. Saving re-syncs Instagram & Facebook automatically.' },
