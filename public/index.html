@@ -1293,12 +1293,13 @@
               <input id="fx-search" class="search-input" placeholder="Search by name or email…">
               <select id="fx-form-filter" class="cmp-preset"><option value="">All forms</option></select>
               <button class="clear-btn" id="fx-export" title="Download these submissions as CSV">⬇ CSV</button>
+              <button class="clear-btn fx-danger" id="fx-bulk-del" hidden>🗑 Delete selected</button>
             </div>
           </div>
           <div class="fx-source-summary" id="fx-source-summary"></div>
           <div class="table-wrap">
             <table class="data-table">
-              <thead><tr><th>Name</th><th>Email</th><th>Form</th><th>Source</th><th>Received</th></tr></thead>
+              <thead><tr><th class="fx-check-col"><input type="checkbox" id="fx-select-all" title="Select all"></th><th>Name</th><th>Email</th><th>Form</th><th>Source</th><th>Received</th></tr></thead>
               <tbody id="fx-subs"></tbody>
             </table>
           </div>

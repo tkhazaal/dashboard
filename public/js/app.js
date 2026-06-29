@@ -3009,15 +3009,25 @@ async function fxSearch() {
   let subs = []; try { subs = await api('/api/forms/submissions?' + qs.toString()); } catch {}
   const fname = k => ((state.fxForms || []).find(f => f.form_key === k) || {}).name || k || '—';
   const srcTag = s => s && s !== 'Direct / Unknown' ? `<span class="fx-src-tag">${escHtml(s)}</span>` : '<span class="muted">—</span>';
+  fxSelected.clear();
   $('fx-subs').innerHTML = (subs && subs.length) ? subs.map(s => `
     <tr class="fx-sub-row" data-id="${s.id}">
+      <td class="fx-check-cell"><input type="checkbox" class="fx-check" data-id="${s.id}"></td>
       <td><strong>${escHtml(s.contact_name || '—')}</strong></td>
       <td>${escHtml(s.contact_email || '—')}</td>
       <td>${escHtml(fname(s.form_key))}</td>
       <td>${srcTag(s.source)}</td>
       <td>${s.created_at ? timeAgo(s.created_at) : ''}</td>
     </tr>`).join('')
-    : `<tr class="empty-row"><td colspan="5">${(search || form) ? 'No matches' : 'No submissions yet — fire your webhook to test it'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="6">${(search || form) ? 'No matches' : 'No submissions yet — fire your webhook to test it'}</td></tr>`;
+  fxUpdateBulk();
+}
+const fxSelected = new Set();
+function fxUpdateBulk() {
+  const btn = $('fx-bulk-del');
+  if (btn) { btn.hidden = fxSelected.size === 0; btn.textContent = `🗑 Delete selected (${fxSelected.size})`; }
+  const all = $('fx-select-all');
+  if (all) { const boxes = $('fx-subs').querySelectorAll('.fx-check'); all.checked = boxes.length > 0 && [...boxes].every(b => b.checked); }
 }
 async function loadSourceSummary() {
   const el = $('fx-source-summary'); if (!el) return;
@@ -3059,7 +3069,26 @@ if ($('fx-webhooks')) $('fx-webhooks').addEventListener('click', async e => {
   if (del && confirm('Delete this webhook? (Captured submissions are kept.)')) { try { await fxDel('/api/forms/webhooks/' + del.dataset.id); loadForms(); } catch {} }
 });
 const fxDownload = url => { const a = document.createElement('a'); a.href = url; document.body.appendChild(a); a.click(); a.remove(); };
-if ($('fx-subs')) $('fx-subs').addEventListener('click', e => { const r = e.target.closest('.fx-sub-row'); if (r) openSubmission(r.dataset.id); });
+if ($('fx-subs')) $('fx-subs').addEventListener('click', e => {
+  if (e.target.closest('.fx-check-cell')) return;        // checkbox cell → don't open the submission
+  const r = e.target.closest('.fx-sub-row'); if (r) openSubmission(r.dataset.id);
+});
+if ($('fx-subs')) $('fx-subs').addEventListener('change', e => {
+  const cb = e.target.closest('.fx-check'); if (!cb) return;
+  cb.checked ? fxSelected.add(cb.dataset.id) : fxSelected.delete(cb.dataset.id);
+  fxUpdateBulk();
+});
+if ($('fx-select-all')) $('fx-select-all').addEventListener('change', e => {
+  const on = e.target.checked;
+  $('fx-subs').querySelectorAll('.fx-check').forEach(b => { b.checked = on; on ? fxSelected.add(b.dataset.id) : fxSelected.delete(b.dataset.id); });
+  fxUpdateBulk();
+});
+if ($('fx-bulk-del')) $('fx-bulk-del').addEventListener('click', async () => {
+  const n = fxSelected.size; if (!n) return;
+  if (!confirm(`Delete ${n} selected submission${n === 1 ? '' : 's'}? This cannot be undone.`)) return;
+  try { await fxPost('/api/forms/submissions/bulk-delete', { ids: [...fxSelected] }); fxSelected.clear(); fxSearch(); loadForms(); loadSourceSummary(); }
+  catch (e) { alert('Delete failed: ' + e.message); }
+});
 if ($('fx-export')) $('fx-export').addEventListener('click', () => {
   const qs = new URLSearchParams();
   const search = $('fx-search').value.trim(), form = $('fx-form-filter').value;

@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.25.0', date: '2026-06-30', title: 'Bulk-delete form submissions',
+    changes: [
+      { title: 'Select & delete in bulk', detail: 'Form Submissions now has a checkbox on every row (plus a select-all in the header). Tick the ones you want and click “Delete selected” to remove them all at once — respects the current search/form filter.' },
+    ],
+  },
+  {
     version: '1.24.0', date: '2026-06-28', title: 'Funnels: reorder, collapse & per-channel comparison',
     changes: [
       { title: 'Drag to reorder groups + click to expand', detail: 'Funnel groups now have a drag handle (⠿) — drag a group up or down to set your own order. Groups start collapsed and expand when you click anywhere on the group row (not just the small arrow).' },

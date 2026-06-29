@@ -998,6 +998,11 @@ table.show-upsell .upsell-col { display: table-cell; }
 .fx-ss-pct { color: var(--sub); font-size: 11px; }
 .fx-ss-pill.top .fx-ss-pct { color: var(--accent); opacity: 0.85; }
 .fx-src-tag { display: inline-block; font: 600 11px var(--font-body); padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
+.fx-check-col { width: 34px; text-align: center; }
+.fx-check-cell { text-align: center; cursor: default; }
+.fx-check, #fx-select-all { cursor: pointer; width: 15px; height: 15px; vertical-align: middle; }
+.clear-btn.fx-danger { color: var(--danger); border-color: rgba(239,68,68,0.45); }
+.clear-btn.fx-danger:hover { background: rgba(239,68,68,0.10); border-color: var(--danger); }
 
 /* Collapsible cards */
 .card.collapsible > .card-header { cursor: pointer; user-select: none; }

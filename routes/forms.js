@@ -170,6 +170,16 @@ router.delete('/submissions/:id', async (req, res) => {
   try { const { error } = await supabase.from('form_submissions').delete().eq('id', req.params.id); if (error) throw error; res.json({ ok: true }); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
+// Bulk delete selected submissions.
+router.post('/submissions/bulk-delete', async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.filter(v => v != null).slice(0, 5000) : [];
+    if (!ids.length) return res.status(400).json({ error: 'ids required' });
+    const { error } = await supabase.from('form_submissions').delete().in('id', ids);
+    if (error) throw error;
+    res.json({ ok: true, deleted: ids.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 router.delete('/form/:key', async (req, res) => {
   try {
     const { error } = await supabase.from('form_submissions').delete().eq('form_key', req.params.key);
