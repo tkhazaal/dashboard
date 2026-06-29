@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.20.0', date: '2026-06-28', title: 'Upsells in funnel comparison',
+    changes: [
+      { title: 'Upsells in Period comparison', detail: 'The Funnels → Period comparison table now includes an Upsells column (current vs previous period, with % change), next to Unique Views, Checkout Views, Orders and Revenue — so you can see how upsell volume moved period over period.' },
+    ],
+  },
+  {
     version: '1.19.0', date: '2026-06-28', title: 'Form submission source',
     changes: [
       { title: 'See which channel each submission came from', detail: 'Form Submissions now shows a Source column (the channel — Email, FB Post, IG Post, etc. — parsed from the form’s captured UTM), plus a “Submissions by source” summary at the top so you can instantly see which channel drove the most submissions.' },

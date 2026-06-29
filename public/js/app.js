@@ -2090,13 +2090,13 @@ async function renderFunnelCompare() {
   const aS = state.funnelStart, aE = state.funnelEnd;
   if (!aS || !aE) {
     $('fn-compare-label').textContent = '';
-    $('fn-compare-body').innerHTML = `<tr class="empty-row"><td colspan="5">Pick a date range above (e.g. Today or This week) to compare it with the period before.</td></tr>`;
+    $('fn-compare-body').innerHTML = `<tr class="empty-row"><td colspan="6">Pick a date range above (e.g. Today or This week) to compare it with the period before.</td></tr>`;
     return;
   }
   const len = daysInRange(aS, aE).length;
   const bE = ymd(_addDays(aS, -1)), bS = ymd(_addDays(aS, -len));
   $('fn-compare-label').textContent = `${fmtRange(new Date(aS + 'T00:00:00'), new Date(aE + 'T00:00:00'))}  vs  ${fmtRange(new Date(bS + 'T00:00:00'), new Date(bE + 'T00:00:00'))}`;
-  $('fn-compare-body').innerHTML = `<tr class="empty-row"><td colspan="5">Loading…</td></tr>`;
+  $('fn-compare-body').innerHTML = `<tr class="empty-row"><td colspan="6">Loading…</td></tr>`;
   let bPages = [];
   try { bPages = await api(`/api/analytics/pages?start=${bS}&end=${bE}`); } catch { /* ignore */ }
   const aM = funnelGroupMetrics(slugStatsFrom(state.funnelPages || []), aS, aE);
@@ -2113,12 +2113,12 @@ function renderCompareTable(aM, bM) {
     return `<div class="cmp-cur">${fa}</div><div class="cmp-prev">vs ${fb} ${badge}</div>`;
   };
   const empty = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
-  const row = (label, a, b, cls) => `<tr class="${cls || ''}"><td>${label}</td><td>${cell(a.U, b.U)}</td><td>${cell(a.C, b.C)}</td><td>${cell(a.M, b.M)}</td><td>${cell(a.R, b.R, true)}</td></tr>`;
+  const row = (label, a, b, cls) => `<tr class="${cls || ''}"><td>${label}</td><td>${cell(a.U, b.U)}</td><td>${cell(a.C, b.C)}</td><td>${cell(a.M, b.M)}</td><td>${cell((a.U1 || 0) + (a.U2 || 0), (b.U1 || 0) + (b.U2 || 0))}</td><td>${cell(a.R, b.R, true)}</td></tr>`;
   const names = [...new Set([...Object.keys(aM.groups), ...Object.keys(bM.groups)])].sort();
   let html = '';
   for (const n of names) html += row(escHtml(n), aM.groups[n] || empty, bM.groups[n] || empty);
   html += row('<strong>TOTAL</strong>', aM.total, bM.total, 'funnel-total');
-  $('fn-compare-body').innerHTML = html || `<tr class="empty-row"><td colspan="5">No data</td></tr>`;
+  $('fn-compare-body').innerHTML = html || `<tr class="empty-row"><td colspan="6">No data</td></tr>`;
 }
 
 function saveFunnels() {
