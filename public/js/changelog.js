@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.24.0', date: '2026-06-28', title: 'Funnels: reorder, collapse & per-channel comparison',
+    changes: [
+      { title: 'Drag to reorder groups + click to expand', detail: 'Funnel groups now have a drag handle (⠿) — drag a group up or down to set your own order. Groups start collapsed and expand when you click anywhere on the group row (not just the small arrow).' },
+      { title: 'Per-channel period comparison', detail: 'The Funnels period comparison now breaks each group down by channel — every platform shows current vs previous (views, checkout, orders, upsells, revenue) beneath its group total.' },
+    ],
+  },
+  {
     version: '1.23.0', date: '2026-06-28', title: 'Refund customer emails',
     changes: [
       { title: 'Every refund shows the buyer', detail: 'Refunds paid by card now show the customer email (and name) too — not just PayPal ones. The dashboard looks each refunded customer up by ID, so all refunds are identifiable instead of showing a blank.' },

@@ -1842,7 +1842,7 @@ const STANDARD_PLATFORMS = ['IG Posts', 'IG Stories', 'FB Posts', 'FB Stories', 
 const DEFAULT_FUNNELS = STANDARD_PLATFORMS
   .map(p => ({ group: "Father's Day", platform: p, pageSlug: '', main: '', upsell1: '', upsell2: '' }));
 
-const funnelCollapsed = new Set();   // collapsed group names (default: expanded)
+const funnelExpanded = new Set();   // expanded group names (default: all collapsed)
 
 function ensureFunnelsConfig() {
   if (!Array.isArray(state.funnelsConfig) || !state.funnelsConfig.length) {
@@ -1897,18 +1897,18 @@ function slugStatsFrom(pages) {
 // orders/revenue from SamCart day-level sales between start..end.
 function funnelGroupMetrics(slugStats, start, end) {
   const cfg = state.funnelsConfig || [];
-  const groups = {}; const total = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
+  const groups = {}; const channels = {}; const total = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
   for (const r of cfg) {
     const pv = slugStats[r.pageSlug] || { unique: 0, checkout: 0 };
     const m  = prodSalesBetween(r.main, start, end);
     const u1 = prodSalesBetween(r.upsell1, start, end);
     const u2 = prodSalesBetween(r.upsell2, start, end);
-    const rev = m.revenue + u1.revenue + u2.revenue;
+    const mt = { U: pv.unique, C: pv.checkout, M: m.orders, U1: u1.orders, U2: u2.orders, R: m.revenue + u1.revenue + u2.revenue };
     const g = groups[r.group] || (groups[r.group] = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 });
-    g.U += pv.unique; g.C += pv.checkout; g.M += m.orders; g.U1 += u1.orders; g.U2 += u2.orders; g.R += rev;
-    total.U += pv.unique; total.C += pv.checkout; total.M += m.orders; total.U1 += u1.orders; total.U2 += u2.orders; total.R += rev;
+    for (const k of ['U', 'C', 'M', 'U1', 'U2', 'R']) { g[k] += mt[k]; total[k] += mt[k]; }
+    (channels[r.group] = channels[r.group] || []).push(Object.assign({ label: r.platform || r.pageSlug || '—' }, mt));
   }
-  return { groups, total };
+  return { groups, channels, total };
 }
 function prodSales(name) {
   const ps = state.scData && state.scData.productSales;
@@ -2058,12 +2058,13 @@ function renderFunnels() {
     const g = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
     const members = idxs.map(i => funnelMemberRow(cfg[i], i, pvm, g)).join('');
     grand.U += g.U; grand.C += g.C; grand.M += g.M; grand.U1 += g.U1; grand.U2 += g.U2; grand.R += g.R;
-    const open = !funnelCollapsed.has(gname);
+    const open = funnelExpanded.has(gname);
     html += `
       <tr class="fn-group-row" data-grp="${escHtml(gname)}">
-        <td colspan="2" class="fn-grp-namecell">
+        <td colspan="2" class="fn-grp-namecell" title="Click to ${open ? 'collapse' : 'expand'}">
           <div class="fn-grp-namewrap">
-            <span class="fn-grp-toggle">${open ? '▾' : '▸'}</span>
+            <span class="fn-grp-drag" draggable="true" title="Drag to reorder">⠿</span>
+            <button class="fn-grp-toggle" title="${open ? 'Collapse' : 'Expand'}">${open ? '▾' : '▸'}</button>
             <input class="fn-grp-name" data-grp="${escHtml(gname)}" value="${escHtml(gname)}" title="Rename group">
             <button class="fn-add-row" data-grp="${escHtml(gname)}" title="Add platform to this group">＋</button>
             <span class="group-count">${idxs.length}</span>
@@ -2124,9 +2125,14 @@ function renderCompareTable(aM, bM) {
   };
   const empty = { U: 0, C: 0, M: 0, U1: 0, U2: 0, R: 0 };
   const row = (label, a, b, cls) => `<tr class="${cls || ''}"><td>${label}</td><td>${cell(a.U, b.U)}</td><td>${cell(a.C, b.C)}</td><td>${cell(a.M, b.M)}</td><td>${cell((a.U1 || 0) + (a.U2 || 0), (b.U1 || 0) + (b.U2 || 0))}</td><td>${cell(a.R, b.R, true)}</td></tr>`;
-  const names = [...new Set([...Object.keys(aM.groups), ...Object.keys(bM.groups)])].sort();
+  const names = funnelGroupNames().filter(n => aM.groups[n] || bM.groups[n]);
+  for (const n of [...Object.keys(aM.groups), ...Object.keys(bM.groups)]) if (!names.includes(n)) names.push(n);
   let html = '';
-  for (const n of names) html += row(escHtml(n), aM.groups[n] || empty, bM.groups[n] || empty);
+  for (const n of names) {
+    html += row(`<strong>${escHtml(n)}</strong>`, aM.groups[n] || empty, bM.groups[n] || empty, 'cmp-group');
+    const aCh = (aM.channels && aM.channels[n]) || [], bCh = (bM.channels && bM.channels[n]) || [];
+    for (let i = 0; i < aCh.length; i++) html += row(`<span class="cmp-ch">↳ ${escHtml(aCh[i].label)}</span>`, aCh[i], bCh[i] || empty, 'cmp-channel');
+  }
   html += row('<strong>TOTAL</strong>', aM.total, bM.total, 'funnel-total');
   $('fn-compare-body').innerHTML = html || `<tr class="empty-row"><td colspan="6">No data</td></tr>`;
 }
@@ -2230,7 +2236,7 @@ $('funnelBody').addEventListener('change', e => {
     const oldN = gn.dataset.grp, newN = e.target.value.trim() || oldN;
     if (newN !== oldN) {
       state.funnelsConfig.forEach(r => { if (r.group === oldN) r.group = newN; });
-      if (funnelCollapsed.has(oldN)) { funnelCollapsed.delete(oldN); funnelCollapsed.add(newN); }
+      if (funnelExpanded.has(oldN)) { funnelExpanded.delete(oldN); funnelExpanded.add(newN); }
       renderFunnels(); saveFunnels();
     }
   }
@@ -2248,8 +2254,6 @@ $('funnelBody').addEventListener('click', e => {
     if (!confirm(`Remove the "${row.platform || 'this'}" platform row?`)) return;
     state.funnelsConfig.splice(+del.dataset.row, 1); renderFunnels(); saveFunnels(); return;
   }
-  const tog = e.target.closest('.fn-grp-toggle');
-  if (tog) { const g = tog.closest('[data-grp]').dataset.grp; funnelCollapsed.has(g) ? funnelCollapsed.delete(g) : funnelCollapsed.add(g); renderFunnels(); return; }
   const addr = e.target.closest('.fn-add-row');
   if (addr) { state.funnelsConfig.push({ group: addr.dataset.grp, platform: 'New Platform', pageSlug: '', main: '', upsell1: '', upsell2: '' }); renderFunnels(); saveFunnels(); return; }
   const delg = e.target.closest('.fn-del-grp');
@@ -2258,6 +2262,45 @@ $('funnelBody').addEventListener('click', e => {
     if (!confirm(`Delete group "${g}" and its ${n} platform${n === 1 ? '' : 's'}? This cannot be undone.`)) return;
     state.funnelsConfig = state.funnelsConfig.filter(r => r.group !== g); renderFunnels(); saveFunnels(); return;
   }
+  // Expand/collapse: clicking anywhere on the group row (except the rename box / drag handle) toggles it.
+  if (e.target.closest('.fn-grp-name, .fn-grp-drag')) return;
+  const grpRow = e.target.closest('.fn-group-row');
+  if (grpRow) { const g = grpRow.dataset.grp; funnelExpanded.has(g) ? funnelExpanded.delete(g) : funnelExpanded.add(g); renderFunnels(); }
+});
+
+// ── Drag-and-drop to reorder funnel groups ──
+let _fnDragGroup = null;
+function reorderFunnelGroups(dragGroup, targetGroup) {
+  if (!dragGroup || dragGroup === targetGroup) return;
+  const order = funnelGroupNames().filter(g => g !== dragGroup);
+  const ti = order.indexOf(targetGroup);
+  if (ti < 0) return;
+  order.splice(ti, 0, dragGroup);                                  // insert before the target group
+  const cfg = state.funnelsConfig;
+  state.funnelsConfig = order.flatMap(g => cfg.filter(r => r.group === g));
+  renderFunnels(); saveFunnels();
+}
+$('funnelBody').addEventListener('dragstart', e => {
+  const h = e.target.closest('.fn-grp-drag'); if (!h) { e.preventDefault(); return; }
+  const row = h.closest('.fn-group-row'); _fnDragGroup = row && row.dataset.grp;
+  e.dataTransfer.effectAllowed = 'move';
+  if (row) row.classList.add('fn-dragging');
+});
+$('funnelBody').addEventListener('dragover', e => {
+  if (!_fnDragGroup) return;
+  const row = e.target.closest('.fn-group-row'); if (!row) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.fn-group-row.fn-drop-target').forEach(r => r.classList.remove('fn-drop-target'));
+  if (row.dataset.grp !== _fnDragGroup) row.classList.add('fn-drop-target');
+});
+$('funnelBody').addEventListener('drop', e => {
+  if (!_fnDragGroup) return;
+  const row = e.target.closest('.fn-group-row'); if (!row) return;
+  e.preventDefault(); reorderFunnelGroups(_fnDragGroup, row.dataset.grp); _fnDragGroup = null;
+});
+$('funnelBody').addEventListener('dragend', () => {
+  _fnDragGroup = null;
+  document.querySelectorAll('.fn-dragging, .fn-drop-target').forEach(r => r.classList.remove('fn-dragging', 'fn-drop-target'));
 });
 $('funnel-add').addEventListener('click', () => {
   ensureFunnelsConfig();
