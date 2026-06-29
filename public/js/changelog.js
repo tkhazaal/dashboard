@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.21.0', date: '2026-06-28', title: 'Facebook followers in snapshot',
+    changes: [
+      { title: 'Facebook follower cards', detail: 'The Reporting Executive snapshot now shows current Facebook page followers and followers gained this month — via the Apify Facebook Pages scraper, snapshotted monthly so month-over-month growth tracks automatically (same as Instagram).' },
+    ],
+  },
+  {
     version: '1.20.0', date: '2026-06-28', title: 'Upsells in funnel comparison',
     changes: [
       { title: 'Upsells in Period comparison', detail: 'The Funnels → Period comparison table now includes an Upsells column (current vs previous period, with % change), next to Unique Views, Checkout Views, Orders and Revenue — so you can see how upsell volume moved period over period.' },

@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const allowed = ['site_name', 'tracker_url', 'samcart_api_key', 'monthly_goal', 'funnels_config', 'ad_campaigns', 'kajabi_client_id', 'kajabi_client_secret', 'ac_api_url', 'ac_api_token', 'apify_token', 'apify_actor_id', 'instagram_username'];
+    const allowed = ['site_name', 'tracker_url', 'samcart_api_key', 'monthly_goal', 'funnels_config', 'ad_campaigns', 'kajabi_client_id', 'kajabi_client_secret', 'ac_api_url', 'ac_api_token', 'apify_token', 'apify_actor_id', 'instagram_username', 'apify_fb_actor_id', 'facebook_page_url'];
     const updates = [];
 
     for (const key of allowed) {

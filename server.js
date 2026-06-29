@@ -57,6 +57,7 @@ app.use('/api/samcart',    samcartRouter);
 app.use('/api/kajabi',     require('./routes/kajabi'));
 app.use('/api/ac',         require('./routes/activecampaign'));
 app.use('/api/instagram',  require('./routes/instagram'));
+app.use('/api/facebook',   require('./routes/facebook'));
 app.use('/api/refunds',    require('./routes/refunds'));
 const forms = require('./routes/forms');
 app.use('/api/forms',      forms.router);

@@ -1402,6 +1402,7 @@ async function renderRevenueKpis() {
   if (!state.scData) await loadSamCart().catch(() => {});
   if (!state.kajabiData) { try { state.kajabiData = await api('/api/kajabi/data'); } catch { state.kajabiData = {}; } }
   if (!state.instagram)  { try { state.instagram  = await api('/api/instagram/data'); } catch { state.instagram = {}; } }
+  if (!state.facebook)   { try { state.facebook   = await api('/api/facebook/data'); } catch { state.facebook = {}; } }
   ensureAdCampaigns();
   const sc = state.scData || {}, kj = state.kajabiData || {};
   const scD = sc.dailyRevenue || {}, kjD = kj.dailyRevenue || {};
@@ -1437,9 +1438,10 @@ async function renderRevenueKpis() {
   const cac = (newCust90 > 0 && adSpend90 > 0) ? adSpend90 / newCust90 : null;
   const ltvcac = (cac && ltv > 0) ? ltv / cac : null;
   const ig = (state.instagram && state.instagram.followers != null) ? state.instagram : null;
+  const fb = (state.facebook && state.facebook.followers != null) ? state.facebook : null;
 
   // ── Daily series (last 30 days) for the sparklines ──
-  const C = { blue: '#2563eb', green: '#16a34a', amber: '#f59e0b', violet: '#8b5cf6', pink: '#ec4899' };
+  const C = { blue: '#2563eb', green: '#16a34a', amber: '#f59e0b', violet: '#8b5cf6', pink: '#ec4899', fb: '#1877f2' };
   const combRev = d => cell(scD, d, 'revenue') + cell(kjD, d, 'revenue');
   const combOrd = d => cell(scD, d, 'orders') + cell(kjD, d, 'orders');
   const revSeries = d30.map(combRev);
@@ -1449,6 +1451,7 @@ async function renderRevenueKpis() {
   const aovSeries = d30.map(d => { const o = combOrd(d); return o ? combRev(d) / o : 0; });
   const roasSeries = d30.map((d, i) => adSeries[i] > 0 ? revSeries[i] / adSeries[i] : 0);
   const igHist = ig ? Object.keys(ig.history || {}).sort().map(m => ig.history[m]) : [];
+  const fbHist = fb ? Object.keys(fb.history || {}).sort().map(m => fb.history[m]) : [];
 
   const cards = [
     ['Revenue today', fmtMoney(revToday), 'SamCart + Kajabi · today (ET)', '', kpiSpark(revSeries, C.blue)],
@@ -1465,6 +1468,8 @@ async function renderRevenueKpis() {
     ['New customers (90d)', fmtNum(newCust90), 'first-time buyers · last 90 days', 'Customers whose first-ever purchase was in the last 90 days.', kpiSpark(newSeries, C.green)],
     ['IG followers gained', ig && ig.gainThisMonth != null ? '+' + fmtNum(ig.gainThisMonth) : (ig ? 'baseline set' : '—'), ig ? 'this month' : 'connect Instagram', ig && ig.gainThisMonth == null ? 'First month sets the baseline — next month shows the gain.' : 'New followers vs last month (Apify, refreshed monthly).', kpiSpark(igHist, C.pink)],
     ['Instagram followers', ig ? fmtNum(ig.followers) : '—', ig ? (ig.verified ? '✔ @' : '@') + ig.username : 'connect Instagram', 'Current follower count (Apify Instagram scraper, monthly).', kpiSpark(igHist, C.pink)],
+    ['FB followers gained', fb && fb.gainThisMonth != null ? '+' + fmtNum(fb.gainThisMonth) : (fb ? 'baseline set' : '—'), fb ? 'this month' : 'connect Facebook', fb && fb.gainThisMonth == null ? 'First month sets the baseline — next month shows the gain.' : 'New Facebook followers vs last month (Apify, refreshed monthly).', kpiSpark(fbHist, C.fb)],
+    ['Facebook followers', fb ? fmtNum(fb.followers) : '—', fb ? (fb.name || fb.pageName || 'Facebook page') : 'connect Facebook', 'Current Facebook page followers (Apify Facebook Pages scraper, monthly).', kpiSpark(fbHist, C.fb)],
   ];
   grid.innerHTML = cards.map(([l, v, s, h, viz]) =>
     `<div class="stat-card kpi-card"><div class="stat-label">${escHtml(l)}${h ? ` <span class="help" data-tip="${escHtml(h)}">?</span>` : ''}</div><div class="stat-value">${v}</div>${viz || ''}<div class="stat-sub">${escHtml(s)}</div></div>`
