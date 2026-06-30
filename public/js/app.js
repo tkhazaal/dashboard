@@ -3345,6 +3345,29 @@ async function loadManychat() {
   if (state.socialData) renderSocial();   // so per-post optin counts paint
 }
 function mcRefMap() { return (state.manychatData && state.manychatData.refMap) || {}; }
+// Normalize a FB/IG post/reel URL to a stable key so the ManyChat post link matches the scraped post.
+function socPostKey(url) {
+  let s = String(url || '').toLowerCase().split('?')[0].split('#')[0].replace(/\/+$/, ''); let m;
+  if (m = s.match(/instagram\.com\/(?:p|reel|reels|tv)\/([a-z0-9_-]+)/)) return 'ig:' + m[1];
+  if (m = s.match(/\/reel\/(\d+)/)) return 'fb:reel:' + m[1];
+  if (m = s.match(/(?:\/posts\/|\/videos\/|story_fbid=|[?&]fbid=|\/permalink\/)(\d+)/)) return 'fb:' + m[1];
+  if (m = s.match(/fb\.watch\/([a-z0-9_-]+)/)) return 'fbw:' + m[1];
+  return s.startsWith('http') ? s : '';
+}
+function mcByPostKey() {
+  if (state._mcByKey && state._mcByKeySrc === state.manychatData) return state._mcByKey;
+  const out = {}, bpu = (state.manychatData && state.manychatData.byPostUrl) || {};
+  for (const u in bpu) { const k = socPostKey(u); if (!k) continue; const m = out[k] || (out[k] = { optins: 0, cta_clicks: 0, lastAt: null });
+    m.optins += bpu[u].optins || 0; m.cta_clicks += bpu[u].cta_clicks || 0; if (!m.lastAt || bpu[u].lastAt > m.lastAt) m.lastAt = bpu[u].lastAt; }
+  state._mcByKey = out; state._mcByKeySrc = state.manychatData; return out;
+}
+// Optins for a post: match by post link first, then fall back to a manual ManyChat ref.
+function mcForPost(p) {
+  const k = p.url ? socPostKey(p.url) : '', byKey = mcByPostKey();
+  if (k && byKey[k]) return byKey[k];
+  if (p.manychat_ref && mcRefMap()[p.manychat_ref]) return mcRefMap()[p.manychat_ref];
+  return null;
+}
 function renderManychatPanel() {
   const el = $('manychat-panel'); if (!el) return;
   const d = state.manychatData;
@@ -3462,7 +3485,7 @@ function renderSocialCards(rows) {
   const shown = rows.slice(0, socState.page * SOC_PAGE);
   $('social-feed').innerHTML = shown.length ? shown.map(p => {
     const dt = socialDateParts(p.posted_at), plat = String(p.platform).toLowerCase(), m = socMetrics(p), cap = (p.caption || '').replace(/\n/g, ' ');
-    const opt = p.manychat_ref ? mcRefMap()[p.manychat_ref] : null;
+    const opt = mcForPost(p);
     const optRate = (opt && p.views) ? socPct(opt.optins / p.views * 100) : null;
     return `<div class="soc-card">
       <div class="soc-card-media">${p.thumbnail ? `<img src="${escHtml(p.thumbnail)}" alt="" loading="lazy" onerror="this.remove()">` : `<div class="soc-noimg soc-bg-${plat}">${escHtml((p.platform || '?')[0])}</div>`}
@@ -3492,7 +3515,7 @@ function renderSocialTable(rows) {
   $('social-tbody').innerHTML = shown.length ? shown.map(p => {
     const dt = socialDateParts(p.posted_at), m = socMetrics(p), plat = String(p.platform).toLowerCase();
     const label = p.hook_topic || (p.caption || '').replace(/\n/g, ' ').slice(0, 60) || '—';
-    const opt = p.manychat_ref ? mcRefMap()[p.manychat_ref] : null;
+    const opt = mcForPost(p);
     return `<tr>
       <td class="soc-nowrap">${dt.date}</td><td><span class="soc-plat soc-${plat}">${escHtml((p.platform || '?')[0])}</span></td><td>${escHtml(p.content_type)}</td>
       <td class="soc-tcap" title="${escHtml(p.caption || '')}">${escHtml(label)}</td>

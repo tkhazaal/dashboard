@@ -4,7 +4,8 @@
 
 create table if not exists manychat_optins (
   id            bigserial primary key,
-  ref           text,                       -- mapping key (a CTA tag or a per-post tag)
+  ref           text,                       -- optional CTA tag (grouping)
+  post_url      text,                       -- the FB/IG post or reel link → auto-matched to a post
   event         text default 'optin',       -- 'optin' | 'cta_click'
   subscriber_id text,                       -- ManyChat user id (for de-dup / counting people)
   name          text,
