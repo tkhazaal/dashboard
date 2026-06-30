@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.30.0', date: '2026-07-01', title: 'Overview KPIs use live Meta ad spend',
+    changes: [
+      { title: 'Real ad spend across the dashboard', detail: 'Now that Meta Ads is connected, the Overview cards — Ad spend today, ROAS MTD, CAC (90d) and LTV:CAC — pull your actual Meta spend instead of the manual budget tracker. ROAS MTD becomes a true blended ROAS: real SamCart + Kajabi revenue ÷ live Meta ad spend. (If Meta isn’t connected, these fall back to manual budgets as before.)' },
+      { title: 'Purchase metric fix', detail: 'Meta returns several overlapping purchase types; the dashboard now uses the de-duplicated total (omni_purchase) instead of summing them, so purchase counts match Ads Manager.' },
+    ],
+  },
+  {
     version: '1.29.0', date: '2026-06-30', title: 'Meta (Facebook) Ads reporting',
     changes: [
       { title: 'Live Meta Ads on the Ads page', detail: 'Connect your Meta ad account (Settings → Meta Ads) and the Ads page pulls live spend, ROAS, purchases, cost-per-purchase, impressions, reach, clicks, CTR, CPC, CPM and frequency — with a 90-day spend & ROAS trend and a per-campaign table. Pick the range (today → maximum) and refresh on demand. Read-only; your campaigns are never touched.' },

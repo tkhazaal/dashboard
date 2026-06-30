@@ -285,7 +285,7 @@ const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 
 async function refreshTab(tab, btn) {
   if (btn) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Refreshing…'; }
   try {
-    if (tab === 'overview')      await Promise.allSettled([applyCompare(state.cmpPreset || 'mtd'), loadSamCart(), loadKajabiData()]);
+    if (tab === 'overview')      await Promise.allSettled([applyCompare(state.cmpPreset || 'mtd'), loadSamCart(), loadKajabiData(), loadMetaSpend()]);
     else if (tab === 'reports')  { await loadSamCart(); await loadReports(); }
     else if (tab === 'funnels')  { await Promise.allSettled([loadSamCart(), loadPagesTable()]); renderFunnels(); }
     else if (tab === 'ads')      { await loadSamCart(); renderAds(); }
@@ -1436,8 +1436,14 @@ async function renderRevenueKpis() {
   const rev30 = Math.round((sumR(scD, d30) + sumR(kjD, d30)) * 100) / 100;
   const aov = ordMTD ? revMTD / ordMTD : 0;
   const camps = state.adCampaigns || [];
-  const adToday = Math.round(camps.reduce((s, c) => s + adSpend(c, today, today), 0) * 100) / 100;
-  const adMTD = Math.round(camps.reduce((s, c) => s + adSpend(c, monthStart, today), 0) * 100) / 100;
+  // Prefer real Meta Ads spend (state.metaSpendByDay, last 90d) when connected; else manual campaign budgets.
+  const metaDay = state.metaSpendByDay || null;
+  const metaConnected = !!(metaDay && Object.keys(metaDay).length);
+  const adSpendRange = (from, to) => metaConnected
+    ? Math.round(daysInRange(from, to).reduce((s, d) => s + (metaDay[d] || 0), 0) * 100) / 100
+    : Math.round(camps.reduce((s, c) => s + adSpend(c, from, to), 0) * 100) / 100;
+  const adToday = adSpendRange(today, today);
+  const adMTD = adSpendRange(monthStart, today);
   const roas = adMTD > 0 ? revMTD / adMTD : null;
   let paid = 0, organic = 0; const obc = sc.ordersByChannelByDay || {};
   for (const d of monthDays) { const e = obc[d]; if (!e) continue; for (const ch in e) { (/\bads?\b/i.test(ch) ? paid += e[ch].orders : organic += e[ch].orders); } }
@@ -1447,7 +1453,7 @@ async function renderRevenueKpis() {
   const d90 = daysInRange(ymd(_addDays(today, -89)), today);
   const fob = sc.firstOrderByDay || {};
   const newCust90 = d90.reduce((s, d) => s + (fob[d] || 0), 0);
-  const adSpend90 = Math.round(camps.reduce((s, c) => s + adSpend(c, ymd(_addDays(today, -89)), today), 0) * 100) / 100;
+  const adSpend90 = adSpendRange(ymd(_addDays(today, -89)), today);
   const ltv = sc.avgLtv || 0;
   const cac = (newCust90 > 0 && adSpend90 > 0) ? adSpend90 / newCust90 : null;
   const ltvcac = (cac && ltv > 0) ? ltv / cac : null;
@@ -1461,7 +1467,7 @@ async function renderRevenueKpis() {
   const revSeries = d30.map(combRev);
   const ordSeries = d30.map(combOrd);
   const newSeries = d30.map(d => fob[d] || 0);
-  const adSeries  = d30.map(d => camps.reduce((s, c) => s + adSpend(c, d, d), 0));
+  const adSeries  = d30.map(d => metaConnected ? (metaDay[d] || 0) : camps.reduce((s, c) => s + adSpend(c, d, d), 0));
   const aovSeries = d30.map(d => { const o = combOrd(d); return o ? combRev(d) / o : 0; });
   const roasSeries = d30.map((d, i) => adSeries[i] > 0 ? revSeries[i] / adSeries[i] : 0);
   const igHist = ig ? Object.keys(ig.history || {}).sort().map(m => ig.history[m]) : [];
@@ -1471,12 +1477,12 @@ async function renderRevenueKpis() {
     ['Revenue today', fmtMoney(revToday), 'SamCart + Kajabi · today (ET)', '', kpiSpark(revSeries, C.blue)],
     ['Revenue MTD', fmtMoney(revMTD), `month to date · ${fmtNum(ordMTD)} orders`, '', kpiSpark(revSeries, C.blue)],
     ['Orders today', fmtNum(ordToday), 'SamCart + Kajabi', '', kpiSpark(ordSeries, C.green)],
-    ['ROAS MTD', roas != null ? roas.toFixed(2) + '×' : '—', adMTD > 0 ? `revenue ÷ ${fmtMoney(adMTD)} ad spend` : 'add ad budgets in Ads tab', '', kpiSpark(roasSeries, C.violet)],
-    ['Ad spend today', fmtMoney(adToday), 'from campaign budgets', '', kpiSpark(adSeries, C.amber)],
+    ['ROAS MTD', roas != null ? roas.toFixed(2) + '×' : '—', adMTD > 0 ? `revenue ÷ ${fmtMoney(adMTD)} ${metaConnected ? 'Meta' : 'budget'} spend` : (metaConnected ? 'no Meta spend in range' : 'add ad budgets in Ads tab'), metaConnected ? 'Blended ROAS — real SamCart+Kajabi revenue ÷ live Meta ad spend (month to date).' : '', kpiSpark(roasSeries, C.violet)],
+    ['Ad spend today', fmtMoney(adToday), metaConnected ? 'Meta Ads · today (ET)' : 'from campaign budgets', '', kpiSpark(adSeries, C.amber)],
     ['Revenue 30 days', fmtMoney(rev30), 'rolling 30 days', '', kpiSpark(revSeries, C.blue)],
     ['Avg order value', fmtMoney(aov), 'month to date', '', kpiSpark(aovSeries, C.blue)],
-    ['LTV : CAC', ltvcac != null ? ltvcac.toFixed(1) + ' : 1' : '—', cac != null ? `LTV ${fmtMoney(ltv)} ÷ CAC ${fmtMoney(cac)}` : `avg LTV ${fmtMoney(ltv)} · add ad budgets`, 'Lifetime value ÷ customer-acquisition cost. CAC = ad spend ÷ new customers (last 90 days).', kpiSplit([{ label: 'LTV', value: ltv, color: C.green }, { label: 'CAC', value: cac || 0, color: C.amber }])],
-    ['CAC (90d)', cac != null ? fmtMoney(cac) : '—', cac != null ? `${fmtMoney(adSpend90)} ÷ ${fmtNum(newCust90)} new` : 'add ad budgets in Ads tab', 'Customer acquisition cost = ad spend ÷ new customers, last 90 days.', kpiSpark(adSeries, C.amber)],
+    ['LTV : CAC', ltvcac != null ? ltvcac.toFixed(1) + ' : 1' : '—', cac != null ? `LTV ${fmtMoney(ltv)} ÷ CAC ${fmtMoney(cac)}` : (metaConnected ? `avg LTV ${fmtMoney(ltv)}` : `avg LTV ${fmtMoney(ltv)} · add ad budgets`), 'Lifetime value ÷ customer-acquisition cost. CAC = ad spend ÷ new customers (last 90 days).', kpiSplit([{ label: 'LTV', value: ltv, color: C.green }, { label: 'CAC', value: cac || 0, color: C.amber }])],
+    ['CAC (90d)', cac != null ? fmtMoney(cac) : '—', cac != null ? `${fmtMoney(adSpend90)} ÷ ${fmtNum(newCust90)} new` : (metaConnected ? 'no new customers in 90d' : 'add ad budgets in Ads tab'), 'Customer acquisition cost = ad spend ÷ new customers, last 90 days.', kpiSpark(adSeries, C.amber)],
     ['Revenue source MTD', fmtMoney(revMTD), `SamCart ${fmtMoney(scMTD)} · Kajabi ${fmtMoney(kjMTD)}`, '', kpiSplit([{ label: 'SamCart', value: scMTD, color: C.blue }, { label: 'Kajabi', value: kjMTD, color: C.violet }])],
     ['Acquisition MTD', acq ? Math.round(paid / acq * 100) + '% ads' : '—', acq ? `${Math.round(organic / acq * 100)}% organic · ${fmtNum(acq)} tagged orders` : 'needs UTM-tagged orders', 'Paid = orders from ad channels (FB Ads, etc.); organic = the rest, from UTM-attributed orders this month.', kpiSplit([{ label: 'Ads', value: paid, color: C.blue }, { label: 'Organic', value: organic, color: C.green }])],
     ['New customers (90d)', fmtNum(newCust90), 'first-time buyers · last 90 days', 'Customers whose first-ever purchase was in the last 90 days.', kpiSpark(newSeries, C.green)],
@@ -2523,6 +2529,7 @@ function renderMetaAds(d) {
   </table></div></div>`;
   body.innerHTML = kpiHtml + trendHtml + tableHtml;
   const daily = d.daily || [];
+  state.metaSpendByDay = {}; for (const x of daily) if (x.date_start) state.metaSpendByDay[x.date_start] = x.spend || 0;
   mkChart('meta-trend-chart', {
     type: 'bar',
     data: { labels: daily.map(x => x.date_start), datasets: [
@@ -2539,6 +2546,17 @@ function renderMetaAds(d) {
 if ($('meta-range')) $('meta-range').addEventListener('change', () => { const b = $('meta-ads-body'); if (b) b.dataset.loaded = ''; loadMetaAds(); });
 if ($('meta-refresh')) $('meta-refresh').addEventListener('click', () => { const b = $('meta-ads-body'); if (b) b.dataset.loaded = ''; loadMetaAds(true); });
 if ($('meta-ads-block')) $('meta-ads-block').addEventListener('click', e => { if (e.target.closest('#meta-goto-settings')) activateTab('settings'); });
+// Lightweight loader for the Overview KPIs: pull Meta's 90-day daily spend → state.metaSpendByDay.
+async function loadMetaSpend() {
+  try {
+    const d = await api('/api/meta-ads/data?preset=last30');
+    if (d && d.configured && !d.error && Array.isArray(d.daily) && d.daily.length) {
+      const map = {}; for (const x of d.daily) if (x.date_start) map[x.date_start] = x.spend || 0;
+      state.metaSpendByDay = map;
+    } else if (d && d.configured === false) { state.metaSpendByDay = null; }
+  } catch {}
+  if (state.scData) renderSalesAnalytics(state.scData);   // re-render Overview KPIs with real Meta spend
+}
 
 // ══ Kajabi (reporting) ════════════════════════════════════════════
 async function loadKajabi() {
@@ -3773,6 +3791,7 @@ async function refreshAll(force = false) {
     loadSamCart(force),
     loadSettings(),
     loadKajabiData(),
+    loadMetaSpend(),
   ]);
 }
 
