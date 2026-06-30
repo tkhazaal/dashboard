@@ -3093,7 +3093,17 @@ if ($('fx-bulk-del')) $('fx-bulk-del').addEventListener('click', async () => {
 });
 
 // ── Social Report (Facebook + Instagram via Apify) ────────────────────
-const SOC_PLAT_COLOR = { Facebook: '#1877f2', Instagram: '#E1306C' };
+const SOC_PLAT_COLOR = { Facebook: '#4267B2', Instagram: '#C13584' };
+const socState = { view: 'cards', sort: 'recent', date: 'all', page: 1, calYM: null };
+const SOC_PAGE = 24;
+const socUrl = u => /^https?:\/\//i.test(u || '') ? u : '';   // only allow http(s) hrefs (block javascript:)
+function socMetrics(p) {
+  const v = p.views || 0, l = p.likes || 0, c = p.comments || 0, s = p.shares || 0, e = l + c + s;
+  return { eng: e, engRate: v ? e / v * 100 : null, likeRate: v ? l / v * 100 : null, commentRate: v ? c / v * 100 : null, shareRate: v ? s / v * 100 : null, resonance: l ? (c + s) / l : null, virality: e ? s / e * 100 : null };
+}
+const socPct = n => n == null ? '—' : (Math.round(n * 10) / 10) + '%';
+const socX = n => n == null ? '—' : (Math.round(n * 100) / 100) + '×';
+const socDay = ts => { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts)); } catch { return ''; } };
 function socialDateParts(ts) {
   if (!ts) return { day: '', date: '', time: '' };
   const d = new Date(ts); if (isNaN(d)) return { day: '', date: '', time: '' };
@@ -3160,72 +3170,160 @@ function runSocialSync() {
 }
 function socialFiltered() {
   const d = state.socialData; if (!d) return [];
+  const now = nowET();
+  let from = null, to = null;
+  if (socState.date === 'thismonth') { from = ymd(new Date(now.getFullYear(), now.getMonth(), 1)); to = ymd(now); }
+  else if (socState.date === 'lastmonth') { from = ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1)); to = ymd(new Date(now.getFullYear(), now.getMonth(), 0)); }
+  else if (socState.date === '30') { from = ymd(_addDays(ymd(now), -29)); to = ymd(now); }
+  else if (socState.date === '90') { from = ymd(_addDays(ymd(now), -89)); to = ymd(now); }
   const plat = $('social-plat-filter').value, type = $('social-type-filter').value, q = ($('social-search').value || '').toLowerCase();
-  return (d.posts || []).filter(p =>
-    (!plat || p.platform === plat) && (!type || p.content_type === type) &&
-    (!q || (p.caption || '').toLowerCase().includes(q) || (p.hook_topic || '').toLowerCase().includes(q) || (p.offer || '').toLowerCase().includes(q)));
+  let rows = (d.posts || []).filter(p => {
+    if (plat && p.platform !== plat) return false;
+    if (type && p.content_type !== type) return false;
+    if (q && !((p.caption || '').toLowerCase().includes(q) || (p.hook_topic || '').toLowerCase().includes(q) || (p.offer || '').toLowerCase().includes(q))) return false;
+    if (from || to) { const dd = socDay(p.posted_at); if (!dd || (from && dd < from) || (to && dd > to)) return false; }   // undated posts excluded from a range
+    return true;
+  });
+  const sk = { views: 'views', likes: 'likes', comments: 'comments', shares: 'shares' }[socState.sort];
+  if (sk) rows.sort((a, b) => (b[sk] || 0) - (a[sk] || 0));
+  else if (socState.sort === 'engagement') rows.sort((a, b) => socMetrics(b).eng - socMetrics(a).eng);
+  else rows.sort((a, b) => String(b.posted_at).localeCompare(String(a.posted_at)));
+  return rows;
 }
 function renderSocial() {
-  const d = state.socialData; if (!d) return;
-  const t = d.totals || {};
-  $('social-cards').innerHTML = [['Posts', t.posts], ['Views', t.views], ['Likes', t.likes], ['Comments', t.comments], ['Shares', t.shares]]
-    .map(([l, v]) => `<div class="rf-card"><div class="rf-card-label">${l}</div><div class="rf-card-val">${fmtNum(v || 0)}</div></div>`).join('');
-  const bp = d.byPlatform || [];
+  if (!state.socialData) return;
+  const rows = socialFiltered();
+  const sum = f => rows.reduce((s, p) => s + (p[f] || 0), 0);
+  const v = sum('views'), l = sum('likes'), c = sum('comments'), s = sum('shares');
+  // avg engagement rate over view-bearing posts only (so 0-view image posts don't inflate it)
+  const vr = rows.filter(p => (p.views || 0) > 0);
+  const vrV = vr.reduce((a, p) => a + (p.views || 0), 0), vrE = vr.reduce((a, p) => a + (p.likes || 0) + (p.comments || 0) + (p.shares || 0), 0);
+  $('social-cards').innerHTML = [['Posts', fmtNum(rows.length)], ['Views', fmtNum(v)], ['Likes', fmtNum(l)], ['Comments', fmtNum(c)], ['Shares', fmtNum(s)], ['Avg eng. rate', socPct(vrV ? vrE / vrV * 100 : null)]]
+    .map(([lab, val]) => `<div class="rf-card"><div class="rf-card-label">${lab}</div><div class="rf-card-val">${val}</div></div>`).join('');
+  const byPlat = {}; for (const p of rows) { (byPlat[p.platform] = byPlat[p.platform] || { platform: p.platform, views: 0 }).views += p.views || 0; }
+  const bp = Object.values(byPlat);
   mkChart('social-platform-chart', {
     type: 'doughnut',
-    data: { labels: bp.map(p => p.platform), datasets: [{ data: bp.map(p => p.views), backgroundColor: bp.map(p => SOC_PLAT_COLOR[p.platform] || '#8b5cf6'), borderWidth: 0, hoverOffset: 6 }] },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '58%', plugins: { legend: { position: 'bottom', labels: { color: TICK, font: { size: 11 } } }, tooltip: { callbacks: { label: c => ` ${c.label}: ${fmtNum(c.parsed)} views` } } } },
+    data: { labels: bp.map(p => p.platform), datasets: [{ data: bp.map(p => p.views), backgroundColor: bp.map(p => SOC_PLAT_COLOR[p.platform] || '#94a3b8'), borderWidth: 0, hoverOffset: 5 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: TICK, font: { size: 11 } } }, tooltip: { callbacks: { label: cc => ` ${cc.label}: ${fmtNum(cc.parsed)} views` } } } },
   });
-  const top = (d.top || []).slice(0, 8);
+  const topN = rows.slice().sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 8);
   mkChart('social-top-chart', {
     type: 'bar',
-    data: { labels: top.map(p => faTrunc((p.caption || p.content_type || '—').replace(/\n/g, ' '), 26)), datasets: [{ data: top.map(p => p.views), backgroundColor: top.map(p => SOC_PLAT_COLOR[p.platform] || '#8b5cf6'), borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtNum(c.parsed.x) + ' views' } } }, scales: { x: { grid: { color: GRID }, ticks: { color: TICK, font: { size: 10 }, callback: v => v >= 1000 ? (v / 1000) + 'k' : v }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: TICK, font: { size: 10 } } } } },
+    data: { labels: topN.map(p => faTrunc((p.hook_topic || p.caption || p.content_type || '—').replace(/\n/g, ' '), 24)), datasets: [{ data: topN.map(p => p.views), backgroundColor: '#4267B2', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: cc => ' ' + fmtNum(cc.parsed.x) + ' views' } } }, scales: { x: { grid: { color: GRID }, ticks: { color: TICK, font: { size: 10 }, callback: x => x >= 1000 ? (x / 1000) + 'k' : x }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: TICK, font: { size: 10 } } } } },
   });
-  const rows = socialFiltered();
-  const edit = (id, f, val, ph) => `<input class="soc-edit" data-post="${escHtml(id)}" data-field="${f}" value="${escHtml(val || '')}" placeholder="${escHtml(ph || '')}">`;
-  $('social-feed').innerHTML = rows.length ? rows.map(p => {
-    const dt = socialDateParts(p.posted_at), plat = String(p.platform).toLowerCase();
+  if (socState.view === 'table') renderSocialTable(rows);
+  else if (socState.view === 'calendar') renderSocialCalendar(rows);
+  else renderSocialCards(rows);
+  $('social-feed').hidden = socState.view !== 'cards';
+  $('social-table-wrap').hidden = socState.view !== 'table';
+  $('social-calendar').hidden = socState.view !== 'calendar';
+}
+const socEdit = (id, f, val, ph) => `<input class="soc-edit" data-post="${escHtml(id)}" data-field="${f}" value="${escHtml(val || '')}" placeholder="${escHtml(ph || '')}">`;
+function renderSocialCards(rows) {
+  const shown = rows.slice(0, socState.page * SOC_PAGE);
+  $('social-feed').innerHTML = shown.length ? shown.map(p => {
+    const dt = socialDateParts(p.posted_at), plat = String(p.platform).toLowerCase(), m = socMetrics(p), cap = (p.caption || '').replace(/\n/g, ' ');
     return `<div class="soc-card">
-      <div class="soc-card-media">
-        ${p.thumbnail ? `<img src="${escHtml(p.thumbnail)}" alt="" loading="lazy" onerror="this.remove()">` : `<div class="soc-noimg soc-bg-${plat}">${escHtml(p.platform)}</div>`}
+      <div class="soc-card-media">${p.thumbnail ? `<img src="${escHtml(p.thumbnail)}" alt="" loading="lazy" onerror="this.remove()">` : `<div class="soc-noimg soc-bg-${plat}">${escHtml((p.platform || '?')[0])}</div>`}
         <span class="soc-plat soc-${plat}">${escHtml(p.platform)} · ${escHtml(p.content_type)}</span>
-        ${p.url ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" class="soc-card-open" title="Open post">↗</a>` : ''}
-      </div>
+        ${socUrl(p.url) ? `<a href="${escHtml(socUrl(p.url))}" target="_blank" rel="noopener" class="soc-card-open" title="Open post">↗</a>` : ''}</div>
       <div class="soc-card-body">
-        <div class="soc-card-date">${dt.day} · ${dt.date} · ${dt.time}</div>
-        <div class="soc-card-cap" title="${escHtml(p.caption || '')}">${escHtml((p.caption || '(no caption)').replace(/\n/g, ' ').slice(0, 130))}</div>
-        <div class="soc-card-metrics">
-          <span title="Views">👁 ${fmtNum(p.views)}</span><span title="Likes">❤️ ${fmtNum(p.likes)}</span>
-          <span title="Comments">💬 ${fmtNum(p.comments)}</span><span title="Shares">🔁 ${fmtNum(p.shares)}</span>
-        </div>
+        <div class="soc-card-date">${dt.date} · ${dt.time}${p.last_updated ? ` <span class="soc-upd">· upd ${escHtml(timeAgo(p.last_updated))}</span>` : ''}</div>
+        <div class="soc-card-cap" title="${escHtml(cap)}">${escHtml(cap || '(no caption)')}</div>
+        ${cap.length > 85 ? '<button class="soc-cap-toggle" type="button">more</button>' : ''}
+        <div class="soc-card-metrics"><span title="Views">👁 ${fmtNum(p.views)}</span><span title="Likes">❤️ ${fmtNum(p.likes)}</span><span title="Comments">💬 ${fmtNum(p.comments)}</span><span title="Shares">🔁 ${fmtNum(p.shares)}</span></div>
+        <div class="soc-card-derived"><span title="Engagement rate = (likes+comments+shares) ÷ views">ER ${socPct(m.engRate)}</span><span title="Resonance = (comments+shares) ÷ likes — deep engagement vs passive likes">Res ${socX(m.resonance)}</span><span title="Virality = shares ÷ total engagement">Vir ${socPct(m.virality)}</span></div>
         <div class="soc-card-fields">
-          <label class="soc-f-wide"><span>Hook / Topic</span>${edit(p.post_id, 'hook_topic', p.hook_topic, 'add a hook…')}</label>
-          <label><span>Offer</span>${edit(p.post_id, 'offer', p.offer, '—')}</label>
-          <label><span>Status</span>${edit(p.post_id, 'status', p.status, '—')}</label>
-          <label class="soc-f-num"><span>Post #</span>${edit(p.post_id, 'post_num', p.post_num, '#')}</label>
-          <label class="soc-f-wide"><span>Notes</span>${edit(p.post_id, 'notes', p.notes, 'notes…')}</label>
+          <label class="soc-f-wide"><span>Hook / Topic</span>${socEdit(p.post_id, 'hook_topic', p.hook_topic, 'add a hook…')}</label>
+          <label><span>Offer</span>${socEdit(p.post_id, 'offer', p.offer, '—')}</label>
+          <label class="soc-f-num"><span>Post #</span>${socEdit(p.post_id, 'post_num', p.post_num, '#')}</label>
+          <label class="soc-f-wide"><span>Notes</span>${socEdit(p.post_id, 'notes', p.notes, 'notes…')}</label>
         </div>
       </div>
     </div>`;
-  }).join('') : '<div class="soc-empty">No posts match — or click “↻ Refresh now” to scrape.</div>';
+  }).join('') : '<div class="soc-empty">No posts match — adjust filters or click “↻ Refresh now”.</div>';
+  $('social-loadmore').hidden = shown.length >= rows.length;
 }
-['social-plat-filter', 'social-type-filter', 'social-search'].forEach(id => { const el = $(id); if (el) el.addEventListener('input', renderSocial); });
-if ($('social-feed')) $('social-feed').addEventListener('change', async e => {
-  const inp = e.target.closest('.soc-edit'); if (!inp) return;
-  try {
-    await fxPost('/api/social/field', { post_id: inp.dataset.post, field: inp.dataset.field, value: inp.value });
-    const p = (state.socialData.posts || []).find(x => x.post_id === inp.dataset.post); if (p) p[inp.dataset.field] = inp.value;
-    inp.classList.add('soc-saved'); setTimeout(() => inp.classList.remove('soc-saved'), 700);
-  } catch { alert('Could not save'); }
+function renderSocialTable(rows) {
+  const shown = rows.slice(0, socState.page * SOC_PAGE);
+  $('social-thead').innerHTML = `<tr><th>Date</th><th>Plat</th><th>Type</th><th>Hook / caption</th><th>Views</th><th>Likes</th><th>Cmt</th><th>Shr</th><th title="Engagement rate = engagement ÷ views">ER%</th><th title="Comments ÷ views">Cmt%</th><th title="Shares ÷ views">Shr%</th><th title="(comments+shares) ÷ likes">Reson.</th><th title="Shares ÷ engagement">Viral.</th><th></th></tr>`;
+  $('social-tbody').innerHTML = shown.length ? shown.map(p => {
+    const dt = socialDateParts(p.posted_at), m = socMetrics(p), plat = String(p.platform).toLowerCase();
+    const label = p.hook_topic || (p.caption || '').replace(/\n/g, ' ').slice(0, 60) || '—';
+    return `<tr>
+      <td class="soc-nowrap">${dt.date}</td><td><span class="soc-plat soc-${plat}">${escHtml((p.platform || '?')[0])}</span></td><td>${escHtml(p.content_type)}</td>
+      <td class="soc-tcap" title="${escHtml(p.caption || '')}">${escHtml(label)}</td>
+      <td class="soc-metric">${fmtNum(p.views)}</td><td class="soc-metric">${fmtNum(p.likes)}</td><td class="soc-metric">${fmtNum(p.comments)}</td><td class="soc-metric">${fmtNum(p.shares)}</td>
+      <td class="soc-metric">${socPct(m.engRate)}</td><td class="soc-metric">${socPct(m.commentRate)}</td><td class="soc-metric">${socPct(m.shareRate)}</td>
+      <td class="soc-metric">${socX(m.resonance)}</td><td class="soc-metric">${socPct(m.virality)}</td>
+      <td>${socUrl(p.url) ? `<a href="${escHtml(socUrl(p.url))}" target="_blank" rel="noopener" class="soc-link">↗</a>` : '—'}</td>
+    </tr>`;
+  }).join('') : '<tr class="empty-row"><td colspan="14">No posts match…</td></tr>';
+  $('social-loadmore').hidden = shown.length >= rows.length;
+}
+function renderSocialCalendar(rows) {
+  const now = nowET();
+  // Month to display: explicit (from ‹ › nav) → selected month → most-recent month that has posts → current month.
+  let ym = socState.calYM;
+  if (!ym) {
+    if (socState.date === 'lastmonth') { const d = new Date(now.getFullYear(), now.getMonth() - 1, 1); ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+    else if (socState.date === 'thismonth') ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    else { const months = [...new Set(rows.map(p => socDay(p.posted_at).slice(0, 7)).filter(Boolean))].sort(); ym = months.length ? months[months.length - 1] : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; }
+  }
+  socState.calYM = ym;   // remember the shown month so the ‹ › buttons can shift from it
+  const my = +ym.slice(0, 4), mm = +ym.slice(5, 7) - 1, target = ym;
+  const byDay = {};
+  for (const p of rows) { const dd = socDay(p.posted_at); if (dd.slice(0, 7) === target) (byDay[+dd.slice(8, 10)] = byDay[+dd.slice(8, 10)] || []).push(p); }
+  const first = new Date(my, mm, 1).getDay(), daysIn = new Date(my, mm + 1, 0).getDate();
+  const monthName = new Date(my, mm, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  let cells = '';
+  for (let i = 0; i < first; i++) cells += '<div class="soc-cal-cell empty"></div>';
+  for (let d = 1; d <= daysIn; d++) {
+    const posts = byDay[d] || [];
+    cells += `<div class="soc-cal-cell"><div class="soc-cal-day">${d}</div>${posts.map(p => `<a class="soc-cal-chip soc-bg-${String(p.platform).toLowerCase()}" href="${escHtml(socUrl(p.url) || '#')}" target="_blank" rel="noopener" title="${escHtml((p.hook_topic || p.caption || '').replace(/\n/g, ' ').slice(0, 90))} · ${fmtNum(p.views)} views · ${fmtNum(p.likes)} likes">${p.content_type === 'Reel' ? '▶ ' : ''}${fmtNum(p.views)}</a>`).join('')}</div>`;
+  }
+  $('social-calendar').innerHTML = `<div class="soc-cal-head"><button class="soc-cal-nav" data-cal="-1" type="button">‹</button> <strong>${monthName}</strong> <button class="soc-cal-nav" data-cal="1" type="button">›</button> <span class="th-hint">— click a chip to open the post</span></div>
+    <div class="soc-cal-grid"><div class="soc-cal-dow">Sun</div><div class="soc-cal-dow">Mon</div><div class="soc-cal-dow">Tue</div><div class="soc-cal-dow">Wed</div><div class="soc-cal-dow">Thu</div><div class="soc-cal-dow">Fri</div><div class="soc-cal-dow">Sat</div>${cells}</div>`;
+  $('social-loadmore').hidden = true;
+}
+document.querySelectorAll('#social-viewtoggle .soc-vbtn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#social-viewtoggle .soc-vbtn').forEach(x => x.classList.toggle('active', x === b));
+  socState.view = b.dataset.view; socState.page = 1; socState.calYM = null; renderSocial();
+}));
+if ($('social-date')) $('social-date').addEventListener('change', e => { socState.date = e.target.value; socState.page = 1; socState.calYM = null; renderSocial(); });
+if ($('social-sort')) $('social-sort').addEventListener('change', e => { socState.sort = e.target.value; socState.page = 1; renderSocial(); });
+['social-plat-filter', 'social-type-filter', 'social-search'].forEach(id => { const el = $(id); if (el) el.addEventListener('input', () => { socState.page = 1; renderSocial(); }); });
+if ($('social-calendar')) $('social-calendar').addEventListener('click', e => {
+  const b = e.target.closest('.soc-cal-nav'); if (!b || !socState.calYM) return;
+  const d = new Date(+socState.calYM.slice(0, 4), +socState.calYM.slice(5, 7) - 1 + (+b.dataset.cal), 1);
+  socState.calYM = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  renderSocialCalendar(socialFiltered());
 });
+if ($('social-loadmore-btn')) $('social-loadmore-btn').addEventListener('click', () => { socState.page++; renderSocial(); });
+if ($('social-feed')) {
+  $('social-feed').addEventListener('change', async e => {
+    const inp = e.target.closest('.soc-edit'); if (!inp) return;
+    try {
+      await fxPost('/api/social/field', { post_id: inp.dataset.post, field: inp.dataset.field, value: inp.value });
+      const p = (state.socialData.posts || []).find(x => x.post_id === inp.dataset.post); if (p) p[inp.dataset.field] = inp.value;
+      inp.classList.add('soc-saved'); setTimeout(() => inp.classList.remove('soc-saved'), 700);
+    } catch { alert('Could not save'); }
+  });
+  $('social-feed').addEventListener('click', e => {
+    const t = e.target.closest('.soc-cap-toggle'); if (!t) return;
+    const cap = t.previousElementSibling;
+    if (cap && cap.classList.contains('soc-card-cap')) { const ex = cap.classList.toggle('expanded'); t.textContent = ex ? 'less' : 'more'; }
+  });
+}
 if ($('social-sync')) $('social-sync').addEventListener('click', runSocialSync);
 if ($('social-export')) $('social-export').addEventListener('click', () => {
   const rows = socialFiltered(); if (!rows.length) return;
-  const esc = v => { let s = String(v == null ? '' : v); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const head = ['Day', 'Date', 'Time', 'Platform', 'Type', 'Post#', 'Hook/Topic', 'Offer', 'Status', 'Views', 'Likes', 'Comments', 'Shares', 'Link', 'Notes', 'Caption'];
+  const esc = val => { let s = String(val == null ? '' : val); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const head = ['Date', 'Time', 'Platform', 'Type', 'Post#', 'Hook/Topic', 'Offer', 'Views', 'Likes', 'Comments', 'Shares', 'EngRate%', 'Comment%', 'Share%', 'Resonance', 'Virality%', 'Link', 'Notes', 'Caption'];
   const lines = [head.join(',')];
-  for (const p of rows) { const dt = socialDateParts(p.posted_at); lines.push([dt.day, dt.date, dt.time, p.platform, p.content_type, p.post_num, p.hook_topic, p.offer, p.status, p.views, p.likes, p.comments, p.shares, p.url, p.notes, (p.caption || '').replace(/\n/g, ' ')].map(esc).join(',')); }
+  for (const p of rows) { const dt = socialDateParts(p.posted_at), m = socMetrics(p); lines.push([dt.date, dt.time, p.platform, p.content_type, p.post_num, p.hook_topic, p.offer, p.views, p.likes, p.comments, p.shares, m.engRate == null ? '' : m.engRate.toFixed(1), m.commentRate == null ? '' : m.commentRate.toFixed(2), m.shareRate == null ? '' : m.shareRate.toFixed(2), m.resonance == null ? '' : m.resonance.toFixed(2), m.virality == null ? '' : m.virality.toFixed(1), p.url, p.notes, (p.caption || '').replace(/\n/g, ' ')].map(esc).join(',')); }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
   a.download = 'social-report.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });

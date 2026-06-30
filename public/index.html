@@ -732,16 +732,38 @@
         <div class="fa-chart-box"><div class="rf-chart-title">Top posts by views</div><div class="chart-wrap"><canvas id="social-top-chart"></canvas></div></div>
       </div>
       <div class="card">
-        <div class="card-header">
-          <h2>Posts &amp; Reels</h2>
-          <div class="email-filters">
+        <div class="soc-toolbar">
+          <div class="soc-views" id="social-viewtoggle">
+            <button class="soc-vbtn active" data-view="cards">▦ Cards</button>
+            <button class="soc-vbtn" data-view="table">☰ Table</button>
+            <button class="soc-vbtn" data-view="calendar">▦ Calendar</button>
+          </div>
+          <div class="soc-tfilters">
+            <select id="social-date" class="cmp-preset" title="Date range">
+              <option value="all">All time</option>
+              <option value="thismonth">This month</option>
+              <option value="lastmonth">Last month</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+            <select id="social-sort" class="cmp-preset" title="Sort by">
+              <option value="recent">Newest first</option>
+              <option value="views">Top views</option>
+              <option value="likes">Top likes</option>
+              <option value="comments">Top comments</option>
+              <option value="shares">Top shares</option>
+              <option value="engagement">Top engagement</option>
+            </select>
             <select id="social-plat-filter" class="cmp-preset"><option value="">All platforms</option><option>Facebook</option><option>Instagram</option></select>
             <select id="social-type-filter" class="cmp-preset"><option value="">All types</option><option>Post</option><option>Reel</option><option>Video</option></select>
-            <input id="social-search" class="search-input" placeholder="Search caption / topic…">
+            <input id="social-search" class="search-input" placeholder="Search…">
             <button class="clear-btn" id="social-export" title="Download as CSV">⬇ CSV</button>
           </div>
         </div>
         <div class="social-feed" id="social-feed"><div class="soc-empty">Loading…</div></div>
+        <div class="table-wrap" id="social-table-wrap" hidden><table class="data-table social-mtable"><thead id="social-thead"></thead><tbody id="social-tbody"></tbody></table></div>
+        <div class="social-calendar" id="social-calendar" hidden></div>
+        <div class="soc-loadmore" id="social-loadmore" hidden><button class="clear-btn" id="social-loadmore-btn">Load more</button></div>
       </div>
     </section>
 

@@ -2,6 +2,14 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.27.0', date: '2026-06-30', title: 'Social Report: 3 views, filters & engagement metrics',
+    changes: [
+      { title: 'Cards / Table / Calendar views', detail: 'Toggle between a compact card feed, a full metrics table, and a month calendar (posts placed on the day they went out — use ‹ › to move between months). Cards are smaller now, captions collapse with “more/less”, each post shows when its metrics were last updated, and a “Load more” button keeps the page short as posts pile up.' },
+      { title: 'Filters, sorting & date ranges', detail: 'Filter by platform, type or search; sort by top views / likes / comments / shares / engagement; and pick a date range (This month, Last month, Last 30 / 90 days, All time). The summary totals, charts and top-posts all update to match what you’ve filtered.' },
+      { title: 'Engagement metrics', detail: 'Every post now shows derived metrics — Engagement Rate (engagement ÷ views), Comment % and Share % (vs views), Resonance ((comments+shares) ÷ likes — how much it sparks real interaction vs passive likes) and Virality (shares ÷ engagement). Full set in the Table view and the CSV. Calmer chart colours, and Status was removed.' },
+    ],
+  },
+  {
     version: '1.26.0', date: '2026-06-30', title: 'Social Report (Facebook + Instagram)',
     changes: [
       { title: 'New Social Report page', detail: 'Pulls your Facebook & Instagram posts and reels via Apify — views, likes, comments and shares auto-update every day at 8am, with a live progress bar when scraping. Summary totals, a views-by-platform donut and a top-posts chart, plus a visual card per post (thumbnail + metrics) where you can add your own Hook/Topic, Offer, Status, Post # and Notes. Export to CSV. (One-time setup: run social-schema.sql in Supabase.)' },
