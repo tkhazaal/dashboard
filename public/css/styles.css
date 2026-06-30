@@ -1131,6 +1131,16 @@ table.show-upsell .upsell-col { display: table-cell; }
 .meta-connect p { color: var(--sub); font: 500 13.5px var(--font-body); max-width: 540px; margin: 0 auto 14px; line-height: 1.55; }
 .meta-connect code { background: var(--surface-alt); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
+/* ── ManyChat optins panel ───────────────────────────────────── */
+#manychat-panel .mc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+#manychat-panel .mc-head h2 { margin: 0; }
+.mc-kpis { margin-bottom: 12px; }
+.mc-webhook { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; margin-bottom: 12px; font: 500 12px var(--font-body); color: var(--sub); }
+.mc-webhook code { font: 600 12px monospace; color: var(--text); word-break: break-all; }
+.clear-btn.sm { padding: 3px 9px; font-size: 11px; }
+.mc-table .soc-metric { text-align: right; font-variant-numeric: tabular-nums; }
+.soc-optin { color: #0ea5e9; font-weight: 700; cursor: help; }
+
 /* Collapsible cards */
 .card.collapsible > .card-header { cursor: pointer; user-select: none; }
 .card.collapsible > .card-header h2 { display: inline-flex; align-items: center; gap: 8px; }

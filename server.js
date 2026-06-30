@@ -60,6 +60,7 @@ app.use('/api/instagram',  require('./routes/instagram'));
 app.use('/api/facebook',   require('./routes/facebook'));
 app.use('/api/social',     require('./routes/social'));
 app.use('/api/meta-ads',   require('./routes/meta-ads'));
+app.use('/api/manychat',   require('./routes/manychat'));
 app.use('/api/refunds',    require('./routes/refunds'));
 const forms = require('./routes/forms');
 app.use('/api/forms',      forms.router);

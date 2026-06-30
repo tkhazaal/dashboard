@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.31.0', date: '2026-07-01', title: 'ManyChat optin tracking on Social Report',
+    changes: [
+      { title: 'Track optins from your posts', detail: 'A new ManyChat panel on the Social Report shows optins (and CTA clicks) collected via webhook — totals, a breakdown by ref/CTA, and by channel. Copy the webhook URL into a ManyChat “External Request” action so each optin flows in with a ref tag.' },
+      { title: 'Per-post optins', detail: 'Give a post a “ManyChat ref” and its optins (and optin-rate vs views) show right on the card and in the table — so you can see which posts and CTAs actually drive subscribers. (One-time setup: run manychat-schema.sql in Supabase.)' },
+    ],
+  },
+  {
     version: '1.30.0', date: '2026-07-01', title: 'Overview KPIs use live Meta ad spend',
     changes: [
       { title: 'Real ad spend across the dashboard', detail: 'Now that Meta Ads is connected, the Overview cards — Ad spend today, ROAS MTD, CAC (90d) and LTV:CAC — pull your actual Meta spend instead of the manual budget tracker. ROAS MTD becomes a true blended ROAS: real SamCart + Kajabi revenue ÷ live Meta ad spend. (If Meta isn’t connected, these fall back to manual budgets as before.)' },

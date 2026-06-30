@@ -137,7 +137,7 @@ router.get('/data', async (req, res) => {
 router.post('/field', async (req, res) => {
   try {
     const { post_id, field } = req.body;
-    const allowed = ['post_num', 'hook_topic', 'offer', 'status', 'notes'];
+    const allowed = ['post_num', 'hook_topic', 'offer', 'status', 'notes', 'manychat_ref'];
     if (!post_id || !allowed.includes(field)) return res.status(400).json({ error: 'invalid' });
     const { error } = await supabase.from('social_posts').update({ [field]: (req.body.value || '').toString().slice(0, 2000) }).eq('post_id', post_id);
     if (error) throw error;

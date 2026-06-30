@@ -3331,13 +3331,47 @@ async function loadSocialData() {
   }
 }
 async function loadSocial() {
-  await loadSocialData();
+  await Promise.allSettled([loadSocialData(), loadManychat()]);
   try {
     const s = await api('/api/social/sync/status');
     if (s.running) startSocialPolling();            // a scrape is already running (e.g. the 8am job) → show it live
     else { hideSocialProgress(); if ($('social-synced')) $('social-synced').textContent = (state.socialData && state.socialData.synced) ? 'Updated ' + timeAgo(state.socialData.synced) : 'Not synced yet'; }
   } catch {}
 }
+// ManyChat optins — pull aggregates + the ref→optins map, render the panel, re-render posts.
+async function loadManychat() {
+  try { state.manychatData = await api('/api/manychat/data'); } catch { state.manychatData = null; }
+  renderManychatPanel();
+  if (state.socialData) renderSocial();   // so per-post optin counts paint
+}
+function mcRefMap() { return (state.manychatData && state.manychatData.refMap) || {}; }
+function renderManychatPanel() {
+  const el = $('manychat-panel'); if (!el) return;
+  const d = state.manychatData;
+  const base = location.origin;
+  const url = d && d.token ? `${base}/api/manychat/hook/${d.token}` : `${base}/api/manychat/hook/…`;
+  if (!d || d.configured === false) {
+    el.innerHTML = `<div class="mc-head"><h2>ManyChat optins</h2></div><div class="soc-empty">Run <code>manychat-schema.sql</code> in Supabase once, then this panel shows your optins. Webhook URL: <code>${escHtml(url)}</code></div>`;
+    return;
+  }
+  const t = d.totals || {};
+  const byRef = (d.byRef || []).slice(0, 12), byChannel = d.byChannel || [];
+  el.innerHTML = `
+    <div class="mc-head"><h2>ManyChat optins</h2><button class="clear-btn" id="mc-refresh">↻ Refresh</button></div>
+    <div class="rf-cards mc-kpis">
+      <div class="rf-card"><div class="rf-card-label">Total optins</div><div class="rf-card-val">${fmtNum(t.optins)}</div></div>
+      <div class="rf-card"><div class="rf-card-label">CTA clicks</div><div class="rf-card-val">${fmtNum(t.ctaClicks)}</div></div>
+      ${byChannel.map(c => `<div class="rf-card"><div class="rf-card-label">${escHtml(c.channel)}</div><div class="rf-card-val">${fmtNum(c.optins)}</div></div>`).join('')}
+    </div>
+    <div class="mc-webhook"><span>Webhook URL for ManyChat (External Request → POST):</span><code id="mc-url">${escHtml(url)}</code><button class="clear-btn sm" id="mc-copy">Copy</button></div>
+    <div class="table-wrap"><table class="data-table mc-table"><thead><tr><th>ref (CTA / post tag)</th><th class="soc-mh">Optins</th><th class="soc-mh">CTA clicks</th><th class="soc-mh">Last</th></tr></thead>
+      <tbody>${byRef.length ? byRef.map(r => `<tr><td>${escHtml(r.ref)}</td><td class="soc-metric">${fmtNum(r.optins)}</td><td class="soc-metric">${fmtNum(r.cta_clicks)}</td><td class="soc-nowrap">${r.lastAt ? escHtml(timeAgo(r.lastAt)) : '—'}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="4">No optins yet — set up the ManyChat webhook above.</td></tr>'}</tbody>
+    </table></div>`;
+}
+if ($('manychat-panel')) $('manychat-panel').addEventListener('click', e => {
+  if (e.target.closest('#mc-refresh')) loadManychat();
+  if (e.target.closest('#mc-copy')) { const u = $('mc-url'); if (u) { navigator.clipboard && navigator.clipboard.writeText(u.textContent); e.target.textContent = 'Copied ✓'; setTimeout(() => { e.target.textContent = 'Copy'; }, 1200); } }
+});
 function showSocialProgress(s) {
   const el = $('social-progress'); if (!el) return;
   el.hidden = false;
@@ -3428,6 +3462,8 @@ function renderSocialCards(rows) {
   const shown = rows.slice(0, socState.page * SOC_PAGE);
   $('social-feed').innerHTML = shown.length ? shown.map(p => {
     const dt = socialDateParts(p.posted_at), plat = String(p.platform).toLowerCase(), m = socMetrics(p), cap = (p.caption || '').replace(/\n/g, ' ');
+    const opt = p.manychat_ref ? mcRefMap()[p.manychat_ref] : null;
+    const optRate = (opt && p.views) ? socPct(opt.optins / p.views * 100) : null;
     return `<div class="soc-card">
       <div class="soc-card-media">${p.thumbnail ? `<img src="${escHtml(p.thumbnail)}" alt="" loading="lazy" onerror="this.remove()">` : `<div class="soc-noimg soc-bg-${plat}">${escHtml((p.platform || '?')[0])}</div>`}
         <span class="soc-plat soc-${plat}">${escHtml(p.platform)} · ${escHtml(p.content_type)}</span>
@@ -3437,11 +3473,12 @@ function renderSocialCards(rows) {
         <div class="soc-card-cap" title="${escHtml(cap)}">${escHtml(cap || '(no caption)')}</div>
         ${cap.length > 85 ? '<button class="soc-cap-toggle" type="button">more</button>' : ''}
         <div class="soc-card-metrics"><span title="Views">👁 ${fmtNum(p.views)}</span><span title="Likes">❤️ ${fmtNum(p.likes)}</span><span title="Comments">💬 ${fmtNum(p.comments)}</span><span title="Shares">🔁 ${fmtNum(p.shares)}</span></div>
-        <div class="soc-card-derived"><span title="Engagement rate = (likes+comments+shares) ÷ views">ER ${socPct(m.engRate)}</span><span title="Resonance = (comments+shares) ÷ likes — deep engagement vs passive likes">Res ${socX(m.resonance)}</span><span title="Virality = shares ÷ total engagement">Vir ${socPct(m.virality)}</span></div>
+        <div class="soc-card-derived"><span title="Engagement rate = (likes+comments+shares) ÷ views">ER ${socPct(m.engRate)}</span><span title="Resonance = (comments+shares) ÷ likes — deep engagement vs passive likes">Res ${socX(m.resonance)}</span><span title="Virality = shares ÷ total engagement">Vir ${socPct(m.virality)}</span>${opt ? `<span class="soc-optin" title="ManyChat optins for ref &quot;${escHtml(p.manychat_ref)}&quot;${optRate ? ' · ' + optRate + ' of views' : ''}">✉ ${fmtNum(opt.optins)} optins${optRate ? ` · ${optRate}` : ''}</span>` : ''}</div>
         <div class="soc-card-fields">
           <label class="soc-f-wide"><span>Hook / Topic</span>${socEdit(p.post_id, 'hook_topic', p.hook_topic, 'add a hook…')}</label>
           <label><span>Offer</span>${socEdit(p.post_id, 'offer', p.offer, '—')}</label>
           <label class="soc-f-num"><span>Post #</span>${socEdit(p.post_id, 'post_num', p.post_num, '#')}</label>
+          <label><span>ManyChat ref</span>${socEdit(p.post_id, 'manychat_ref', p.manychat_ref, 'cta tag…')}</label>
           <label class="soc-f-wide"><span>Notes</span>${socEdit(p.post_id, 'notes', p.notes, 'notes…')}</label>
         </div>
       </div>
@@ -3451,19 +3488,21 @@ function renderSocialCards(rows) {
 }
 function renderSocialTable(rows) {
   const shown = rows.slice(0, socState.page * SOC_PAGE);
-  $('social-thead').innerHTML = `<tr><th>Date</th><th>Plat</th><th>Type</th><th>Hook / caption</th><th class="soc-mh">Views</th><th class="soc-mh">Likes</th><th class="soc-mh">Cmt</th><th class="soc-mh">Shr</th><th class="soc-mh" title="Engagement rate = engagement ÷ views">ER%</th><th class="soc-mh" title="Comments ÷ views">Cmt%</th><th class="soc-mh" title="Shares ÷ views">Shr%</th><th class="soc-mh" title="(comments+shares) ÷ likes">Reson.</th><th class="soc-mh" title="Shares ÷ engagement">Viral.</th><th></th></tr>`;
+  $('social-thead').innerHTML = `<tr><th>Date</th><th>Plat</th><th>Type</th><th>Hook / caption</th><th class="soc-mh">Views</th><th class="soc-mh">Likes</th><th class="soc-mh">Cmt</th><th class="soc-mh">Shr</th><th class="soc-mh" title="Engagement rate = engagement ÷ views">ER%</th><th class="soc-mh" title="Comments ÷ views">Cmt%</th><th class="soc-mh" title="Shares ÷ views">Shr%</th><th class="soc-mh" title="(comments+shares) ÷ likes">Reson.</th><th class="soc-mh" title="Shares ÷ engagement">Viral.</th><th class="soc-mh" title="ManyChat optins (by ref)">Optins</th><th></th></tr>`;
   $('social-tbody').innerHTML = shown.length ? shown.map(p => {
     const dt = socialDateParts(p.posted_at), m = socMetrics(p), plat = String(p.platform).toLowerCase();
     const label = p.hook_topic || (p.caption || '').replace(/\n/g, ' ').slice(0, 60) || '—';
+    const opt = p.manychat_ref ? mcRefMap()[p.manychat_ref] : null;
     return `<tr>
       <td class="soc-nowrap">${dt.date}</td><td><span class="soc-plat soc-${plat}">${escHtml((p.platform || '?')[0])}</span></td><td>${escHtml(p.content_type)}</td>
       <td class="soc-tcap" title="${escHtml(p.caption || '')}">${escHtml(label)}</td>
       <td class="soc-metric">${fmtNum(p.views)}</td><td class="soc-metric">${fmtNum(p.likes)}</td><td class="soc-metric">${fmtNum(p.comments)}</td><td class="soc-metric">${fmtNum(p.shares)}</td>
       <td class="soc-metric">${socPct(m.engRate)}</td><td class="soc-metric">${socPct(m.commentRate)}</td><td class="soc-metric">${socPct(m.shareRate)}</td>
       <td class="soc-metric">${socX(m.resonance)}</td><td class="soc-metric">${socPct(m.virality)}</td>
+      <td class="soc-metric"${opt ? ` title="ref: ${escHtml(p.manychat_ref)}"` : ''}>${opt ? fmtNum(opt.optins) : '—'}</td>
       <td>${socUrl(p.url) ? `<a href="${escHtml(socUrl(p.url))}" target="_blank" rel="noopener" class="soc-link">↗</a>` : '—'}</td>
     </tr>`;
-  }).join('') : '<tr class="empty-row"><td colspan="14">No posts match…</td></tr>';
+  }).join('') : '<tr class="empty-row"><td colspan="15">No posts match…</td></tr>';
   $('social-loadmore').hidden = shown.length >= rows.length;
 }
 function renderSocialCalendar(rows) {
