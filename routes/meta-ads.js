@@ -41,11 +41,13 @@ async function graphAll(path, params, creds, cap = 2000) {
 }
 
 const N = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
-const PURCHASE = ['purchase', 'omni_purchase', 'offsite_conversion.fb_pixel_purchase'];
-const sumAction = (arr, types) => Array.isArray(arr) ? arr.reduce((s, a) => s + (types.includes(a.action_type) ? N(a.value) : 0), 0) : 0;
+// Pick ONE purchase metric in priority order — omni_purchase is Meta's deduped total,
+// so summing it with its sub-types (fb_pixel_purchase, web_in_store…) would double-count.
+const PURCHASE = ['omni_purchase', 'purchase', 'offsite_conversion.fb_pixel_purchase', 'web_in_store_purchase', 'onsite_web_purchase'];
+const pickAction = (arr, types) => { if (!Array.isArray(arr)) return 0; for (const t of types) { const a = arr.find(x => x.action_type === t); if (a) return N(a.value); } return 0; };
 function norm(row) {
-  const spend = N(row.spend), purchases = sumAction(row.actions, PURCHASE), revenue = sumAction(row.action_values, PURCHASE);
-  const roas = (Array.isArray(row.purchase_roas) && row.purchase_roas[0]) ? N(row.purchase_roas[0].value) : (spend ? revenue / spend : 0);
+  const spend = N(row.spend), purchases = pickAction(row.actions, PURCHASE), revenue = pickAction(row.action_values, PURCHASE);
+  const roas = spend ? revenue / spend : 0;   // keep ROAS consistent with the Revenue we display (Revenue ÷ Spend)
   return {
     name: row.campaign_name || row.adset_name || row.ad_name || 'Account', id: row.campaign_id || row.adset_id || row.ad_id || '',
     spend: Math.round(spend * 100) / 100, impressions: N(row.impressions), reach: N(row.reach), frequency: Math.round(N(row.frequency) * 100) / 100,
