@@ -15,6 +15,17 @@ create table if not exists manychat_optins (
   raw           jsonb,                      -- full webhook payload (debugging)
   created_at    timestamptz default now()
 );
+-- Safe to re-run: adds any columns that an earlier version of this table was missing.
+alter table manychat_optins add column if not exists ref              text;
+alter table manychat_optins add column if not exists post_url         text;
+alter table manychat_optins add column if not exists growth_tool_id   text;
+alter table manychat_optins add column if not exists growth_tool_name text;
+alter table manychat_optins add column if not exists event            text default 'optin';
+alter table manychat_optins add column if not exists subscriber_id    text;
+alter table manychat_optins add column if not exists name             text;
+alter table manychat_optins add column if not exists channel          text;
+alter table manychat_optins add column if not exists raw              jsonb;
+
 create index if not exists manychat_optins_ref_idx     on manychat_optins (ref);
 create index if not exists manychat_optins_created_idx  on manychat_optins (created_at desc);
 
