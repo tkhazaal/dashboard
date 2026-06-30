@@ -4,9 +4,11 @@
 
 create table if not exists manychat_optins (
   id            bigserial primary key,
-  ref           text,                       -- optional CTA tag (grouping)
-  post_url      text,                       -- the FB/IG post or reel link → auto-matched to a post
-  event         text default 'optin',       -- 'optin' | 'cta_click'
+  ref               text,                   -- optional CTA tag (grouping)
+  post_url          text,                   -- the FB/IG post or reel link → auto-matched to a post
+  growth_tool_id    text,                   -- ManyChat last_growth_tool.id  (each comment-trigger = one post)
+  growth_tool_name  text,                   -- ManyChat last_growth_tool.name
+  event             text default 'optin',   -- 'optin' | 'cta_click'
   subscriber_id text,                       -- ManyChat user id (for de-dup / counting people)
   name          text,
   channel       text,                       -- instagram | facebook | messenger

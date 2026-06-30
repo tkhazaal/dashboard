@@ -20,14 +20,17 @@ router.post('/hook/:token', async (req, res) => {
   try {
     if (req.params.token !== await getToken()) return res.status(403).json({ ok: false, error: 'bad token' });
     const b = (req.body && typeof req.body === 'object') ? req.body : {};
+    const gt = (b.last_growth_tool && typeof b.last_growth_tool === 'object') ? b.last_growth_tool : {};
     const event = String(b.event || b.type || 'optin').toLowerCase() === 'cta_click' ? 'cta_click' : 'optin';
     const row = {
       ref: str(b.ref || b.cta || b.tag, 200),
       post_url: str(b.post_url || b.post_link || b.link || b.url || b.permalink, 600),
+      growth_tool_id: str(b.growth_tool_id || gt.id || gt.key, 80),
+      growth_tool_name: str(b.growth_tool_name || gt.name, 200),
       event,
       subscriber_id: str(b.subscriber_id || b.user_id || b.id, 120),
-      name: str(b.name || b.first_name || b.full_name, 160),
-      channel: str(b.channel || b.platform || b.source, 40),
+      name: str(b.name || b.full_name || [b.first_name, b.last_name].filter(Boolean).join(' '), 160),
+      channel: str(b.channel || b.platform || b.source || gt.channel, 40),
       raw: b,
     };
     const { error } = await supabase.from('manychat_optins').insert(row);
@@ -42,21 +45,27 @@ router.get('/data', async (req, res) => {
   try { token = await getToken(); } catch {}
   try {
     const { data, error } = await supabase.from('manychat_optins')
-      .select('ref, post_url, event, channel, created_at').order('created_at', { ascending: false }).limit(20000);
+      .select('ref, post_url, growth_tool_id, growth_tool_name, event, channel, created_at').order('created_at', { ascending: false }).limit(20000);
     if (error) throw error;
     const rows = data || [];
-    const refMap = {}, byChannel = {}, byPostUrl = {};
+    const refMap = {}, byChannel = {}, byPostUrl = {}, gtMap = {};
     let optins = 0, ctaClicks = 0;
     const bump = (bag, key, field, isCta, at, extra) => {
       const m = bag[key] || (bag[key] = { [field]: key, optins: 0, cta_clicks: 0, lastAt: null, ...extra });
       if (isCta) m.cta_clicks++; else m.optins++;
       if (!m.lastAt || at > m.lastAt) m.lastAt = at;
+      return m;
     };
     for (const r of rows) {
       const isCta = r.event === 'cta_click';
       if (isCta) ctaClicks++; else optins++;
       if (r.ref) bump(refMap, r.ref, 'ref', isCta, r.created_at);
       if (r.post_url) bump(byPostUrl, r.post_url, 'post_url', isCta, r.created_at);
+      if (r.growth_tool_id || r.growth_tool_name) {
+        const key = String(r.growth_tool_id || r.growth_tool_name);
+        const m = bump(gtMap, key, 'growth_tool_id', isCta, r.created_at, { name: r.growth_tool_name || null });
+        if (r.growth_tool_name && !m.name) m.name = r.growth_tool_name;
+      }
       const ch = r.channel || 'unknown';
       const c = byChannel[ch] || (byChannel[ch] = { channel: ch, optins: 0 });
       if (!isCta) c.optins++;
@@ -65,8 +74,9 @@ router.get('/data', async (req, res) => {
       configured: true, token,
       totals: { optins, ctaClicks, total: rows.length },
       byRef: Object.values(refMap).sort((a, b) => b.optins - a.optins),
+      byGrowthTool: Object.values(gtMap).sort((a, b) => b.optins - a.optins),
       byChannel: Object.values(byChannel).sort((a, b) => b.optins - a.optins),
-      refMap, byPostUrl,
+      refMap, byPostUrl, gtMap,
     });
   } catch (e) { res.json({ configured: false, token, error: e.message }); }
 });

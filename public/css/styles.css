@@ -1139,6 +1139,9 @@ table.show-upsell .upsell-col { display: table-cell; }
 .mc-webhook code { font: 600 12px monospace; color: var(--text); word-break: break-all; }
 .clear-btn.sm { padding: 3px 9px; font-size: 11px; }
 .mc-table .soc-metric { text-align: right; font-variant-numeric: tabular-nums; }
+.mc-subhead { font: 700 12.5px var(--font-body); color: var(--text); margin: 16px 2px 8px; }
+.mc-subhead .th-hint { font-weight: 500; }
+.soc-gtid { font: 600 11px monospace; color: var(--sub); }
 .soc-optin { color: #0ea5e9; font-weight: 700; cursor: help; }
 
 /* Collapsible cards */
