@@ -2,6 +2,14 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.28.0', date: '2026-06-30', title: 'Sales Alerts — week-over-week drop notifications',
+    changes: [
+      { title: 'New Alerts page (notification center)', detail: 'A new “Alerts” item in the sidebar (with a live count badge) flags every channel or campaign where sales dropped vs the previous week. Each alert reads like “Cut of Culture · IG Post — Revenue ↓ 52.4%: $389 (Jun 22–28) down from $818 (Jun 15–21)”, with a summary of how much revenue is down overall. Click “↻ Update” to re-pull SamCart and recompare on the spot.' },
+      { title: 'Flexible comparisons & thresholds', detail: 'Compare the last full week vs the prior week (default), this week vs last week so far, or today vs the same weekday last week — Monday-start weeks, Eastern time. Break down by campaign × channel or by channel/post-type (IG Post, FB Post, Email…), filter to Revenue / Orders / Upsells, and set the alert threshold (≥10/20/25/50% drop). A small noise floor keeps tiny blips out.' },
+      { title: 'Upsell tracking by channel', detail: 'SamCart upsell revenue is now tracked per channel per day so upsell drops show up in Alerts too (populates after the next SamCart sync). Downsells are counted within upsells. Revenue & order alerts work immediately.' },
+    ],
+  },
+  {
     version: '1.27.0', date: '2026-06-30', title: 'Social Report: 3 views, filters & engagement metrics',
     changes: [
       { title: 'Cards / Table / Calendar views', detail: 'Toggle between a compact card feed, a full metrics table, and a month calendar (posts placed on the day they went out — use ‹ › to move between months). Cards are smaller now, captions collapse with “more/less”, each post shows when its metrics were last updated, and a “Load more” button keeps the page short as posts pile up.' },

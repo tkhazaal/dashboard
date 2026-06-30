@@ -265,6 +265,7 @@ function activateTab(tab) {
   if (tab === 'kajabi') loadKajabi();
   if (tab === 'email') loadEmail();
   if (tab === 'social') loadSocial();
+  if (tab === 'alerts') loadAlerts();
   if (tab === 'utm') loadUtm();
   if (tab === 'forms') loadForms();
 }
@@ -280,7 +281,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Per-tab Refresh ───────────────────────────────────────────────
 // Each reporting tab gets its own Refresh button that reloads only that tab's data
 // (and re-renders the widgets it shows). Sidebar "Refresh All Data" still does everything.
-const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 'email', 'social', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
+const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 'email', 'social', 'alerts', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
 async function refreshTab(tab, btn) {
   if (btn) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Refreshing…'; }
   try {
@@ -291,6 +292,7 @@ async function refreshTab(tab, btn) {
     else if (tab === 'kajabi')   await loadKajabi();
     else if (tab === 'email')    await loadEmail();
     else if (tab === 'social')   await loadSocial();
+    else if (tab === 'alerts')   { await loadSamCart(); renderAlerts(); updateAlertBadge(); }
     else if (tab === 'pages')    await Promise.allSettled([loadPagesTable(), loadSamCart()]);
     else if (tab === 'utm')      await loadUtm();
     else if (tab === 'customers' || tab === 'behaviour' || tab === 'paths') await loadSamCart();
@@ -886,6 +888,7 @@ async function loadSamCart(force = false) {
   }
 
   state.scData = data;
+  updateAlertBadge();   // refresh the sidebar "Alerts" count whenever SamCart data loads
 
   // Overview KPI cards
   $('ov-totalCustomers').textContent = fmtNum(data.totalCustomers);   // all-time (lifetime)
@@ -3090,6 +3093,125 @@ if ($('fx-bulk-del')) $('fx-bulk-del').addEventListener('click', async () => {
   if (!confirm(`Delete ${n} selected submission${n === 1 ? '' : 's'}? This cannot be undone.`)) return;
   try { await fxPost('/api/forms/submissions/bulk-delete', { ids: [...fxSelected] }); fxSelected.clear(); fxSearch(); loadForms(); loadSourceSummary(); }
   catch (e) { alert('Delete failed: ' + e.message); }
+});
+
+// ── Sales Alerts / Notification Center (week-over-week sales drops) ────
+const alertState = { basis: 'lastfull', dim: 'campaign', metric: 'all', threshold: 10 };
+const AL_SEP = String.fromCharCode(1);                       // campaign∴channel∴product key separator
+const AL_FLOOR = { revenue: 25, orders: 2, upsells: 2 };     // ignore tiny prior-period values (noise)
+const AL_METRIC_LABEL = { revenue: 'Revenue', orders: 'Orders', upsells: 'Upsells' };
+const alMoney = v => (typeof fmtMoney === 'function' ? fmtMoney(v) : '$' + Math.round(v || 0));
+const alVal = (m, v) => m === 'revenue' ? alMoney(v) : fmtNum(Math.round(v || 0));
+const alMd = s => { const d = new Date(s + 'T00:00:00'); return isNaN(d) ? s : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+const alRange = (from, to) => from === to ? alMd(from) : `${alMd(from)} – ${alMd(to)}`;
+
+// Monday-start week windows (Eastern), for each comparison basis.
+function alWindows(basis) {
+  const today = nowET(), t = ymd(today);
+  const mondayBack = (today.getDay() + 6) % 7;               // days since this week's Monday
+  const thisMon = ymd(_addDays(t, -mondayBack));
+  if (basis === 'day')  return { thisFrom: t, thisTo: t, lastFrom: ymd(_addDays(t, -7)), lastTo: ymd(_addDays(t, -7)) };
+  if (basis === 'week') return { thisFrom: thisMon, thisTo: t, lastFrom: ymd(_addDays(thisMon, -7)), lastTo: ymd(_addDays(t, -7)) };
+  // 'lastfull' — last complete Mon–Sun vs the week before it
+  return { thisFrom: ymd(_addDays(thisMon, -7)), thisTo: ymd(_addDays(thisMon, -1)), lastFrom: ymd(_addDays(thisMon, -14)), lastTo: ymd(_addDays(thisMon, -8)) };
+}
+function alDays(from, to) { const out = []; let d = from, g = 0; while (d <= to && g++ < 800) { out.push(d); d = ymd(_addDays(d, 1)); } return out; }
+function alSumChannel(byDay, from, to) {
+  const out = {}; if (!byDay) return out;
+  for (const day of alDays(from, to)) { const e = byDay[day]; if (!e) continue;
+    for (const ch in e) { const o = out[ch] || (out[ch] = { orders: 0, revenue: 0 }); o.orders += e[ch].orders || 0; o.revenue += e[ch].revenue || 0; } }
+  return out;
+}
+function alSumCampaignChannel(byDay, from, to) {
+  const out = {}; if (!byDay) return out;
+  for (const day of alDays(from, to)) { const e = byDay[day]; if (!e) continue;
+    for (const key in e) { const p = key.split(AL_SEP), camp = p[0] || '(none)', ch = p[1] || '(untagged)', k = camp + AL_SEP + ch;
+      const o = out[k] || (out[k] = { orders: 0, revenue: 0, campaign: camp, channel: ch }); o.orders += e[key].orders || 0; o.revenue += e[key].revenue || 0; } }
+  return out;
+}
+function alDrop(metric, thisVal, lastVal, meta) {
+  if ((lastVal || 0) < (AL_FLOOR[metric] || 1)) return null;        // prior period too small to be meaningful
+  const dropPct = (lastVal - thisVal) / lastVal * 100;
+  if (dropPct < alertState.threshold) return null;                  // not down enough (also excludes gains / flat)
+  return { metric, thisVal, lastVal, dropPct, deltaVal: lastVal - thisVal,
+    severity: dropPct >= 50 ? 'crit' : dropPct >= 25 ? 'high' : 'med', ...meta };
+}
+function alEmit(thisMap, lastMap, metric, field, labelFn) {
+  const out = [], keys = new Set([...Object.keys(thisMap), ...Object.keys(lastMap)]);
+  for (const k of keys) { const a = alDrop(metric, (thisMap[k] || {})[field] || 0, (lastMap[k] || {})[field] || 0, labelFn(k, thisMap[k] || lastMap[k])); if (a) out.push(a); }
+  return out;
+}
+function computeAlerts() {
+  const sc = state.scData;
+  if (!sc || !sc.ordersByChannelByDay) return { alerts: [], w: null, ready: !!sc };
+  const w = alWindows(alertState.basis);
+  const metrics = alertState.metric === 'all' ? ['revenue', 'orders', 'upsells'] : [alertState.metric];
+  const alerts = [];
+  if (alertState.dim === 'channel') {
+    const tC = alSumChannel(sc.ordersByChannelByDay, w.thisFrom, w.thisTo), lC = alSumChannel(sc.ordersByChannelByDay, w.lastFrom, w.lastTo);
+    const tU = alSumChannel(sc.upsellByChannelByDay, w.thisFrom, w.thisTo), lU = alSumChannel(sc.upsellByChannelByDay, w.lastFrom, w.lastTo);
+    const lbl = ch => ({ label: ch, channel: ch, campaign: '' });
+    if (metrics.includes('revenue')) alerts.push(...alEmit(tC, lC, 'revenue', 'revenue', lbl));
+    if (metrics.includes('orders'))  alerts.push(...alEmit(tC, lC, 'orders', 'orders', lbl));
+    if (metrics.includes('upsells')) alerts.push(...alEmit(tU, lU, 'upsells', 'orders', lbl));
+  } else {
+    const tCC = alSumCampaignChannel(sc.ordersByChannelProductByDay, w.thisFrom, w.thisTo), lCC = alSumCampaignChannel(sc.ordersByChannelProductByDay, w.lastFrom, w.lastTo);
+    const lbl = (k, e) => { const camp = (e && e.campaign) || k.split(AL_SEP)[0] || '(none)', ch = (e && e.channel) || k.split(AL_SEP)[1] || '(untagged)';
+      return { label: (camp && camp !== '(none)') ? `${camp} · ${ch}` : ch, channel: ch, campaign: camp === '(none)' ? '' : camp }; };
+    if (metrics.includes('revenue')) alerts.push(...alEmit(tCC, lCC, 'revenue', 'revenue', lbl));
+    if (metrics.includes('orders'))  alerts.push(...alEmit(tCC, lCC, 'orders', 'orders', lbl));
+    // upsells aren't tracked at campaign×channel granularity (channel-level only)
+  }
+  alerts.sort((a, b) => b.dropPct - a.dropPct);
+  return { alerts, w, ready: true };
+}
+function renderAlerts() {
+  const sc = state.scData;
+  if ($('alerts-synced')) $('alerts-synced').textContent = (sc && sc.syncedAt) ? 'Data as of ' + timeAgo(sc.syncedAt) : '';
+  const { alerts, w, ready } = computeAlerts();
+  if (!ready) { $('alerts-list').innerHTML = '<div class="soc-empty">Loading SamCart data… if this persists, click “↻ Update”.</div>'; $('alerts-window').textContent = ''; $('alerts-summary').textContent = ''; return; }
+  $('alerts-window').innerHTML = w ? `Comparing <strong>${alRange(w.thisFrom, w.thisTo)}</strong> vs <strong>${alRange(w.lastFrom, w.lastTo)}</strong>` : '';
+  const revDrops = alerts.filter(a => a.metric === 'revenue'), lostRev = revDrops.reduce((s, a) => s + a.deltaVal, 0);
+  $('alerts-summary').innerHTML = alerts.length
+    ? `<span class="alerts-count">${alerts.length}</span> alert${alerts.length > 1 ? 's' : ''}${revDrops.length ? ` · ${revDrops.length} revenue drop${revDrops.length > 1 ? 's' : ''} totalling <strong>${alMoney(lostRev)}</strong> below the previous period` : ''}.`
+    : '';
+  if (!alerts.length) {
+    const upHint = (alertState.dim === 'campaign' && alertState.metric === 'upsells');
+    $('alerts-list').innerHTML = upHint
+      ? '<div class="alerts-clear">Upsell drops are tracked <strong>By channel / post type</strong> — switch the breakdown selector to see them.</div>'
+      : `<div class="alerts-clear">✓ No ${alertState.metric === 'all' ? '' : AL_METRIC_LABEL[alertState.metric].toLowerCase() + ' '}drops ≥ ${alertState.threshold}% — everything is holding or up vs the previous period.</div>`;
+    return;
+  }
+  $('alerts-list').innerHTML = alerts.map(a => `
+    <div class="alert-card alert-${a.severity}">
+      <div class="alert-top"><span class="alert-badge">${AL_METRIC_LABEL[a.metric]} ↓ ${a.dropPct.toFixed(1)}%</span><span class="alert-title" title="${escHtml(a.label)}">${escHtml(a.label)}</span></div>
+      <div class="alert-cmp">
+        <div class="alert-col"><span class="alert-now">${alVal(a.metric, a.thisVal)}</span><span class="alert-range">${alRange(w.thisFrom, w.thisTo)}</span></div>
+        <span class="alert-vs">↓ from</span>
+        <div class="alert-col"><span class="alert-was">${alVal(a.metric, a.lastVal)}</span><span class="alert-range">${alRange(w.lastFrom, w.lastTo)}</span></div>
+      </div>
+      <div class="alert-detail">Down <strong>${alVal(a.metric, a.deltaVal)}</strong> (${a.dropPct.toFixed(1)}%) vs the previous ${alertState.basis === 'day' ? 'week’s day' : 'week'}.</div>
+    </div>`).join('');
+}
+function updateAlertBadge() {
+  const badge = $('alerts-badge'); if (!badge) return;
+  if (!state.scData || !state.scData.ordersByChannelByDay) { badge.hidden = true; return; }
+  const n = computeAlerts().alerts.length;
+  badge.textContent = n > 99 ? '99+' : n; badge.hidden = n === 0;
+}
+async function loadAlerts() {
+  if (!state.scData) { try { await loadSamCart(); } catch {} }
+  renderAlerts(); updateAlertBadge();
+}
+['alerts-basis', 'alerts-dim', 'alerts-metric', 'alerts-threshold'].forEach(id => { const el = $(id); if (el) el.addEventListener('change', () => {
+  alertState.basis = $('alerts-basis').value; alertState.dim = $('alerts-dim').value; alertState.metric = $('alerts-metric').value; alertState.threshold = +$('alerts-threshold').value;
+  renderAlerts(); updateAlertBadge();
+}); });
+if ($('alerts-update')) $('alerts-update').addEventListener('click', async () => {
+  const btn = $('alerts-update'), lbl = btn.textContent; btn.disabled = true; btn.textContent = 'Updating…';
+  try { await loadSamCart(); } catch {}
+  renderAlerts(); updateAlertBadge();
+  btn.disabled = false; btn.textContent = lbl;
 });
 
 // ── Social Report (Facebook + Instagram via Apify) ────────────────────

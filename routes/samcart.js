@@ -236,6 +236,7 @@ async function computeMetrics(orders, apiKey) {
   const nonUtmOrders = [];   // {day, product, amount} for orders without UTM → time-match estimate candidates
   const upsellTotals = {};   // upsellName -> { orders, revenue }
   const upsellBySlug = {};   // mainSlug -> { upsellName -> { orders, revenue } }
+  const upsellByChannelByDay = {}; // 'YYYY-MM-DD' -> { channel -> { orders, revenue } } (drives week-over-week Alerts)
 
   for (const o of orders) {
     if (o.test_mode) continue;                         // exclude sandbox/test orders
@@ -308,7 +309,8 @@ async function computeMetrics(orders, apiKey) {
       }
     }
 
-    // Upsell line items (upsell_id set) — attribute to the order's main slug (channel)
+    // Upsell line items (upsell_id set) — attribute to the order's main slug + its UTM channel
+    const upCh = (dRev && (up.source || up.medium || up.content || up.campaign)) ? utmChannel(up.content, up.source, up.medium) : null;
     for (const it of (o.cart_items || [])) {
       if (!it.upsell_id) continue;
       const uname = itemName(it) || `Product #${it.product_id}`;
@@ -319,6 +321,11 @@ async function computeMetrics(orders, apiKey) {
         if (!upsellBySlug[slug]) upsellBySlug[slug] = {};
         if (!upsellBySlug[slug][uname]) upsellBySlug[slug][uname] = { orders: 0, revenue: 0 };
         upsellBySlug[slug][uname].orders++; upsellBySlug[slug][uname].revenue += urev;
+      }
+      if (upCh && upCh !== '(untagged)') {
+        if (!upsellByChannelByDay[dRev]) upsellByChannelByDay[dRev] = {};
+        if (!upsellByChannelByDay[dRev][upCh]) upsellByChannelByDay[dRev][upCh] = { orders: 0, revenue: 0 };
+        upsellByChannelByDay[dRev][upCh].orders++; upsellByChannelByDay[dRev][upCh].revenue += urev;
       }
     }
 
@@ -558,7 +565,7 @@ async function computeMetrics(orders, apiKey) {
     netRevenue:     Math.round((revenue - totalRefunded) * 100) / 100,
     refunds,
     tiers: TIERS, topCustomers, productPaths, monthly, topProducts,
-    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, ordersByChannelProductByDay, estOrdersByChannelProductByDay, firstOrderByDay, upsellProducts, upsellBySlug,
+    ordersBySlug, ordersBySlugByDay, ordersByChannelByDay, ordersByUtmByDay, ordersByChannelProductByDay, estOrdersByChannelProductByDay, firstOrderByDay, upsellProducts, upsellBySlug, upsellByChannelByDay,
     productSales, productList: sortedProductList, productSlug, salesByDay,
     dailyRevenue, refundsByDay,
   };

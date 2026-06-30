@@ -1085,6 +1085,36 @@ table.show-upsell .upsell-col { display: table-cell; }
 @media (max-width: 700px) { .soc-cal-cell { min-height: 54px; } }
 @media (max-width: 900px) { .social-charts { grid-template-columns: 1fr; } }
 
+/* ── Sales Alerts / Notification Center ───────────────────────── */
+.nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font: 700 10.5px var(--font-body); display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.alerts-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.alerts-window { color: var(--sub); font: 500 12.5px var(--font-body); margin-left: auto; }
+.alerts-summary { color: var(--text); font: 500 13.5px var(--font-body); margin: 15px 2px 4px; }
+.alerts-summary:empty { display: none; }
+.alerts-count { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px; background: var(--danger); color: #fff; font-weight: 800; font-size: 12.5px; margin-right: 4px; }
+.alerts-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(335px, 1fr)); gap: 13px; margin-top: 10px; }
+.alert-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--sub); border-radius: 12px; padding: 13px 15px; box-shadow: var(--shadow); }
+.alert-card.alert-crit { border-left-color: var(--danger); }
+.alert-card.alert-high { border-left-color: #f59e0b; }
+.alert-card.alert-med  { border-left-color: #eab308; }
+.alert-top { display: flex; align-items: center; gap: 9px; margin-bottom: 11px; }
+.alert-badge { font: 700 11px var(--font-body); padding: 3px 9px; border-radius: 7px; background: var(--surface-alt); color: var(--text); white-space: nowrap; }
+.alert-crit .alert-badge { background: rgba(239,68,68,0.13); color: var(--danger); }
+.alert-high .alert-badge { background: rgba(245,158,11,0.15); color: #d97706; }
+.alert-med  .alert-badge { background: rgba(234,179,8,0.16); color: #a16207; }
+.alert-title { font: 700 13.5px var(--font-body); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-cmp { display: flex; align-items: flex-end; gap: 12px; }
+.alert-col { display: flex; flex-direction: column; gap: 1px; }
+.alert-now { font: 800 21px var(--font-body); color: var(--text); line-height: 1.05; }
+.alert-was { font: 700 15px var(--font-body); color: var(--sub); text-decoration: line-through; line-height: 1.05; }
+.alert-range { font: 600 10px var(--font-body); color: var(--sub); text-transform: uppercase; letter-spacing: 0.02em; }
+.alert-vs { font: 600 11px var(--font-body); color: var(--danger); padding-bottom: 3px; white-space: nowrap; }
+.alert-detail { color: var(--sub); font: 500 12px var(--font-body); margin-top: 10px; line-height: 1.5; }
+.alert-detail strong { color: var(--text); }
+.alerts-clear { grid-column: 1 / -1; padding: 36px; text-align: center; color: var(--text); font: 600 14.5px var(--font-body); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.alerts-note { margin-top: 16px; }
+@media (max-width: 700px) { .alerts-window { margin-left: 0; width: 100%; } }
+
 /* Collapsible cards */
 .card.collapsible > .card-header { cursor: pointer; user-select: none; }
 .card.collapsible > .card-header h2 { display: inline-flex; align-items: center; gap: 8px; }
