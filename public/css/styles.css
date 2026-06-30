@@ -1069,7 +1069,7 @@ table.show-upsell .upsell-col { display: table-cell; }
 /* Social table view */
 .social-mtable th, .social-mtable td { white-space: nowrap; }
 .social-mtable .soc-tcap { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.social-mtable .soc-metric { text-align: right; font-variant-numeric: tabular-nums; }
+.social-mtable th.soc-mh, .social-mtable .soc-metric { text-align: right; font-variant-numeric: tabular-nums; }
 .social-mtable .soc-plat { padding: 1px 6px; font-size: 10px; }
 /* Social calendar view */
 .soc-cal-head { font: 600 14px var(--font-body); color: var(--text); margin-bottom: 10px; }

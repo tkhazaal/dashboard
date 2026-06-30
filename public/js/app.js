@@ -3248,7 +3248,7 @@ function renderSocialCards(rows) {
 }
 function renderSocialTable(rows) {
   const shown = rows.slice(0, socState.page * SOC_PAGE);
-  $('social-thead').innerHTML = `<tr><th>Date</th><th>Plat</th><th>Type</th><th>Hook / caption</th><th>Views</th><th>Likes</th><th>Cmt</th><th>Shr</th><th title="Engagement rate = engagement ÷ views">ER%</th><th title="Comments ÷ views">Cmt%</th><th title="Shares ÷ views">Shr%</th><th title="(comments+shares) ÷ likes">Reson.</th><th title="Shares ÷ engagement">Viral.</th><th></th></tr>`;
+  $('social-thead').innerHTML = `<tr><th>Date</th><th>Plat</th><th>Type</th><th>Hook / caption</th><th class="soc-mh">Views</th><th class="soc-mh">Likes</th><th class="soc-mh">Cmt</th><th class="soc-mh">Shr</th><th class="soc-mh" title="Engagement rate = engagement ÷ views">ER%</th><th class="soc-mh" title="Comments ÷ views">Cmt%</th><th class="soc-mh" title="Shares ÷ views">Shr%</th><th class="soc-mh" title="(comments+shares) ÷ likes">Reson.</th><th class="soc-mh" title="Shares ÷ engagement">Viral.</th><th></th></tr>`;
   $('social-tbody').innerHTML = shown.length ? shown.map(p => {
     const dt = socialDateParts(p.posted_at), m = socMetrics(p), plat = String(p.platform).toLowerCase();
     const label = p.hook_topic || (p.caption || '').replace(/\n/g, ' ').slice(0, 60) || '—';
