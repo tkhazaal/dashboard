@@ -516,6 +516,27 @@
         </div>
       </div>
 
+      <div class="card meta-ads-card" id="meta-ads-block">
+        <div class="card-header">
+          <h2>Meta Ads <span class="th-hint" id="meta-acct-label"></span></h2>
+          <div class="header-pills">
+            <select id="meta-range" class="cmp-preset" title="Meta reporting range">
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="last7">Last 7 days</option>
+              <option value="last30" selected>Last 30 days</option>
+              <option value="thismonth">This month</option>
+              <option value="lastmonth">Last month</option>
+              <option value="all">Maximum</option>
+            </select>
+            <span class="pill" id="meta-synced"></span>
+            <button class="clear-btn" id="meta-refresh">↻ Refresh</button>
+          </div>
+        </div>
+        <div id="meta-ads-body"><div class="soc-empty">Loading…</div></div>
+      </div>
+
+      <h2 class="meta-section-h">Planned budgets <span class="th-hint">manual — spend &amp; ROAS from each campaign's budget vs linked SamCart revenue</span></h2>
       <div class="stat-grid" id="ad-kpis"></div>
 
       <div class="card">
@@ -1335,6 +1356,23 @@
             <label>
               <span>Facebook page URL</span>
               <input type="text" name="facebook_page_url" placeholder="https://www.facebook.com/taniakhazaal/" autocomplete="off">
+            </label>
+
+            <div class="settings-divider">Meta (Facebook) Ads</div>
+            <label>
+              <span>Meta Ad Account ID <small>(act_… — Ads Manager / Business Settings)</small></span>
+              <input type="text" name="meta_ad_account_id" placeholder="act_1234567890" autocomplete="off">
+              <small id="metaAcctHint" class="field-hint"></small>
+            </label>
+            <label>
+              <span>Meta Access Token <small>(System User token — never expires)</small></span>
+              <input type="password" name="meta_ads_token" placeholder="Paste long-lived token to update" autocomplete="off">
+              <small id="metaTokenHint" class="field-hint"></small>
+            </label>
+            <label>
+              <span>Meta App Secret <small>(optional — adds appsecret_proof security)</small></span>
+              <input type="password" name="meta_app_secret" placeholder="Optional" autocomplete="off">
+              <small id="metaSecretHint" class="field-hint"></small>
             </label>
 
             <button type="submit" class="btn-primary">Save Settings</button>

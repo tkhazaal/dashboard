@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.29.0', date: '2026-06-30', title: 'Meta (Facebook) Ads reporting',
+    changes: [
+      { title: 'Live Meta Ads on the Ads page', detail: 'Connect your Meta ad account (Settings → Meta Ads) and the Ads page pulls live spend, ROAS, purchases, cost-per-purchase, impressions, reach, clicks, CTR, CPC, CPM and frequency — with a 90-day spend & ROAS trend and a per-campaign table. Pick the range (today → maximum) and refresh on demand. Read-only; your campaigns are never touched.' },
+      { title: 'Secure, long-term connection', detail: 'Uses a Meta System User access token (never expires) stored in Settings just like your other keys — masked on screen, kept in the database, never in code. Optional App Secret adds appsecret_proof. Until you connect, the page shows a simple “Connect Meta Ads” prompt.' },
+    ],
+  },
+  {
     version: '1.28.0', date: '2026-06-30', title: 'Sales Alerts — week-over-week drop notifications',
     changes: [
       { title: 'New Alerts page (notification center)', detail: 'A new “Alerts” item in the sidebar (with a live count badge) flags every channel or campaign where sales dropped vs the previous week. Each alert reads like “Cut of Culture · IG Post — Revenue ↓ 52.4%: $389 (Jun 22–28) down from $818 (Jun 15–21)”, with a summary of how much revenue is down overall. Click “↻ Update” to re-pull SamCart and recompare on the spot.' },

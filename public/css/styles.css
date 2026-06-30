@@ -1115,6 +1115,22 @@ table.show-upsell .upsell-col { display: table-cell; }
 .alerts-note { margin-top: 16px; }
 @media (max-width: 700px) { .alerts-window { margin-left: 0; width: 100%; } }
 
+/* ── Meta (Facebook) Ads reporting ────────────────────────────── */
+.meta-ads-card .header-pills { gap: 8px; }
+.meta-section-h { font: 700 15px var(--font-body); color: var(--text); margin: 22px 2px 12px; }
+.meta-section-h .th-hint { font-weight: 500; }
+.meta-kpis { margin-bottom: 14px; }
+.meta-trend { margin-bottom: 14px; }
+.meta-trend .chart-wrap { height: 240px; }
+.meta-table .meta-cname { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta-good { color: #10b981; font-weight: 700; }
+.meta-bad  { color: var(--danger); font-weight: 700; }
+.meta-connect { text-align: center; padding: 38px 20px; }
+.meta-connect-icon { font-size: 32px; }
+.meta-connect h3 { margin: 8px 0 6px; font: 700 17px var(--font-body); color: var(--text); }
+.meta-connect p { color: var(--sub); font: 500 13.5px var(--font-body); max-width: 540px; margin: 0 auto 14px; line-height: 1.55; }
+.meta-connect code { background: var(--surface-alt); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
 /* Collapsible cards */
 .card.collapsible > .card-header { cursor: pointer; user-select: none; }
 .card.collapsible > .card-header h2 { display: inline-flex; align-items: center; gap: 8px; }

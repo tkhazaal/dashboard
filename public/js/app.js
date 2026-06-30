@@ -1046,6 +1046,10 @@ async function loadSettings() {
   if ($('apifyHint')) $('apifyHint').textContent = s.apify_token_masked ? `Connected ✓ · token ${s.apify_token_masked}` : 'Not connected';
   if (form.instagram_username && s.instagram_username) form.instagram_username.value = s.instagram_username;
   if (form.facebook_page_url && s.facebook_page_url) form.facebook_page_url.value = s.facebook_page_url;
+  if (form.meta_ad_account_id && s.meta_ad_account_id) form.meta_ad_account_id.value = s.meta_ad_account_id;
+  if ($('metaAcctHint'))   $('metaAcctHint').textContent   = s.meta_ad_account_id ? `Account ${s.meta_ad_account_id}` : 'Not set';
+  if ($('metaTokenHint'))  $('metaTokenHint').textContent  = s.meta_ads_token_masked ? `Connected ✓ · token ${s.meta_ads_token_masked}` : 'Not connected';
+  if ($('metaSecretHint')) $('metaSecretHint').textContent = s.meta_app_secret_masked ? `Set ✓ · ${s.meta_app_secret_masked}` : 'Optional — not set';
   state.monthlyGoal = parseFloat(s.monthly_goal) || 0;
   if (s.funnels_config) { try { state.funnelsConfig = JSON.parse(s.funnels_config); } catch {} }
   if (s.ad_campaigns)   { try { state.adCampaigns   = JSON.parse(s.ad_campaigns);   } catch {} }
@@ -2475,7 +2479,66 @@ async function loadAds() {
   }
   if (!state.scData) await loadSamCart().catch(() => {});
   renderAds();
+  loadMetaAds();
 }
+
+// ── Meta (Facebook) Ads reporting ─────────────────────────────────
+const metaMoney = (v, cur) => { const n = Number(v) || 0; try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur || 'USD', minimumFractionDigits: 0, maximumFractionDigits: Math.abs(n) < 100 && n !== 0 ? 2 : 0 }).format(n); } catch { return '$' + n.toFixed(2); } };
+function metaConnectHtml() {
+  return `<div class="meta-connect">
+    <div class="meta-connect-icon">📊</div>
+    <h3>Connect Meta (Facebook) Ads</h3>
+    <p>Add your <strong>Meta Ad Account ID</strong> and a <strong>System User access token</strong> in Settings to pull live spend, ROAS, CPM / CPC / CTR and per-campaign performance here — read-only, never expires.</p>
+    <button class="btn-primary sm" id="meta-goto-settings" type="button">Open Settings</button>
+  </div>`;
+}
+async function loadMetaAds(force) {
+  const body = $('meta-ads-body'); if (!body) return;
+  const preset = ($('meta-range') && $('meta-range').value) || 'last30';
+  if (!body.dataset.loaded) body.innerHTML = '<div class="soc-empty">Loading Meta Ads…</div>';
+  try {
+    const d = await api(`/api/meta-ads/data?preset=${encodeURIComponent(preset)}${force ? '&force=1' : ''}`);
+    state.metaAds = d; renderMetaAds(d); body.dataset.loaded = '1';
+  } catch (e) { body.innerHTML = `<div class="meta-connect"><p>⚠ ${escHtml((e && e.message) || 'Could not load Meta Ads')}</p></div>`; }
+}
+function renderMetaAds(d) {
+  const body = $('meta-ads-body'); if (!body) return;
+  if (!d || d.configured === false) { if ($('meta-acct-label')) $('meta-acct-label').textContent = '· not connected'; if ($('meta-synced')) $('meta-synced').textContent = ''; body.innerHTML = metaConnectHtml(); return; }
+  if (d.error) { if ($('meta-synced')) $('meta-synced').textContent = ''; body.innerHTML = `<div class="meta-connect"><div class="meta-connect-icon">⚠</div><h3>Meta API error</h3><p>${escHtml(d.error)}</p><p class="th-hint">Check the ad account ID & token in Settings (the token needs <code>ads_read</code> on this account).</p></div>`; return; }
+  const t = d.totals || {}, cur = d.currency || 'USD', money = v => metaMoney(v, cur);
+  if ($('meta-acct-label')) $('meta-acct-label').textContent = d.account ? '· ' + (d.account.name || d.account.id || '') : '';
+  if ($('meta-synced')) $('meta-synced').textContent = d.syncedAt ? 'Updated ' + timeAgo(d.syncedAt) : '';
+  const kpis = [
+    ['Spend', money(t.spend)], ['Revenue', money(t.revenue)], ['ROAS', (t.roas || 0).toFixed(2) + '×'],
+    ['Purchases', fmtNum(t.purchases)], ['Cost / purchase', t.cpa ? money(t.cpa) : '—'],
+    ['Impressions', fmtNum(t.impressions)], ['Reach', fmtNum(t.reach)], ['Clicks', fmtNum(t.clicks)],
+    ['CTR', (t.ctr || 0).toFixed(2) + '%'], ['CPC', money(t.cpc)], ['CPM', money(t.cpm)], ['Frequency', (t.frequency || 0).toFixed(2)],
+  ];
+  const kpiHtml = `<div class="rf-cards meta-kpis">${kpis.map(([l, v]) => `<div class="rf-card"><div class="rf-card-label">${l}</div><div class="rf-card-val">${v}</div></div>`).join('')}</div>`;
+  const trendHtml = `<div class="card meta-trend"><div class="chart-card-head"><h3>Spend &amp; ROAS — last 90 days</h3></div><div class="chart-wrap"><canvas id="meta-trend-chart"></canvas></div></div>`;
+  const camps = d.campaigns || [];
+  const tableHtml = `<div class="card"><div class="card-header"><h2>Campaigns <span class="th-hint">by spend</span></h2></div><div class="table-wrap"><table class="data-table meta-table">
+    <thead><tr><th>Campaign</th><th class="soc-mh">Spend</th><th class="soc-mh">Impr.</th><th class="soc-mh">Clicks</th><th class="soc-mh">CTR</th><th class="soc-mh">CPC</th><th class="soc-mh">CPM</th><th class="soc-mh">Purch.</th><th class="soc-mh">Revenue</th><th class="soc-mh">ROAS</th></tr></thead>
+    <tbody>${camps.length ? camps.map(c => `<tr><td class="meta-cname" title="${escHtml(c.name)}">${escHtml(c.name)}</td><td class="soc-metric">${money(c.spend)}</td><td class="soc-metric">${fmtNum(c.impressions)}</td><td class="soc-metric">${fmtNum(c.clicks)}</td><td class="soc-metric">${(c.ctr || 0).toFixed(2)}%</td><td class="soc-metric">${money(c.cpc)}</td><td class="soc-metric">${money(c.cpm)}</td><td class="soc-metric">${fmtNum(c.purchases)}</td><td class="soc-metric">${money(c.revenue)}</td><td class="soc-metric ${c.roas >= 1 ? 'meta-good' : 'meta-bad'}">${(c.roas || 0).toFixed(2)}×</td></tr>`).join('') : '<tr class="empty-row"><td colspan="10">No campaign spend in this range.</td></tr>'}</tbody>
+  </table></div></div>`;
+  body.innerHTML = kpiHtml + trendHtml + tableHtml;
+  const daily = d.daily || [];
+  mkChart('meta-trend-chart', {
+    type: 'bar',
+    data: { labels: daily.map(x => x.date_start), datasets: [
+      { type: 'bar', label: 'Spend', data: daily.map(x => x.spend), backgroundColor: '#4267B2', yAxisID: 'y', borderRadius: 3, order: 2 },
+      { type: 'line', label: 'ROAS', data: daily.map(x => x.roas), borderColor: '#10b981', backgroundColor: 'transparent', yAxisID: 'y1', tension: 0.3, pointRadius: 0, borderWidth: 2, order: 1 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: TICK, font: { size: 11 } } }, tooltip: { callbacks: { label: c => c.dataset.label === 'ROAS' ? ` ROAS ${(c.parsed.y || 0).toFixed(2)}×` : ` Spend ${money(c.parsed.y)}` } } }, scales: {
+      x: { grid: { display: false }, ticks: { color: TICK, font: { size: 9 }, maxTicksLimit: 12 } },
+      y: { position: 'left', grid: { color: GRID }, ticks: { color: TICK, font: { size: 10 }, callback: v => money(v) }, beginAtZero: true },
+      y1: { position: 'right', grid: { display: false }, ticks: { color: TICK, font: { size: 10 }, callback: v => v + '×' }, beginAtZero: true },
+    } },
+  });
+}
+if ($('meta-range')) $('meta-range').addEventListener('change', () => { const b = $('meta-ads-body'); if (b) b.dataset.loaded = ''; loadMetaAds(); });
+if ($('meta-refresh')) $('meta-refresh').addEventListener('click', () => { const b = $('meta-ads-body'); if (b) b.dataset.loaded = ''; loadMetaAds(true); });
+if ($('meta-ads-block')) $('meta-ads-block').addEventListener('click', e => { if (e.target.closest('#meta-goto-settings')) activateTab('settings'); });
 
 // ══ Kajabi (reporting) ════════════════════════════════════════════
 async function loadKajabi() {
