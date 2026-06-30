@@ -3374,7 +3374,9 @@ function renderManychatPanel() {
   const base = location.origin;
   const url = d && d.token ? `${base}/api/manychat/hook/${d.token}` : `${base}/api/manychat/hook/…`;
   if (!d || d.configured === false) {
-    el.innerHTML = `<div class="mc-head"><h2>ManyChat optins</h2></div><div class="soc-empty">Run <code>manychat-schema.sql</code> in Supabase once, then this panel shows your optins. Webhook URL: <code>${escHtml(url)}</code></div>`;
+    el.innerHTML = `<div class="mc-head"><h2>ManyChat optins</h2></div>
+      <div class="mc-webhook"><span>Webhook URL — paste into ManyChat (External Request → POST):</span><code id="mc-url">${escHtml(url)}</code><button class="clear-btn sm" id="mc-copy" type="button">Copy</button></div>
+      <div class="soc-empty">Run <code>manychat-schema.sql</code> in Supabase once, then your optins appear here.</div>`;
     return;
   }
   const t = d.totals || {};
