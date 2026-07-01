@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.32.0', date: '2026-07-01', title: 'ManyChat gets its own tab',
+    changes: [
+      { title: 'Dedicated ManyChat page', detail: 'The ManyChat optins panel (webhook URL, totals, by growth tool, by ref, by channel) now lives in its own “ManyChat” tab in the sidebar. Per-post optins still show on the Social Report.' },
+    ],
+  },
+  {
     version: '1.31.0', date: '2026-07-01', title: 'ManyChat optin tracking on Social Report',
     changes: [
       { title: 'Track optins from your posts', detail: 'A new ManyChat panel on the Social Report shows optins (and CTA clicks) collected via webhook — totals, a breakdown by ref/CTA, and by channel. Copy the webhook URL into a ManyChat “External Request” action so each optin flows in with a ref tag.' },

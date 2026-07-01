@@ -265,6 +265,7 @@ function activateTab(tab) {
   if (tab === 'kajabi') loadKajabi();
   if (tab === 'email') loadEmail();
   if (tab === 'social') loadSocial();
+  if (tab === 'manychat') loadManychat();
   if (tab === 'alerts') loadAlerts();
   if (tab === 'utm') loadUtm();
   if (tab === 'forms') loadForms();
@@ -281,7 +282,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Per-tab Refresh ───────────────────────────────────────────────
 // Each reporting tab gets its own Refresh button that reloads only that tab's data
 // (and re-renders the widgets it shows). Sidebar "Refresh All Data" still does everything.
-const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 'email', 'social', 'alerts', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
+const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 'email', 'social', 'manychat', 'alerts', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
 async function refreshTab(tab, btn) {
   if (btn) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Refreshing…'; }
   try {
@@ -292,6 +293,7 @@ async function refreshTab(tab, btn) {
     else if (tab === 'kajabi')   await loadKajabi();
     else if (tab === 'email')    await loadEmail();
     else if (tab === 'social')   await loadSocial();
+    else if (tab === 'manychat') await loadManychat();
     else if (tab === 'alerts')   { await loadSamCart(); renderAlerts(); updateAlertBadge(); }
     else if (tab === 'pages')    await Promise.allSettled([loadPagesTable(), loadSamCart()]);
     else if (tab === 'utm')      await loadUtm();
