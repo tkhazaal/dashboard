@@ -1159,6 +1159,10 @@ th.soc-mh { text-align: right; }
 .sc-table .sc-sort { cursor: pointer; user-select: none; }
 .sc-table .sc-sort:hover { color: var(--accent); }
 #sc-kpis { margin-bottom: 4px; }
+#sc-compare-toggle.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sc-compare-range { margin-bottom: 14px; }
+.rf-card-cmp { font-size: 11px; color: var(--sub); margin-top: 4px; }
+.sc-table td .cmp-cur, .sc-table td .cmp-prev { text-align: right; }
 
 /* Collapsible cards */
 .card.collapsible > .card-header { cursor: pointer; user-select: none; }

@@ -2,6 +2,13 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.36.0', date: '2026-07-02', title: 'SamCart: compare any two date ranges',
+    changes: [
+      { title: '⇄ Compare on the SamCart page', detail: 'Pick your main date range, click “⇄ Compare”, then pick a second range to measure against — any preset or custom dates, independent of the main range. Defaults to “the period right before, same length” so it’s useful immediately.' },
+      { title: 'Per-product deltas', detail: 'Units, Revenue and Avg price each show the current value plus “vs previous” and a ▲/▼% change — right in the products table, the KPI cards, and a two-bar chart. A product that dropped to zero still shows up instead of silently disappearing.' },
+    ],
+  },
+  {
     version: '1.35.0', date: '2026-07-01', title: 'ManyChat: real growth-tool names, keyword tracking, recent optins',
     changes: [
       { title: 'Connect your ManyChat API key', detail: 'Settings → ManyChat now takes your API key (read-only). The dashboard uses it to pull your real growth-tool names — so the ManyChat tab shows “Facebook Comments #91” instead of a raw id, and the post “ManyChat ref” field on Social Report autocompletes real names as you type.' },

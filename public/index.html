@@ -595,9 +595,31 @@
               <input type="date" id="sc-end" class="date-input" aria-label="End date">
             </span>
           </div>
+          <button class="clear-btn" id="sc-compare-toggle" title="Compare with another date range">⇄ Compare</button>
           <input id="sc-search" class="search-input" placeholder="Search product…">
           <span class="pill" id="sc-synced"></span>
         </div>
+      </div>
+      <div class="fn-daterange sc-compare-range" id="sc-compare-controls" hidden>
+        <span class="fn-range-label">⇄ Compare to</span>
+        <select id="sc-cmp-preset" class="cmp-preset">
+          <option value="prior" selected>Previous period (same length)</option>
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="thisweek">This week</option>
+          <option value="lastweek">Last week</option>
+          <option value="thismonth">This month</option>
+          <option value="lastmonth">Last month</option>
+          <option value="thisyear">This year</option>
+          <option value="all">All time</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <span class="fn-range-custom" id="sc-cmp-range-custom" hidden>
+          <input type="date" id="sc-cmp-start" class="date-input" aria-label="Compare start date">
+          <span class="daterange-to">→</span>
+          <input type="date" id="sc-cmp-end" class="date-input" aria-label="Compare end date">
+        </span>
+        <span class="pill" id="sc-cmp-label"></span>
       </div>
       <div class="rf-cards" id="sc-kpis"></div>
       <div class="card"><div class="chart-card-head"><h3>Top products by revenue</h3></div><div class="chart-wrap sc-chart-wrap"><canvas id="sc-top-chart"></canvas></div></div>

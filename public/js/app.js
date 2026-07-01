@@ -2564,35 +2564,105 @@ async function loadMetaSpend() {
 }
 
 // ── SamCart products & sales ──────────────────────────────────────
-const scState = { range: 'all', start: '', end: '', sort: 'revenue', desc: true, search: '' };
+const scState = { range: 'all', start: '', end: '', sort: 'revenue', desc: true, search: '', compare: false, cmpPreset: 'prior', cmpFrom: '', cmpTo: '' };
+function scAggFor(from, to, useAll) {
+  const sc = state.scData, agg = {}; if (!sc) return agg;
+  if (useAll) { const ps = sc.productSales || {}; for (const name in ps) agg[name] = { units: ps[name].orders || 0, revenue: ps[name].revenue || 0 }; }
+  else if (from && to) { const sbd = sc.salesByDay || {}; for (const d of daysInRange(from, to)) { const e = sbd[d]; if (!e) continue; for (const name in e) { const a = agg[name] || (agg[name] = { units: 0, revenue: 0 }); a.units += e[name].orders || 0; a.revenue += e[name].revenue || 0; } } }
+  return agg;
+}
+// Resolve scState.cmpFrom/cmpTo from scState.cmpPreset. 'prior' = the period immediately
+// before the main range, same length (auto-updates whenever the main range changes).
+function scResolveCmpRange() {
+  if (scState.cmpPreset === 'custom') return;   // user is editing the compare inputs directly
+  if (scState.cmpPreset === 'prior') {
+    if (scState.start && scState.end) { const len = daysInRange(scState.start, scState.end).length; scState.cmpTo = ymd(_addDays(scState.start, -1)); scState.cmpFrom = ymd(_addDays(scState.start, -len)); }
+    else { scState.cmpFrom = ''; scState.cmpTo = ''; }
+  } else {
+    const r = funnelPresetRange(scState.cmpPreset);
+    if (r) { scState.cmpFrom = r[0] ? ymd(r[0]) : ''; scState.cmpTo = r[1] ? ymd(r[1]) : ''; }
+  }
+  if ($('sc-cmp-start')) $('sc-cmp-start').value = scState.cmpFrom;
+  if ($('sc-cmp-end'))   $('sc-cmp-end').value   = scState.cmpTo;
+}
 function samcartProductRows() {
-  const sc = state.scData; if (!sc) return { rows: [], totRev: 0, totUnits: 0 };
-  const agg = {};
+  const sc = state.scData; if (!sc) return { rows: [], totRev: 0, totUnits: 0, curCount: 0, cTotRev: 0, cTotUnits: 0, cCount: 0, cmpReady: false, compareOn: false, useAll: true };
   const useAll = scState.range === 'all' || (!scState.start && !scState.end);
-  if (useAll) { const ps = sc.productSales || {}; for (const name in ps) agg[name] = { name, units: ps[name].orders || 0, revenue: ps[name].revenue || 0 }; }
-  else { const sbd = sc.salesByDay || {}; for (const d of daysInRange(scState.start, scState.end)) { const e = sbd[d]; if (!e) continue; for (const name in e) { const a = agg[name] || (agg[name] = { name, units: 0, revenue: 0 }); a.units += e[name].orders || 0; a.revenue += e[name].revenue || 0; } } }
-  let rows = Object.values(agg).filter(r => r.units > 0 || r.revenue > 0);
-  const totRev = rows.reduce((s, r) => s + r.revenue, 0), totUnits = rows.reduce((s, r) => s + r.units, 0);
+  const agg = scAggFor(scState.start, scState.end, useAll);
+  let rows = Object.entries(agg).map(([name, v]) => ({ name, units: v.units, revenue: v.revenue })).filter(r => r.units > 0 || r.revenue > 0);
+  const totRev = rows.reduce((s, r) => s + r.revenue, 0), totUnits = rows.reduce((s, r) => s + r.units, 0), curCount = rows.length;
   rows.forEach(r => { r.avg = r.units ? r.revenue / r.units : 0; r.pct = totRev ? r.revenue / totRev * 100 : 0; });
+
+  // Comparison period — merged onto the same rows (plus any product that only sold in the
+  // compare period, so a product dropping to zero is visible instead of silently vanishing).
+  let cTotRev = 0, cTotUnits = 0, cCount = 0, cmpReady = false;
+  if (scState.compare && !useAll) {
+    const cUseAll = scState.cmpPreset === 'all';
+    if (cUseAll || (scState.cmpFrom && scState.cmpTo)) {
+      cmpReady = true;
+      const cAgg = scAggFor(scState.cmpFrom, scState.cmpTo, cUseAll);
+      const cNames = Object.keys(cAgg).filter(n => cAgg[n].units > 0 || cAgg[n].revenue > 0);
+      cCount = cNames.length;
+      for (const name of cNames) { cTotRev += cAgg[name].revenue; cTotUnits += cAgg[name].units; }
+      rows.forEach(r => { const c = cAgg[r.name]; r.cUnits = c ? c.units : 0; r.cRevenue = c ? c.revenue : 0; r.cAvg = r.cUnits ? r.cRevenue / r.cUnits : 0; });
+      for (const name of cNames) { if (!rows.find(r => r.name === name)) { const c = cAgg[name]; rows.push({ name, units: 0, revenue: 0, avg: 0, pct: 0, cUnits: c.units, cRevenue: c.revenue, cAvg: c.units ? c.revenue / c.units : 0 }); } }
+    }
+  }
+
   const q = scState.search.trim().toLowerCase(); if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
   const k = scState.sort;
   rows.sort((a, b) => { const cmp = k === 'name' ? String(a.name).localeCompare(String(b.name)) : ((a[k] || 0) - (b[k] || 0)); return scState.desc ? -cmp : cmp; });
-  return { rows, totRev, totUnits };
+  return { rows, totRev, totUnits, curCount, cTotRev, cTotUnits, cCount, cmpReady, compareOn: scState.compare, useAll };
+}
+// A two-line "current / vs previous ▲n%" cell, matching the Funnels period-comparison look.
+function scCmpCell(a, b, isMoney) {
+  const fa = isMoney ? fmtMoney(a) : fmtNum(a), fb = isMoney ? fmtMoney(b) : fmtNum(b);
+  let badge;
+  if (b > 0) { const dv = Math.round(((a - b) / b) * 1000) / 10; badge = `<span class="delta ${dv >= 0 ? 'up' : 'down'}">${dv >= 0 ? '▲' : '▼'}${Math.abs(dv)}%</span>`; }
+  else badge = a > 0 ? '<span class="delta up">new</span>' : '<span class="delta flat">—</span>';
+  return `<div class="cmp-cur">${fa}</div><div class="cmp-prev">vs ${fb} ${badge}</div>`;
 }
 function renderSamcart() {
   const sc = state.scData;
   if ($('sc-synced')) $('sc-synced').textContent = sc && sc.syncedAt ? 'Updated ' + timeAgo(sc.syncedAt) : '';
   if (!sc) { if ($('sc-tbody')) $('sc-tbody').innerHTML = '<tr class="empty-row"><td colspan="5">No data — click “Sync SamCart” on Reporting.</td></tr>'; return; }
-  const { rows, totRev, totUnits } = samcartProductRows();
-  $('sc-kpis').innerHTML = [['Products', fmtNum(rows.length)], ['Units sold', fmtNum(totUnits)], ['Gross revenue', fmtMoney(totRev)], ['Avg price', fmtMoney(totUnits ? totRev / totUnits : 0)]]
-    .map(([l, v]) => `<div class="rf-card"><div class="rf-card-label">${l}</div><div class="rf-card-val">${v}</div></div>`).join('');
-  if ($('sc-count')) $('sc-count').textContent = `${rows.length} product${rows.length === 1 ? '' : 's'}`;
+  const { rows, totRev, totUnits, curCount, cTotRev, cTotUnits, cCount, cmpReady, compareOn, useAll } = samcartProductRows();
+  const cmp = compareOn && cmpReady;
+
+  if ($('sc-cmp-label')) {
+    if (!compareOn) $('sc-cmp-label').textContent = '';
+    else if (useAll) $('sc-cmp-label').textContent = 'Pick a specific range above (not All time) to compare';
+    else if (scState.cmpPreset === 'all') $('sc-cmp-label').textContent = cmpReady ? 'vs All time' : '';
+    else if (cmpReady) $('sc-cmp-label').textContent = 'vs ' + fmtRange(new Date(scState.cmpFrom + 'T00:00:00'), new Date(scState.cmpTo + 'T00:00:00'));
+    else $('sc-cmp-label').textContent = 'Pick a comparison range';
+  }
+
+  const kCmp = (a, b, isMoney) => {
+    if (!cmp) return '';
+    const fb = isMoney ? fmtMoney(b) : fmtNum(b);
+    let badge;
+    if (b > 0) { const dv = Math.round(((a - b) / b) * 1000) / 10; badge = `<span class="delta ${dv >= 0 ? 'up' : 'down'}">${dv >= 0 ? '▲' : '▼'}${Math.abs(dv)}%</span>`; }
+    else badge = a > 0 ? '<span class="delta up">new</span>' : '<span class="delta flat">—</span>';
+    return `<div class="rf-card-cmp">vs ${fb} ${badge}</div>`;
+  };
+  const avgCur = totUnits ? totRev / totUnits : 0, avgCmp = cTotUnits ? cTotRev / cTotUnits : 0;
+  $('sc-kpis').innerHTML = [
+    ['Products', fmtNum(curCount), kCmp(curCount, cCount, false)],
+    ['Units sold', fmtNum(totUnits), kCmp(totUnits, cTotUnits, false)],
+    ['Gross revenue', fmtMoney(totRev), kCmp(totRev, cTotRev, true)],
+    ['Avg price', fmtMoney(avgCur), kCmp(avgCur, avgCmp, true)],
+  ].map(([l, v, sub]) => `<div class="rf-card"><div class="rf-card-label">${l}</div><div class="rf-card-val">${v}</div>${sub || ''}</div>`).join('');
+  if ($('sc-count')) $('sc-count').textContent = `${curCount} product${curCount === 1 ? '' : 's'}`;
+
   const top = rows.slice().sort((a, b) => b.revenue - a.revenue).slice(0, 12);
-  mkChart('sc-top-chart', { type: 'bar', data: { labels: top.map(r => faTrunc(r.name, 32)), datasets: [{ data: top.map(r => r.revenue), backgroundColor: '#2563eb', borderRadius: 4 }] },
-    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.parsed.x) } } }, scales: { x: { grid: { color: GRID }, ticks: { color: TICK, font: { size: 10 }, callback: v => v >= 1000 ? '$' + (v / 1000) + 'k' : '$' + v }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: TICK, font: { size: 10 } } } } } });
+  const chartDatasets = [{ label: 'Current', data: top.map(r => r.revenue), backgroundColor: '#2563eb', borderRadius: 4 }];
+  if (cmp) chartDatasets.push({ label: 'Compare', data: top.map(r => r.cRevenue || 0), backgroundColor: '#94a3b8', borderRadius: 4 });
+  mkChart('sc-top-chart', { type: 'bar', data: { labels: top.map(r => faTrunc(r.name, 32)), datasets: chartDatasets },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: cmp, labels: { color: TICK, font: { size: 11 } } }, tooltip: { callbacks: { label: c => ` ${cmp ? c.dataset.label + ': ' : ''}${fmtMoney(c.parsed.x)}` } } }, scales: { x: { grid: { color: GRID }, ticks: { color: TICK, font: { size: 10 }, callback: v => v >= 1000 ? '$' + (v / 1000) + 'k' : '$' + v }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: TICK, font: { size: 10 } } } } } });
+
   const arrow = k => scState.sort === k ? (scState.desc ? ' ▾' : ' ▴') : '';
   $('sc-thead').innerHTML = `<tr><th class="sc-sort" data-k="name">Product${arrow('name')}</th><th class="sc-sort sc-num" data-k="units">Units${arrow('units')}</th><th class="sc-sort sc-num" data-k="revenue">Revenue${arrow('revenue')}</th><th class="sc-sort sc-num" data-k="avg">Avg price${arrow('avg')}</th><th class="sc-sort sc-num" data-k="pct">% of rev${arrow('pct')}</th></tr>`;
-  $('sc-tbody').innerHTML = rows.length ? rows.map(r => `<tr><td class="sc-name" title="${escHtml(r.name)}">${escHtml(r.name)}</td><td class="sc-num">${fmtNum(r.units)}</td><td class="sc-num">${fmtMoney(r.revenue)}</td><td class="sc-num">${fmtMoney(r.avg)}</td><td class="sc-num">${r.pct.toFixed(1)}%</td></tr>`).join('') : '<tr class="empty-row"><td colspan="5">No sales in this range.</td></tr>';
+  $('sc-tbody').innerHTML = rows.length ? rows.map(r => `<tr><td class="sc-name" title="${escHtml(r.name)}">${escHtml(r.name)}</td><td class="sc-num">${cmp ? scCmpCell(r.units, r.cUnits, false) : fmtNum(r.units)}</td><td class="sc-num">${cmp ? scCmpCell(r.revenue, r.cRevenue, true) : fmtMoney(r.revenue)}</td><td class="sc-num">${cmp ? scCmpCell(r.avg, r.cAvg, true) : fmtMoney(r.avg)}</td><td class="sc-num">${r.pct.toFixed(1)}%</td></tr>`).join('') : '<tr class="empty-row"><td colspan="5">No sales in this range.</td></tr>';
   const ups = (sc.upsellProducts || []).slice(0, 60);
   if ($('sc-upsell-body')) $('sc-upsell-body').innerHTML = ups.length ? ups.map(u => `<tr><td class="sc-name" title="${escHtml(u.name)}">${escHtml(u.name)}</td><td class="sc-num">${fmtNum(u.orders)}</td><td class="sc-num">${fmtMoney(u.revenue)}</td><td class="sc-num">${fmtMoney(u.orders ? u.revenue / u.orders : 0)}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="4">No upsells.</td></tr>';
 }
@@ -2603,11 +2673,36 @@ if ($('sc-range-preset')) $('sc-range-preset').addEventListener('change', e => {
   if (r === undefined) { $('sc-range-custom').hidden = false; $('sc-start').focus(); return; }
   $('sc-range-custom').hidden = true;
   scState.start = r[0] ? ymd(r[0]) : ''; scState.end = r[1] ? ymd(r[1]) : '';
+  if (scState.compare && scState.cmpPreset === 'prior') scResolveCmpRange();
   renderSamcart();
 });
-['sc-start', 'sc-end'].forEach(id => { const el = $(id); if (el) el.addEventListener('change', () => { scState.range = 'custom'; const a = $('sc-start').value, b = $('sc-end').value; if (a && b) { scState.start = a <= b ? a : b; scState.end = a <= b ? b : a; } renderSamcart(); }); });
+['sc-start', 'sc-end'].forEach(id => { const el = $(id); if (el) el.addEventListener('change', () => {
+  scState.range = 'custom'; const a = $('sc-start').value, b = $('sc-end').value;
+  if (a && b) { scState.start = a <= b ? a : b; scState.end = a <= b ? b : a; }
+  if (scState.compare && scState.cmpPreset === 'prior') scResolveCmpRange();
+  renderSamcart();
+}); });
 if ($('sc-search')) $('sc-search').addEventListener('input', e => { scState.search = e.target.value; renderSamcart(); });
 if ($('sc-thead')) $('sc-thead').addEventListener('click', e => { const th = e.target.closest('.sc-sort'); if (!th) return; const k = th.dataset.k; if (scState.sort === k) scState.desc = !scState.desc; else { scState.sort = k; scState.desc = true; } renderSamcart(); });
+if ($('sc-compare-toggle')) $('sc-compare-toggle').addEventListener('click', () => {
+  scState.compare = !scState.compare;
+  $('sc-compare-toggle').classList.toggle('active', scState.compare);
+  $('sc-compare-controls').hidden = !scState.compare;
+  if (scState.compare) scResolveCmpRange();
+  renderSamcart();
+});
+if ($('sc-cmp-preset')) $('sc-cmp-preset').addEventListener('change', e => {
+  scState.cmpPreset = e.target.value;
+  $('sc-cmp-range-custom').hidden = scState.cmpPreset !== 'custom';
+  if (scState.cmpPreset === 'custom') { if ($('sc-cmp-start')) $('sc-cmp-start').focus(); } else scResolveCmpRange();
+  renderSamcart();
+});
+['sc-cmp-start', 'sc-cmp-end'].forEach(id => { const el = $(id); if (el) el.addEventListener('change', () => {
+  scState.cmpPreset = 'custom'; if ($('sc-cmp-preset')) $('sc-cmp-preset').value = 'custom'; $('sc-cmp-range-custom').hidden = false;
+  const a = $('sc-cmp-start').value, b = $('sc-cmp-end').value;
+  if (a && b) { scState.cmpFrom = a <= b ? a : b; scState.cmpTo = a <= b ? b : a; } else { scState.cmpFrom = a || ''; scState.cmpTo = b || ''; }
+  renderSamcart();
+}); });
 
 // ══ Kajabi (reporting) ════════════════════════════════════════════
 async function loadKajabi() {
