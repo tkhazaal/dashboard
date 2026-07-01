@@ -260,6 +260,7 @@ function activateTab(tab) {
   if (history.replaceState) history.replaceState(null, '', '#' + tab);
   // Charts must be built while their canvas is visible (Chart.js needs real dimensions)
   if (tab === 'reports') loadReports();
+  if (tab === 'samcart') loadSamcart();
   if (tab === 'funnels') loadFunnels();
   if (tab === 'ads') loadAds();
   if (tab === 'kajabi') loadKajabi();
@@ -282,12 +283,13 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Per-tab Refresh ───────────────────────────────────────────────
 // Each reporting tab gets its own Refresh button that reloads only that tab's data
 // (and re-renders the widgets it shows). Sidebar "Refresh All Data" still does everything.
-const REFRESHABLE = new Set(['overview', 'reports', 'funnels', 'ads', 'kajabi', 'email', 'social', 'manychat', 'alerts', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
+const REFRESHABLE = new Set(['overview', 'reports', 'samcart', 'funnels', 'ads', 'kajabi', 'email', 'social', 'manychat', 'alerts', 'pages', 'utm', 'customers', 'behaviour', 'paths']);
 async function refreshTab(tab, btn) {
   if (btn) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Refreshing…'; }
   try {
     if (tab === 'overview')      await Promise.allSettled([applyCompare(state.cmpPreset || 'mtd'), loadSamCart(), loadKajabiData(), loadMetaSpend()]);
     else if (tab === 'reports')  { await loadSamCart(); await loadReports(); }
+    else if (tab === 'samcart')  { await loadSamCart(); renderSamcart(); }
     else if (tab === 'funnels')  { await Promise.allSettled([loadSamCart(), loadPagesTable()]); renderFunnels(); }
     else if (tab === 'ads')      { await loadSamCart(); renderAds(); }
     else if (tab === 'kajabi')   await loadKajabi();
@@ -2559,6 +2561,52 @@ async function loadMetaSpend() {
   } catch {}
   if (state.scData) renderSalesAnalytics(state.scData);   // re-render Overview KPIs with real Meta spend
 }
+
+// ── SamCart products & sales ──────────────────────────────────────
+const scState = { range: 'all', start: '', end: '', sort: 'revenue', desc: true, search: '' };
+function samcartProductRows() {
+  const sc = state.scData; if (!sc) return { rows: [], totRev: 0, totUnits: 0 };
+  const agg = {};
+  const useAll = scState.range === 'all' || (!scState.start && !scState.end);
+  if (useAll) { const ps = sc.productSales || {}; for (const name in ps) agg[name] = { name, units: ps[name].orders || 0, revenue: ps[name].revenue || 0 }; }
+  else { const sbd = sc.salesByDay || {}; for (const d of daysInRange(scState.start, scState.end)) { const e = sbd[d]; if (!e) continue; for (const name in e) { const a = agg[name] || (agg[name] = { name, units: 0, revenue: 0 }); a.units += e[name].orders || 0; a.revenue += e[name].revenue || 0; } } }
+  let rows = Object.values(agg).filter(r => r.units > 0 || r.revenue > 0);
+  const totRev = rows.reduce((s, r) => s + r.revenue, 0), totUnits = rows.reduce((s, r) => s + r.units, 0);
+  rows.forEach(r => { r.avg = r.units ? r.revenue / r.units : 0; r.pct = totRev ? r.revenue / totRev * 100 : 0; });
+  const q = scState.search.trim().toLowerCase(); if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
+  const k = scState.sort;
+  rows.sort((a, b) => { const cmp = k === 'name' ? String(a.name).localeCompare(String(b.name)) : ((a[k] || 0) - (b[k] || 0)); return scState.desc ? -cmp : cmp; });
+  return { rows, totRev, totUnits };
+}
+function renderSamcart() {
+  const sc = state.scData;
+  if ($('sc-synced')) $('sc-synced').textContent = sc && sc.syncedAt ? 'Updated ' + timeAgo(sc.syncedAt) : '';
+  if (!sc) { if ($('sc-tbody')) $('sc-tbody').innerHTML = '<tr class="empty-row"><td colspan="5">No data — click “Sync SamCart” on Reporting.</td></tr>'; return; }
+  const { rows, totRev, totUnits } = samcartProductRows();
+  $('sc-kpis').innerHTML = [['Products', fmtNum(rows.length)], ['Units sold', fmtNum(totUnits)], ['Gross revenue', fmtMoney(totRev)], ['Avg price', fmtMoney(totUnits ? totRev / totUnits : 0)]]
+    .map(([l, v]) => `<div class="rf-card"><div class="rf-card-label">${l}</div><div class="rf-card-val">${v}</div></div>`).join('');
+  if ($('sc-count')) $('sc-count').textContent = `${rows.length} product${rows.length === 1 ? '' : 's'}`;
+  const top = rows.slice().sort((a, b) => b.revenue - a.revenue).slice(0, 12);
+  mkChart('sc-top-chart', { type: 'bar', data: { labels: top.map(r => faTrunc(r.name, 32)), datasets: [{ data: top.map(r => r.revenue), backgroundColor: '#2563eb', borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + fmtMoney(c.parsed.x) } } }, scales: { x: { grid: { color: GRID }, ticks: { color: TICK, font: { size: 10 }, callback: v => v >= 1000 ? '$' + (v / 1000) + 'k' : '$' + v }, beginAtZero: true }, y: { grid: { display: false }, ticks: { color: TICK, font: { size: 10 } } } } } });
+  const arrow = k => scState.sort === k ? (scState.desc ? ' ▾' : ' ▴') : '';
+  $('sc-thead').innerHTML = `<tr><th class="sc-sort" data-k="name">Product${arrow('name')}</th><th class="sc-sort sc-num" data-k="units">Units${arrow('units')}</th><th class="sc-sort sc-num" data-k="revenue">Revenue${arrow('revenue')}</th><th class="sc-sort sc-num" data-k="avg">Avg price${arrow('avg')}</th><th class="sc-sort sc-num" data-k="pct">% of rev${arrow('pct')}</th></tr>`;
+  $('sc-tbody').innerHTML = rows.length ? rows.map(r => `<tr><td class="sc-name" title="${escHtml(r.name)}">${escHtml(r.name)}</td><td class="sc-num">${fmtNum(r.units)}</td><td class="sc-num">${fmtMoney(r.revenue)}</td><td class="sc-num">${fmtMoney(r.avg)}</td><td class="sc-num">${r.pct.toFixed(1)}%</td></tr>`).join('') : '<tr class="empty-row"><td colspan="5">No sales in this range.</td></tr>';
+  const ups = (sc.upsellProducts || []).slice(0, 60);
+  if ($('sc-upsell-body')) $('sc-upsell-body').innerHTML = ups.length ? ups.map(u => `<tr><td class="sc-name" title="${escHtml(u.name)}">${escHtml(u.name)}</td><td class="sc-num">${fmtNum(u.orders)}</td><td class="sc-num">${fmtMoney(u.revenue)}</td><td class="sc-num">${fmtMoney(u.orders ? u.revenue / u.orders : 0)}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="4">No upsells.</td></tr>';
+}
+async function loadSamcart() { if (!state.scData) await loadSamCart().catch(() => {}); renderSamcart(); }
+if ($('sc-range-preset')) $('sc-range-preset').addEventListener('change', e => {
+  scState.range = e.target.value;
+  const r = funnelPresetRange(e.target.value);
+  if (r === undefined) { $('sc-range-custom').hidden = false; $('sc-start').focus(); return; }
+  $('sc-range-custom').hidden = true;
+  scState.start = r[0] ? ymd(r[0]) : ''; scState.end = r[1] ? ymd(r[1]) : '';
+  renderSamcart();
+});
+['sc-start', 'sc-end'].forEach(id => { const el = $(id); if (el) el.addEventListener('change', () => { scState.range = 'custom'; const a = $('sc-start').value, b = $('sc-end').value; if (a && b) { scState.start = a <= b ? a : b; scState.end = a <= b ? b : a; } renderSamcart(); }); });
+if ($('sc-search')) $('sc-search').addEventListener('input', e => { scState.search = e.target.value; renderSamcart(); });
+if ($('sc-thead')) $('sc-thead').addEventListener('click', e => { const th = e.target.closest('.sc-sort'); if (!th) return; const k = th.dataset.k; if (scState.sort === k) scState.desc = !scState.desc; else { scState.sort = k; scState.desc = true; } renderSamcart(); });
 
 // ══ Kajabi (reporting) ════════════════════════════════════════════
 async function loadKajabi() {

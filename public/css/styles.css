@@ -1144,6 +1144,17 @@ table.show-upsell .upsell-col { display: table-cell; }
 .soc-gtid { font: 600 11px monospace; color: var(--sub); }
 .soc-optin { color: #0ea5e9; font-weight: 700; cursor: help; }
 
+/* Numeric column headers right-align everywhere (match their right-aligned values) */
+th.soc-mh { text-align: right; }
+
+/* ── SamCart products & sales ─────────────────────────────────── */
+.sc-chart-wrap { height: 300px; }
+.sc-table .sc-num, .sc-table th.sc-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sc-table .sc-name { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-table .sc-sort { cursor: pointer; user-select: none; }
+.sc-table .sc-sort:hover { color: var(--accent); }
+#sc-kpis { margin-bottom: 4px; }
+
 /* Collapsible cards */
 .card.collapsible > .card-header { cursor: pointer; user-select: none; }
 .card.collapsible > .card-header h2 { display: inline-flex; align-items: center; gap: 8px; }
@@ -1174,6 +1185,7 @@ table.show-upsell .upsell-col { display: table-cell; }
 .fa-chart-box .chart-wrap { height: 300px; position: relative; }
 .fa-table .fa-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
 .fa-table .fa-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fa-table th:nth-child(2), .fa-table th:nth-child(3) { text-align: right; }   /* People / % headers align with values */
 .fa-table .fa-barcell { width: 32%; }
 .fa-barfill { display: block; height: 8px; border-radius: 4px; min-width: 2px; }
 .fa-empty { padding: 28px 8px; text-align: center; color: var(--sub); font: 500 13px var(--font-body); }
@@ -1199,6 +1211,7 @@ table.show-upsell .upsell-col { display: table-cell; }
 .rf-date-cell { white-space: nowrap; color: var(--sub); font-size: 12.5px; }
 .rf-cust { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rf-amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--danger); white-space: nowrap; }
+.rf-table th:nth-child(5) { text-align: right; }   /* Amount header aligns with right-aligned amounts */
 .rf-src { display: inline-block; font: 600 11px var(--font-body); padding: 2px 8px; border-radius: 6px; }
 .rf-src-samcart { background: rgba(139,92,246,0.16); color: #7c3aed; }
 .rf-src-kajabi { background: rgba(37,99,235,0.14); color: #2563eb; }

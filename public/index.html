@@ -47,6 +47,10 @@
         <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Reporting
       </a>
+      <a href="#" class="nav-item" data-tab="samcart">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        SamCart
+      </a>
       <a href="#" class="nav-item" data-tab="funnels">
         <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
         Funnels
@@ -565,6 +569,46 @@
       </div>
       <p class="chart-insight" style="padding:0 2px;">Spend is calculated from each campaign's budget: <strong>Daily</strong> = budget × days active in range; <strong>Total</strong> = budget prorated across the campaign's run. Revenue/orders come from the linked SamCart product. ROAS = Revenue ÷ Spend.</p>
       <datalist id="ad-products"></datalist>
+    </section>
+
+    <!-- ── SAMCART (products & sales) ───────── -->
+    <section class="tab" id="tab-samcart">
+      <div class="page-header">
+        <div><h1>SamCart</h1><p class="subtitle">Every product and its sales — units, revenue &amp; share for the selected range</p></div>
+        <div class="header-pills fn-actions">
+          <div class="fn-daterange">
+            <span class="fn-range-label">📅 Range</span>
+            <select id="sc-range-preset" class="cmp-preset">
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="thisweek">This week</option>
+              <option value="lastweek">Last week</option>
+              <option value="thismonth">This month</option>
+              <option value="lastmonth">Last month</option>
+              <option value="thisyear">This year</option>
+              <option value="all" selected>All time</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <span class="fn-range-custom" id="sc-range-custom" hidden>
+              <input type="date" id="sc-start" class="date-input" aria-label="Start date">
+              <span class="daterange-to">→</span>
+              <input type="date" id="sc-end" class="date-input" aria-label="End date">
+            </span>
+          </div>
+          <input id="sc-search" class="search-input" placeholder="Search product…">
+          <span class="pill" id="sc-synced"></span>
+        </div>
+      </div>
+      <div class="rf-cards" id="sc-kpis"></div>
+      <div class="card"><div class="chart-card-head"><h3>Top products by revenue</h3></div><div class="chart-wrap sc-chart-wrap"><canvas id="sc-top-chart"></canvas></div></div>
+      <div class="card">
+        <div class="card-header"><h2>Products</h2><span class="th-hint" id="sc-count"></span></div>
+        <div class="table-wrap"><table class="data-table sc-table"><thead id="sc-thead"></thead><tbody id="sc-tbody"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Upsell products <span class="th-hint">all-time</span></h2></div>
+        <div class="table-wrap"><table class="data-table sc-table"><thead><tr><th>Upsell</th><th class="sc-num">Units</th><th class="sc-num">Revenue</th><th class="sc-num">Avg price</th></tr></thead><tbody id="sc-upsell-body"></tbody></table></div>
+      </div>
     </section>
 
     <!-- ── KAJABI ──────────────────────────── -->
