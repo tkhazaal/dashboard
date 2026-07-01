@@ -27,7 +27,9 @@ router.post('/hook/:token', async (req, res) => {
     const b = (req.body && typeof req.body === 'object') ? req.body : {};
     const gt = (b.last_growth_tool && typeof b.last_growth_tool === 'object') ? b.last_growth_tool : {};
     const cf = (b.custom_fields && typeof b.custom_fields === 'object') ? b.custom_fields : {};
-    const event = String(b.event || b.type || 'optin').toLowerCase() === 'cta_click' ? 'cta_click' : 'optin';
+    // event can come from the body (?) or — simplest for ManyChat's fragile Body editor — the URL itself,
+    // e.g. …/hook/<token>?event=cta_click, so two External Requests with an identical body still differ.
+    const event = String(req.query.event || b.event || b.type || 'optin').toLowerCase() === 'cta_click' ? 'cta_click' : 'optin';
     const row = {
       ref: str(b.ref || b.cta || b.tag, 200),
       post_url: str(b.post_url || b.post_link || b.link || b.url || b.permalink, 600),
