@@ -974,14 +974,17 @@
             <input type="text" id="utm-term" placeholder="optional"></label>
           <label class="utm-field"><span>Content <small>(utm_content — optional, ad/variant)</small></span>
             <input type="text" id="utm-content" placeholder="optional"></label>
-          <label class="utm-field utm-full"><span>Your tagged URL</span>
+          <label class="utm-field utm-full"><span>Your tagged URL <small>(use on <strong>your own</strong> tracked pages)</small></span>
             <textarea id="utm-result" rows="2" readonly placeholder="Fill in the fields above…"></textarea></label>
+          <label class="utm-field utm-full"><span>Tracked redirect link <small>(use for <strong>external</strong> pages — Skool, Calendly, etc. — so clicks still show below)</small></span>
+            <textarea id="utm-tracked" rows="2" readonly placeholder="Appears when you enter a destination…"></textarea></label>
           <div class="utm-builder-actions">
+            <button class="clear-btn" id="utm-tracked-copy">Copy tracked link</button>
             <button class="clear-btn" id="utm-clear">Clear</button>
             <span class="save-msg" id="utm-copied"></span>
           </div>
         </div>
-        <p class="chart-insight" style="padding:8px 2px 0;">Tip: keep values lowercase and consistent (e.g. always <code>facebook</code>, not <code>FB</code>/<code>Facebook</code>) so the tracking below groups them cleanly. Tagged links land on your tracked pages and show up in the report.</p>
+        <p class="chart-insight" style="padding:8px 2px 0;">Keep values lowercase and consistent (always <code>facebook</code>, not <code>FB</code>) so tracking groups them cleanly. For your own tracked pages use the <strong>tagged URL</strong>; for pages you can’t install tracking on (Skool, Calendly, etc.), use the <strong>tracked redirect link</strong> — it logs the click on your domain, then forwards to the destination.</p>
       </div>
 
       <!-- UTM Tracking -->

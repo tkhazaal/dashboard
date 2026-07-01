@@ -2909,14 +2909,19 @@ function buildUtm() {
   let url = base;
   if (base && parts.length) url += (base.includes('?') ? '&' : '?') + parts.join('&');
   $('utm-result').value = base ? url : '';
+  const tr = $('utm-tracked'); if (tr) tr.value = (base && url) ? `${location.origin}/go?to=${encodeURIComponent(url)}` : '';
 }
 ['utm-base', 'utm-source', 'utm-medium', 'utm-campaign', 'utm-term', 'utm-content'].forEach(id => $(id).addEventListener('input', buildUtm));
 $('utm-copy').addEventListener('click', () => {
   const v = $('utm-result').value; if (!v) return;
   navigator.clipboard.writeText(v).then(() => { $('utm-copied').textContent = '✓ Copied!'; setTimeout(() => $('utm-copied').textContent = '', 2000); });
 });
+if ($('utm-tracked-copy')) $('utm-tracked-copy').addEventListener('click', () => {
+  const v = $('utm-tracked').value; if (!v) return;
+  navigator.clipboard.writeText(v).then(() => { $('utm-copied').textContent = '✓ Tracked link copied!'; setTimeout(() => $('utm-copied').textContent = '', 2000); });
+});
 $('utm-clear').addEventListener('click', () => {
-  ['utm-base', 'utm-source', 'utm-medium', 'utm-campaign', 'utm-term', 'utm-content', 'utm-result'].forEach(id => $(id).value = '');
+  ['utm-base', 'utm-source', 'utm-medium', 'utm-campaign', 'utm-term', 'utm-content', 'utm-result', 'utm-tracked'].forEach(id => $(id).value = '');
 });
 
 function utmRangeParams() {

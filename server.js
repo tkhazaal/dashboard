@@ -68,6 +68,7 @@ app.use('/api/forms',      forms.router);
 // express.text catches text/plain etc.; body-parser skips if already parsed).
 app.use('/hook',           express.text({ type: () => true, limit: '2mb' }), forms.hook);
 app.use('/api/settings',   require('./routes/settings'));
+app.use('/go',             require('./routes/go'));   // click-tracking redirect for outbound (Skool, etc.)
 
 // Dashboard UI
 app.use(express.static(path.join(__dirname, 'public')));

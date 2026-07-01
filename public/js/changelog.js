@@ -2,6 +2,12 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.34.0', date: '2026-07-01', title: 'Track clicks to external pages (Skool, etc.)',
+    changes: [
+      { title: 'Tracked redirect links', detail: 'UTM campaigns only showed up when traffic landed on a page with your tracking snippet — so links to third-party sites (Skool, Calendly) were invisible. The UTM Link Builder now also gives a “tracked redirect link”: it routes the click through your domain (logging the UTM), then forwards to the destination. Use it for any page you can’t install tracking on, and those campaigns now appear in UTM Traffic.' },
+    ],
+  },
+  {
     version: '1.33.0', date: '2026-07-01', title: 'SamCart products page + column alignment fixes',
     changes: [
       { title: 'New SamCart page', detail: 'A dedicated SamCart tab listing every product with its units, revenue, average price and share of revenue — with a date-range filter (today → all time), search, sortable columns, a top-products chart, and an upsell-products table. Just like SamCart Analytics, from your synced order data.' },
