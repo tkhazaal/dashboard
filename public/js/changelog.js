@@ -2,6 +2,14 @@
 // For each release, add a new entry at the TOP — APP_VERSION tracks the latest automatically.
 const CHANGELOG = [
   {
+    version: '1.35.0', date: '2026-07-01', title: 'ManyChat: real growth-tool names, keyword tracking, recent optins',
+    changes: [
+      { title: 'Connect your ManyChat API key', detail: 'Settings → ManyChat now takes your API key (read-only). The dashboard uses it to pull your real growth-tool names — so the ManyChat tab shows “Facebook Comments #91” instead of a raw id, and the post “ManyChat ref” field on Social Report autocompletes real names as you type.' },
+      { title: 'Keyword tracking', detail: 'A new “By keyword” table on the ManyChat tab, plus a keyword column in Recent optins. ManyChat doesn’t expose the matched keyword after the fact, so send it explicitly — set a Custom Field at the point your flow matches the keyword, then include it in the External Request body (instructions shown on the page).' },
+      { title: 'Recent optins feed', detail: 'A live feed of the latest optins/CTA clicks — name, growth tool, channel, keyword and when — plus a browsable list of every growth tool on your account.' },
+    ],
+  },
+  {
     version: '1.34.0', date: '2026-07-01', title: 'Track clicks to external pages (Skool, etc.)',
     changes: [
       { title: 'Tracked redirect links', detail: 'UTM campaigns only showed up when traffic landed on a page with your tracking snippet — so links to third-party sites (Skool, Calendly) were invisible. The UTM Link Builder now also gives a “tracked redirect link”: it routes the click through your domain (logging the UTM), then forwards to the destination. Use it for any page you can’t install tracking on, and those campaigns now appear in UTM Traffic.' },

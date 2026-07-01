@@ -1142,7 +1142,12 @@ table.show-upsell .upsell-col { display: table-cell; }
 .mc-subhead { font: 700 12.5px var(--font-body); color: var(--text); margin: 16px 2px 8px; }
 .mc-subhead .th-hint { font-weight: 500; }
 .soc-gtid { font: 600 11px monospace; color: var(--sub); }
+.soc-gttype { font: 500 11px var(--font-body); color: var(--sub); white-space: nowrap; }
 .soc-optin { color: #0ea5e9; font-weight: 700; cursor: help; }
+.mc-details { margin-top: 18px; }
+.mc-details summary { cursor: pointer; font: 700 12.5px var(--font-body); color: var(--text); padding: 4px 2px; }
+.mc-details summary .th-hint { font-weight: 500; margin-left: 4px; }
+.mc-details .mc-scroll { max-height: 340px; overflow-y: auto; margin-top: 8px; }
 
 /* Numeric column headers right-align everywhere (match their right-aligned values) */
 th.soc-mh { text-align: right; }

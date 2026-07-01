@@ -1054,6 +1054,7 @@ async function loadSettings() {
   if ($('metaAcctHint'))   $('metaAcctHint').textContent   = s.meta_ad_account_id ? `Account ${s.meta_ad_account_id}` : 'Not set';
   if ($('metaTokenHint'))  $('metaTokenHint').textContent  = s.meta_ads_token_masked ? `Connected ✓ · token ${s.meta_ads_token_masked}` : 'Not connected';
   if ($('metaSecretHint')) $('metaSecretHint').textContent = s.meta_app_secret_masked ? `Set ✓ · ${s.meta_app_secret_masked}` : 'Optional — not set';
+  if ($('manychatKeyHint')) $('manychatKeyHint').textContent = s.manychat_api_key_masked ? `Connected ✓ · key ${s.manychat_api_key_masked}` : 'Not connected — growth tools show raw ids until set';
   state.monthlyGoal = parseFloat(s.monthly_goal) || 0;
   if (s.funnels_config) { try { state.funnelsConfig = JSON.parse(s.funnels_config); } catch {} }
   if (s.ad_campaigns)   { try { state.adCampaigns   = JSON.parse(s.ad_campaigns);   } catch {} }
@@ -3395,9 +3396,19 @@ async function loadSocial() {
 }
 // ManyChat optins — pull aggregates + the ref→optins map, render the panel, re-render posts.
 async function loadManychat() {
-  try { state.manychatData = await api('/api/manychat/data'); } catch { state.manychatData = null; }
+  const [d, gt] = await Promise.allSettled([api('/api/manychat/data'), api('/api/manychat/growth-tools')]);
+  state.manychatData = d.status === 'fulfilled' ? d.value : null;
+  state.mcGrowthTools = (gt.status === 'fulfilled' && gt.value && gt.value.tools) || [];
+  renderMcDatalist();
   renderManychatPanel();
-  if (state.socialData) renderSocial();   // so per-post optin counts paint
+  if (state.socialData) renderSocial();   // so per-post optin counts + the ref datalist paint
+}
+// Populate the <datalist> so a post's "ManyChat ref" field autocompletes real growth-tool names.
+function renderMcDatalist() {
+  const dl = $('mc-gt-datalist'); if (!dl) return;
+  const seen = new Set();
+  dl.innerHTML = (state.mcGrowthTools || []).filter(t => t.name && !seen.has(t.name) && seen.add(t.name))
+    .map(t => `<option value="${escHtml(t.name)}">${escHtml(t.name)} — ${escHtml(t.type || '')}</option>`).join('');
 }
 function mcRefMap() { return (state.manychatData && state.manychatData.refMap) || {}; }
 // Normalize a FB/IG post/reel URL to a stable key so the ManyChat post link matches the scraped post.
@@ -3444,17 +3455,37 @@ function renderManychatPanel() {
     return;
   }
   const t = d.totals || {};
-  const byRef = (d.byRef || []).slice(0, 12), byChannel = d.byChannel || [], byGT = (d.byGrowthTool || []).slice(0, 30);
+  const byRef = (d.byRef || []).slice(0, 12), byChannel = d.byChannel || [], byGT = (d.byGrowthTool || []).slice(0, 30), byKw = (d.byKeyword || []).slice(0, 20);
   const gtTable = byGT.length ? `
-    <div class="mc-subhead">By growth tool <span class="th-hint">to attribute these to a post, put the growth tool's id or name in that post's “ManyChat ref” field</span></div>
-    <div class="table-wrap"><table class="data-table mc-table"><thead><tr><th>Growth tool</th><th>id</th><th class="soc-mh">Optins</th><th class="soc-mh">CTA</th><th class="soc-mh">Last</th></tr></thead>
-      <tbody>${byGT.map(g => `<tr><td>${escHtml(g.name || '(unnamed)')}</td><td class="soc-gtid">${escHtml(g.growth_tool_id || '')}</td><td class="soc-metric">${fmtNum(g.optins)}</td><td class="soc-metric">${fmtNum(g.cta_clicks)}</td><td class="soc-nowrap">${g.lastAt ? escHtml(timeAgo(g.lastAt)) : '—'}</td></tr>`).join('')}</tbody>
+    <div class="mc-subhead">By growth tool <span class="th-hint">to attribute these to a post, put the growth tool's name (or id) in that post's “ManyChat ref” field — start typing for suggestions</span></div>
+    <div class="table-wrap"><table class="data-table mc-table"><thead><tr><th>Growth tool</th><th>Type</th><th>id</th><th class="soc-mh">Optins</th><th class="soc-mh">CTA</th><th class="soc-mh">Last</th></tr></thead>
+      <tbody>${byGT.map(g => `<tr><td>${escHtml(g.name || '(unnamed)')}</td><td class="soc-gttype">${escHtml(g.type || '—')}</td><td class="soc-gtid">${escHtml(g.growth_tool_id || '')}</td><td class="soc-metric">${fmtNum(g.optins)}</td><td class="soc-metric">${fmtNum(g.cta_clicks)}</td><td class="soc-nowrap">${g.lastAt ? escHtml(timeAgo(g.lastAt)) : '—'}</td></tr>`).join('')}</tbody>
     </table></div>` : '';
+  const kwTable = byKw.length ? `
+    <div class="mc-subhead">By keyword</div>
+    <div class="table-wrap"><table class="data-table mc-table"><thead><tr><th>Keyword</th><th class="soc-mh">Optins</th><th class="soc-mh">CTA</th><th class="soc-mh">Last</th></tr></thead>
+      <tbody>${byKw.map(k => `<tr><td>${escHtml(k.keyword)}</td><td class="soc-metric">${fmtNum(k.optins)}</td><td class="soc-metric">${fmtNum(k.cta_clicks)}</td><td class="soc-nowrap">${k.lastAt ? escHtml(timeAgo(k.lastAt)) : '—'}</td></tr>`).join('')}</tbody>
+    </table></div>` : `
+    <div class="mc-subhead">By keyword</div>
+    <div class="soc-empty">No keyword data yet — ManyChat doesn't expose the matched keyword after the fact, so send it explicitly: in the flow, add a “Set Custom Field” at the point the keyword matches (e.g. <code>matched_keyword = "quiz"</code>), then include <code>"keyword": "{{cf matched_keyword}}"</code> in the External Request body.</div>`;
   const refTable = byRef.length ? `
     <div class="mc-subhead">By ref / CTA</div>
     <div class="table-wrap"><table class="data-table mc-table"><thead><tr><th>ref</th><th class="soc-mh">Optins</th><th class="soc-mh">CTA</th><th class="soc-mh">Last</th></tr></thead>
       <tbody>${byRef.map(r => `<tr><td>${escHtml(r.ref)}</td><td class="soc-metric">${fmtNum(r.optins)}</td><td class="soc-metric">${fmtNum(r.cta_clicks)}</td><td class="soc-nowrap">${r.lastAt ? escHtml(timeAgo(r.lastAt)) : '—'}</td></tr>`).join('')}</tbody>
     </table></div>` : '';
+  const recent = d.recent || [];
+  const recentTable = `
+    <div class="mc-subhead">Recent optins</div>
+    <div class="table-wrap"><table class="data-table mc-table"><thead><tr><th>Name</th><th>Growth tool</th><th>Channel</th><th>Keyword</th><th>Event</th><th>When</th></tr></thead>
+      <tbody>${recent.length ? recent.map(r => `<tr><td>${escHtml(r.name || '—')}</td><td>${escHtml(r.growth_tool_name || '—')}</td><td>${escHtml(r.channel || '—')}</td><td>${escHtml(r.keyword || '—')}</td><td>${r.event === 'cta_click' ? 'CTA click' : 'Optin'}</td><td class="soc-nowrap">${escHtml(timeAgo(r.created_at))}</td></tr>`).join('') : '<tr class="empty-row"><td colspan="6">No optins yet.</td></tr>'}</tbody>
+    </table></div>`;
+  const allTools = state.mcGrowthTools || [];
+  const allToolsBlock = allTools.length ? `
+    <details class="mc-details"><summary>All growth tools from ManyChat (${allTools.length}) <span class="th-hint">browse every comment/story trigger you've set up, with its id</span></summary>
+      <div class="table-wrap mc-scroll"><table class="data-table mc-table"><thead><tr><th>Name</th><th>Type</th><th>id</th></tr></thead>
+        <tbody>${allTools.map(x => `<tr><td>${escHtml(x.name || '(unnamed)')}</td><td class="soc-gttype">${escHtml(x.type || '')}</td><td class="soc-gtid">${escHtml(x.id)}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </details>` : '';
   el.innerHTML = `
     <div class="mc-head"><h2>ManyChat optins</h2><button class="clear-btn" id="mc-refresh">↻ Refresh</button></div>
     <div class="rf-cards mc-kpis">
@@ -3463,7 +3494,8 @@ function renderManychatPanel() {
       ${byChannel.map(c => `<div class="rf-card"><div class="rf-card-label">${escHtml(c.channel)}</div><div class="rf-card-val">${fmtNum(c.optins)}</div></div>`).join('')}
     </div>
     <div class="mc-webhook"><span>Webhook URL for ManyChat (External Request → POST):</span><code id="mc-url">${escHtml(url)}</code><button class="clear-btn sm" id="mc-copy">Copy</button></div>
-    ${gtTable || refTable ? (gtTable + refTable) : '<div class="soc-empty">No optins yet — set up the ManyChat webhook above.</div>'}`;
+    ${gtTable || refTable || t.total ? (gtTable + kwTable + refTable + recentTable) : '<div class="soc-empty">No optins yet — set up the ManyChat webhook above.</div>'}
+    ${allToolsBlock}`;
 }
 if ($('manychat-panel')) $('manychat-panel').addEventListener('click', e => {
   if (e.target.closest('#mc-refresh')) loadManychat();
@@ -3554,7 +3586,7 @@ function renderSocial() {
   $('social-table-wrap').hidden = socState.view !== 'table';
   $('social-calendar').hidden = socState.view !== 'calendar';
 }
-const socEdit = (id, f, val, ph) => `<input class="soc-edit" data-post="${escHtml(id)}" data-field="${f}" value="${escHtml(val || '')}" placeholder="${escHtml(ph || '')}">`;
+const socEdit = (id, f, val, ph, extra) => `<input class="soc-edit" data-post="${escHtml(id)}" data-field="${f}" value="${escHtml(val || '')}" placeholder="${escHtml(ph || '')}"${extra || ''}>`;
 function renderSocialCards(rows) {
   const shown = rows.slice(0, socState.page * SOC_PAGE);
   $('social-feed').innerHTML = shown.length ? shown.map(p => {
@@ -3575,7 +3607,7 @@ function renderSocialCards(rows) {
           <label class="soc-f-wide"><span>Hook / Topic</span>${socEdit(p.post_id, 'hook_topic', p.hook_topic, 'add a hook…')}</label>
           <label><span>Offer</span>${socEdit(p.post_id, 'offer', p.offer, '—')}</label>
           <label class="soc-f-num"><span>Post #</span>${socEdit(p.post_id, 'post_num', p.post_num, '#')}</label>
-          <label><span>ManyChat ref</span>${socEdit(p.post_id, 'manychat_ref', p.manychat_ref, 'GT id / name / tag…')}</label>
+          <label><span>ManyChat ref</span>${socEdit(p.post_id, 'manychat_ref', p.manychat_ref, 'start typing a growth tool…', ' list="mc-gt-datalist"')}</label>
           <label class="soc-f-wide"><span>Notes</span>${socEdit(p.post_id, 'notes', p.notes, 'notes…')}</label>
         </div>
       </div>

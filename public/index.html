@@ -882,6 +882,7 @@
         <div><h1>ManyChat</h1><p class="subtitle">Optins &amp; CTA clicks collected via webhook — mapped to posts by growth tool or post link</p></div>
       </div>
       <div class="card" id="manychat-panel"><div class="soc-empty">Loading ManyChat…</div></div>
+      <datalist id="mc-gt-datalist"></datalist>
     </section>
 
     <!-- ── PAGE ANALYTICS ──────────────────── -->
@@ -1432,6 +1433,13 @@
               <span>Meta App Secret <small>(optional — adds appsecret_proof security)</small></span>
               <input type="password" name="meta_app_secret" placeholder="Optional" autocomplete="off">
               <small id="metaSecretHint" class="field-hint"></small>
+            </label>
+
+            <div class="settings-divider">ManyChat</div>
+            <label>
+              <span>ManyChat API Key <small>(ManyChat → Settings → API — used read-only, to fetch growth tool names)</small></span>
+              <input type="password" name="manychat_api_key" placeholder="Paste API key to update" autocomplete="off">
+              <small id="manychatKeyHint" class="field-hint"></small>
             </label>
 
             <button type="submit" class="btn-primary">Save Settings</button>

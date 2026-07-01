@@ -8,6 +8,7 @@ create table if not exists manychat_optins (
   post_url          text,                   -- the FB/IG post or reel link → auto-matched to a post
   growth_tool_id    text,                   -- ManyChat last_growth_tool.id  (each comment-trigger = one post)
   growth_tool_name  text,                   -- ManyChat last_growth_tool.name
+  keyword           text,                   -- the comment/reply keyword that matched (set via a Custom Field in the flow)
   event             text default 'optin',   -- 'optin' | 'cta_click'
   subscriber_id text,                       -- ManyChat user id (for de-dup / counting people)
   name          text,
@@ -20,6 +21,7 @@ alter table manychat_optins add column if not exists ref              text;
 alter table manychat_optins add column if not exists post_url         text;
 alter table manychat_optins add column if not exists growth_tool_id   text;
 alter table manychat_optins add column if not exists growth_tool_name text;
+alter table manychat_optins add column if not exists keyword          text;
 alter table manychat_optins add column if not exists event            text default 'optin';
 alter table manychat_optins add column if not exists subscriber_id    text;
 alter table manychat_optins add column if not exists name             text;
